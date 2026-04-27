@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Get your Strava archive — Power Predict</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="stylesheet" href="../dist/app.min.css">
+  <style>
+    main { max-width: 720px; }
+    main h2 { margin-top: 2rem; }
+    main h3 { margin-top: 1.5rem; font-size: 1.05rem; }
+    main p, main li { line-height: 1.6; }
+    main ol li, main ul li { margin-bottom: 0.4rem; }
+    main code { background: var(--card); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+    main table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.9rem; }
+    main th, main td { padding: 0.4rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    main th { color: var(--muted); font-weight: 500; }
+    .back-link { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+    .back-link:hover { color: var(--fg); }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <h1>Power Predict</h1>
+    <p class="tagline"><a href="../" class="back-link">&larr; Back to home</a></p>
+  </header>
+
+  <main>
+    <h1>Get your Strava archive</h1>
+
+    <p>Power Predict needs your full ride history to build an accurate power-duration curve. The fastest way to import it &mdash; and the only one that doesn't burn through Strava's tight API rate limits &mdash; is to request your account archive directly from Strava and drop the zip into Power Predict.</p>
+
+    <p>The archive contains every ride you've ever uploaded, including the raw power streams. <strong>Strava prepares it offline and emails you when it's ready</strong> &mdash; usually within a few hours, sometimes faster, sometimes the next day.</p>
+
+    <h2>Step 1 &mdash; Request the archive</h2>
+    <ol>
+      <li>Go to <a href="https://www.strava.com/account" target="_blank" rel="noopener">Strava &rarr; Settings &rarr; My Account</a>.</li>
+      <li>Scroll to the bottom and click <strong>Download or Delete Your Account</strong>.</li>
+      <li>Click <strong>Get Started</strong> under "Download Request (optional)".</li>
+      <li>Click <strong>Request Your Archive</strong>.</li>
+    </ol>
+
+    <p>You will <strong>not</strong> lose your account. The "Download or Delete" page bundles both options, but the archive request is independent of deletion.</p>
+
+    <h2>Step 2 &mdash; Wait for the email</h2>
+
+    <p>Strava will email a link titled <strong>"Your Strava Data Export"</strong> to the address on your account, typically within 1&ndash;6 hours. The link expires after about 7 days, so download promptly.</p>
+
+    <h2>Step 3 &mdash; Download and drop in</h2>
+
+    <p>You'll get a file like <code>strava_export_&lt;id&gt;.zip</code> (often hundreds of MB if you have a lot of rides). Save it somewhere you can find it.</p>
+
+    <p>Open Power Predict and drag the zip onto the upload area. Everything happens in your browser:</p>
+    <ul>
+      <li>The zip is unpacked locally</li>
+      <li>Each <code>activities/&lt;id&gt;.fit.gz</code> file is parsed for its power stream</li>
+      <li>Power-duration curves are computed and displayed</li>
+    </ul>
+
+    <p><strong>Nothing is uploaded to a server.</strong> Raw streams stay on your machine. Only the derived numbers (best 5-min power, etc.) are stored if you choose to sync your account later.</p>
+
+    <h2>What's in the archive</h2>
+
+    <p>For reference, the zip contains:</p>
+    <table>
+      <thead><tr><th>Path</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr><td><code>activities.csv</code></td><td>Metadata for every activity (date, name, distance, duration, etc.)</td></tr>
+        <tr><td><code>activities/&lt;id&gt;.fit.gz</code></td><td>Full FIT file per activity &mdash; power, HR, cadence, GPS at 1Hz</td></tr>
+        <tr><td><code>activities/&lt;id&gt;.tcx.gz</code> / <code>.gpx.gz</code></td><td>Older or non-FIT activities</td></tr>
+        <tr><td><code>media/</code></td><td>Photos attached to activities (Power Predict ignores these)</td></tr>
+        <tr><td><code>profile.csv</code>, <code>bikes.csv</code>, etc.</td><td>Account profile info (also ignored)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Troubleshooting</h2>
+
+    <h3>"My archive is huge."</h3>
+    <p>That's normal &mdash; mine is over a gigabyte. Power Predict streams it entry-by-entry; you don't need to extract it manually.</p>
+
+    <h3>"Some activities don't have power."</h3>
+    <p>Power Predict only uses activities with a power meter recording. Older rides, rides on a different bike, and rides recorded by phone-only typically have no power stream. They're skipped automatically.</p>
+
+    <h3>"My archive email never came."</h3>
+    <p>Check spam. If it's been more than 24 hours, request again from the same page &mdash; old requests don't block new ones.</p>
+
+    <h3>"I'm worried about uploading my data."</h3>
+    <p>Power Predict parses the archive entirely in your browser using JavaScript. The zip never leaves your machine during onboarding. You can verify this by opening DevTools &rarr; Network while you drop the file: there will be no upload requests.</p>
+
+    <h2>Updating later</h2>
+
+    <p>You only need to do the archive dance once. After the initial import, you can connect Strava via OAuth and Power Predict will pull individual new rides as you complete them &mdash; no more archive requests required.</p>
+  </main>
+
+  <footer>
+    <p><a href="../" class="back-link">&larr; Back to home</a></p>
+  </footer>
+</body>
+</html>

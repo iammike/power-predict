@@ -125,18 +125,54 @@ async function handleArchive(file) {
   renderCurves(all);
 }
 
-function setProgressPhase(phase, { bytesRead, totalBytes, activitiesSeen, parsedCount, withPower, skipped }) {
-  const pct = totalBytes ? Math.min(100, (bytesRead / totalBytes) * 100) : 0;
-  const readPart = `${phase}: ${formatBytes(bytesRead)} / ${formatBytes(totalBytes)} (${pct.toFixed(0)}%)`;
-  const parsePart = activitiesSeen
-    ? ` · ${parsedCount}/${activitiesSeen} parsed${withPower ? `, ${withPower} with power` : ''}${skipped ? `, ${skipped} cached` : ''}`
-    : '';
+// Progress UI is updated at most once per animation frame and writes
+// directly to a cached text node + bar-fill element instead of
+// rebuilding innerHTML — calling this on every fflate chunk would
+// otherwise paint-storm the page into unresponsiveness.
+let progressTextNode = null;
+let progressBarFill = null;
+let progressFrameQueued = false;
+let progressLatest = null;
+
+function ensureProgressDom() {
   if (!progressEl) return;
-  progressEl.hidden = false;
+  if (progressTextNode && progressBarFill && progressEl.contains(progressTextNode)) return;
   progressEl.innerHTML = `
-    <span class="progress__text">${readPart}${parsePart}</span>
-    <span class="progress__bar"><span class="progress__bar-fill" style="width: ${pct}%"></span></span>
+    <span class="progress__text"></span>
+    <span class="progress__bar"><span class="progress__bar-fill"></span></span>
   `;
+  progressTextNode = progressEl.querySelector('.progress__text');
+  progressBarFill = progressEl.querySelector('.progress__bar-fill');
+}
+
+function setProgressPhase(phase, payload) {
+  if (!progressEl) return;
+  ensureProgressDom();
+  progressEl.hidden = false;
+  progressLatest = { phase, payload };
+  if (progressFrameQueued) return;
+  progressFrameQueued = true;
+  requestAnimationFrame(() => {
+    progressFrameQueued = false;
+    if (!progressLatest) return;
+    const { phase, payload: p } = progressLatest;
+    const pct = p.totalBytes ? Math.min(100, (p.bytesRead / p.totalBytes) * 100) : 0;
+    const readPart = `${phase}: ${formatBytes(p.bytesRead)} / ${formatBytes(p.totalBytes)} (${pct.toFixed(0)}%)`;
+    const parsePart = p.activitiesSeen
+      ? ` · ${p.parsedCount}/${p.activitiesSeen} parsed${p.withPower ? `, ${p.withPower} with power` : ''}${p.skipped ? `, ${p.skipped} cached` : ''}`
+      : '';
+    progressTextNode.textContent = `${readPart}${parsePart}`;
+    progressBarFill.style.width = `${pct}%`;
+  });
+}
+
+function setProgress(msg) {
+  if (!progressEl) return;
+  // Reset to plain-text mode so subsequent setProgressPhase rebuilds.
+  progressTextNode = null;
+  progressBarFill = null;
+  progressEl.textContent = msg;
+  progressEl.hidden = false;
 }
 
 function formatBytes(bytes) {
@@ -276,10 +312,4 @@ async function handleClearCache() {
   resultsEl.hidden = true;
   resultsEl.innerHTML = '';
   setProgress(`Cache cleared. ${await activityCount()} activities remaining.`);
-}
-
-function setProgress(msg) {
-  if (!progressEl) return;
-  progressEl.textContent = msg;
-  progressEl.hidden = false;
 }

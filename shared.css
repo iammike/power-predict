@@ -83,6 +83,17 @@ input[type="text"] {
 .mmp-table thead th { color: var(--muted); font-weight: 500; }
 .hint { color: var(--muted); font-size: 0.85rem; }
 
+.link-button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-button:hover { filter: brightness(1.15); }
+
 footer {
   border-top: 1px solid var(--border);
   padding: 1rem 1.5rem;

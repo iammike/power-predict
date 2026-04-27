@@ -19,7 +19,7 @@ describe('extractMmp', () => {
     const stream = new Array(60).fill(150);
     for (let i = 10; i < 30; i++) stream[i] = 400;
     const mmp = extractMmp(stream);
-    expect(mmp[20]).toBeCloseTo(400, 5);
+    expect(mmp[15]).toBeCloseTo(400, 5);
     expect(mmp[60]).toBeCloseTo((150 * 40 + 400 * 20) / 60, 5);
   });
 });

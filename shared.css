@@ -63,6 +63,26 @@ input[type="text"] {
   font: inherit;
 }
 
+.progress {
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.mmp-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+.mmp-table th, .mmp-table td {
+  padding: 0.4rem 0.6rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+.mmp-table th:first-child, .mmp-table td:first-child { text-align: left; }
+.mmp-table thead th { color: var(--muted); font-weight: 500; }
+.hint { color: var(--muted); font-size: 0.85rem; }
+
 footer {
   border-top: 1px solid var(--border);
   padding: 1rem 1.5rem;

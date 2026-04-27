@@ -57,6 +57,15 @@ export function fitCp2(points, range = DEFAULT_FIT_RANGE) {
   }
   const rmse = Math.sqrt(sse / n);
 
+  // Track the longest-duration MMP across the *full* input (not just
+  // the fitting window) so predictions for endurance durations can
+  // anchor to real data instead of extrapolating from the CP model.
+  let longest = null;
+  for (const p of points) {
+    if (!Number.isFinite(p.durationS) || !Number.isFinite(p.powerW)) continue;
+    if (!longest || p.durationS > longest.durationS) longest = p;
+  }
+
   return {
     cpW,
     wPrimeJ,
@@ -65,23 +74,33 @@ export function fitCp2(points, range = DEFAULT_FIT_RANGE) {
     range,
     minObservedS: filtered.reduce((m, p) => Math.min(m, p.durationS), Infinity),
     maxObservedS: filtered.reduce((m, p) => Math.max(m, p.durationS), -Infinity),
+    longestS: longest?.durationS ?? null,
+    longestW: longest?.powerW ?? null,
   };
 }
 
 // Riegel-style fatigue decay applied beyond the CP-validity window.
 //   P(t) = P_anchor × (t_anchor / t)^k
-// With k ≈ 0.07 for trained cyclists (Skiba), this matches Coggan's
-// observed power profile: 1h ≈ 95% CP, 4h ≈ 85%, 8h ≈ 75%. Without
-// the decay, the raw CP model asymptotes at CP and badly overpredicts
-// for endurance durations.
+//
+// Empirically, single-k Riegel underpredicts decay for ultra-endurance
+// durations. Skiba publishes k = 0.07 for cycling, which matches Coggan
+// well in the 1-4h range; beyond that, observed pro/amateur profiles
+// fall off faster, more like k ≈ 0.10. Default is 0.10 here so 12h+
+// predictions land in the 65-75% CP range observed in practice.
+//
+// When a longer-duration MMP point exists in the user's data than the
+// fitting window's ceiling, predictPower anchors the decay at *that
+// observed power and duration* rather than the model-extrapolated
+// value at 1200s. This grounds endurance predictions in real data.
 //
 // References:
 //   - Riegel, "Athletic Records and Human Endurance" (1981)
 //   - Skiba, Scientific Training for Endurance Athletes
-//   - Coggan, Training and Racing with a Power Meter
+//   - Allen & Coggan, Training and Racing with a Power Meter
+//   - Pinot & Grappe, "The Record Power Profile" (2011)
 export const DEFAULT_DECAY = {
   fromS: 1200,  // top of standard CP fitting window (20 min)
-  k: 0.07,
+  k: 0.10,
 };
 
 // Predict sustainable power for a target duration.
@@ -100,8 +119,19 @@ export function predictPower(fit, durationS, opts = {}) {
   let powerW = fit.cpW + fit.wPrimeJ / durationS;
   let decayed = false;
   if (decay && durationS > decay.fromS) {
-    const anchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
-    powerW = anchorPower * (decay.fromS / durationS) ** decay.k;
+    // Prefer to anchor at the longest observed MMP when it's beyond
+    // the fitting window — real data beats the model extrapolation.
+    let anchorS = decay.fromS;
+    let anchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
+    if (
+      fit.longestS && fit.longestW &&
+      fit.longestS > decay.fromS &&
+      fit.longestS <= durationS
+    ) {
+      anchorS = fit.longestS;
+      anchorPower = fit.longestW;
+    }
+    powerW = anchorPower * (anchorS / durationS) ** decay.k;
     decayed = true;
   }
 

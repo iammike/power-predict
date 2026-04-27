@@ -1,6 +1,4 @@
-import { streamArchive } from './archive.js';
-import { parseFit } from './fit.js';
-import { extractMmp, DURATIONS_S } from './mmp.js';
+import { DURATIONS_S } from './mmp.js';
 import { rollingBest } from './aggregate.js';
 import { formatDuration, formatPower } from './format.js';
 import {
@@ -56,55 +54,60 @@ async function handleArchive(file) {
   setProgressPhase('Reading', { bytesRead: 0, totalBytes: file.size });
 
   const newActivities = [];
-  let parsedCount = 0;
   let withPower = 0;
   let skipped = 0;
-  let lastTotalActivities = 0;
+  let lastActivitiesSeen = 0;
 
-  const onActivity = async ({ name, ext, bytes }) => {
-    if (ext !== 'fit') return; // TCX/GPX in a follow-up issue
-    try {
-      const activity = await parseFit(bytes);
-      parsedCount++;
-      if (activity?.powerStream) {
-        if (await hasActivity(activity.startTime)) {
-          skipped++;
-        } else {
-          const mmp = extractMmp(activity.powerStream);
-          newActivities.push({
-            startTime: activity.startTime,
-            durationS: activity.durationS,
-            distanceM: activity.distanceM,
-            mmp,
-          });
-        }
-        withPower++;
-      }
-    } catch (err) {
-      console.warn('parse failed', name, err);
-    }
-  };
-
-  const onProgress = ({ bytesRead, totalBytes, activitiesSeen }) => {
-    const phase = activitiesSeen > 0 ? 'Reading + parsing' : 'Reading';
-    lastTotalActivities = activitiesSeen;
-    setProgressPhase(phase, {
-      bytesRead,
-      totalBytes,
-      activitiesSeen,
-      parsedCount,
-      withPower,
-      skipped,
-    });
-  };
+  const worker = new Worker('dist/archive-worker.js');
 
   try {
-    await streamArchive(file, { onProgress, onActivity });
+    await new Promise((resolve, reject) => {
+      worker.onerror = (e) => reject(new Error(e.message || 'worker error'));
+      worker.onmessage = async (e) => {
+        const msg = e.data;
+        if (msg.type === 'progress') {
+          lastActivitiesSeen = msg.activitiesSeen;
+          const phase = msg.phase === 'parsing' ? 'Parsing'
+            : msg.activitiesSeen > 0 ? 'Reading' : 'Reading';
+          setProgressPhase(phase, {
+            bytesRead: msg.bytesRead,
+            totalBytes: msg.totalBytes,
+            activitiesSeen: msg.activitiesSeen,
+            parsedCount: msg.parsedCount,
+            withPower: msg.withPower,
+            skipped,
+          });
+        } else if (msg.type === 'activity') {
+          try {
+            if (await hasActivity(msg.startTime)) {
+              skipped++;
+            } else {
+              newActivities.push({
+                startTime: msg.startTime,
+                durationS: msg.durationS,
+                distanceM: msg.distanceM,
+                mmp: msg.mmp,
+              });
+            }
+            withPower++;
+          } catch (err) {
+            console.warn('cache check failed', err);
+          }
+        } else if (msg.type === 'done') {
+          resolve();
+        } else if (msg.type === 'error') {
+          reject(new Error(msg.message));
+        }
+      };
+      worker.postMessage({ type: 'parse', file });
+    });
   } catch (err) {
-    console.error('archive stream failed', err);
+    console.error('archive worker failed', err);
     setProgress(`Archive read failed: ${err.message || err}`);
+    worker.terminate();
     return;
   }
+  worker.terminate();
 
   if (newActivities.length > 0) {
     setProgress(`Saving ${newActivities.length} new activities to local cache…`);
@@ -114,7 +117,7 @@ async function handleArchive(file) {
   const all = await loadActivities();
   if (all.length === 0) {
     setProgress(
-      `No power-equipped activities found in the archive (${lastTotalActivities} activity files seen).`
+      `No power-equipped activities found in the archive (${lastActivitiesSeen} activity files seen).`
     );
     return;
   }

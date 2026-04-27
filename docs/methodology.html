@@ -75,16 +75,21 @@
 
     <p class="formula"><em>P</em>(<em>t</em>) = <em>P</em><sub>anchor</sub> × (<em>t</em><sub>anchor</sub> / <em>t</em>)<sup><em>k</em></sup></p>
 
-    <p>where <em>t</em><sub>anchor</sub> = 1200 s (20 min), <em>P</em><sub>anchor</sub> is the model's prediction at that duration, and <em>k</em> = 0.07 &mdash; Skiba's published fatigue exponent for trained cyclists. This matches Coggan's empirical observations of pro and amateur power profiles:</p>
+    <p>The anchor is whichever is later: your longest observed MMP point, or the 20-minute model prediction. Anchoring at real data when available means a 12-hour forecast is grounded in your actual 4-hour or 6-hour ride, not extrapolated all the way from the CP fit.</p>
+
+    <p>The fatigue exponent <em>k</em> = 0.10. Skiba publishes 0.07, which fits the 1&ndash;4 hour range; observed pro and amateur ultra-endurance data falls off faster than that, more like 0.10 in the 8&ndash;24 hour range. Defaulting higher avoids the trap of ultra predictions reading too close to CP.</p>
 
     <table>
-      <thead><tr><th>Duration</th><th>Fraction of CP (typical)</th><th>Power Predict default</th></tr></thead>
+      <thead><tr><th>Duration</th><th>Typical fraction of CP</th><th>Power Predict default</th></tr></thead>
       <tbody>
-        <tr><td>1 hour</td><td>≈ 95%</td><td>≈ 95%</td></tr>
-        <tr><td>4 hours</td><td>≈ 85%</td><td>≈ 86%</td></tr>
-        <tr><td>8 hours</td><td>≈ 75%</td><td>≈ 80%</td></tr>
+        <tr><td>1 hour</td><td>≈ 95%</td><td>≈ 89%</td></tr>
+        <tr><td>4 hours</td><td>≈ 85%</td><td>≈ 80%</td></tr>
+        <tr><td>8 hours</td><td>≈ 75%</td><td>≈ 75%</td></tr>
+        <tr><td>12 hours</td><td>≈ 68%</td><td>≈ 72%</td></tr>
       </tbody>
     </table>
+
+    <p>Without observed long-duration MMP, the 1-hour and 4-hour numbers run a touch low &mdash; that's a known trade-off of the steeper <em>k</em>. Once your archive contains long rides, the anchor moves to those real points and the prediction tightens up.</p>
 
     <p>The "extrapolated" badge in the predict UI marks any duration outside your observed MMP range. The confidence band widens logarithmically with how far out you've reached.</p>
 

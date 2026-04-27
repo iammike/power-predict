@@ -68,16 +68,43 @@ export function fitCp2(points, range = DEFAULT_FIT_RANGE) {
   };
 }
 
-// Predict sustainable power for a target duration.
-// Returns { powerW, low, high, extrapolated, fit } or null.
+// Riegel-style fatigue decay applied beyond the CP-validity window.
+//   P(t) = P_anchor × (t_anchor / t)^k
+// With k ≈ 0.07 for trained cyclists (Skiba), this matches Coggan's
+// observed power profile: 1h ≈ 95% CP, 4h ≈ 85%, 8h ≈ 75%. Without
+// the decay, the raw CP model asymptotes at CP and badly overpredicts
+// for endurance durations.
 //
-// The band is built from the fit's RMSE plus an extrapolation penalty:
-// the further outside [minObservedS, maxObservedS] the target sits,
-// the wider the band gets. The penalty grows linearly with log(t/edge).
-export function predictPower(fit, durationS) {
-  if (!fit || !Number.isFinite(durationS) || durationS <= 0) return null;
+// References:
+//   - Riegel, "Athletic Records and Human Endurance" (1981)
+//   - Skiba, Scientific Training for Endurance Athletes
+//   - Coggan, Training and Racing with a Power Meter
+export const DEFAULT_DECAY = {
+  fromS: 1200,  // top of standard CP fitting window (20 min)
+  k: 0.07,
+};
 
-  const powerW = fit.cpW + fit.wPrimeJ / durationS;
+// Predict sustainable power for a target duration.
+// Returns { powerW, low, high, extrapolated, fit, decayed } or null.
+//
+// Pass `opts.decay = false` to disable fatigue decay (raw 2-param CP);
+// pass `opts.decay = { fromS, k }` to override.
+//
+// The confidence band is the fit RMSE plus an extrapolation penalty
+// that grows logarithmically with how far the target sits outside
+// the observed MMP range.
+export function predictPower(fit, durationS, opts = {}) {
+  if (!fit || !Number.isFinite(durationS) || durationS <= 0) return null;
+  const decay = opts.decay === false ? null : { ...DEFAULT_DECAY, ...(opts.decay || {}) };
+
+  let powerW = fit.cpW + fit.wPrimeJ / durationS;
+  let decayed = false;
+  if (decay && durationS > decay.fromS) {
+    const anchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
+    powerW = anchorPower * (decay.fromS / durationS) ** decay.k;
+    decayed = true;
+  }
+
   let extrapolated = false;
   let extrapolationPenalty = 0;
   if (durationS < fit.minObservedS) {
@@ -94,6 +121,7 @@ export function predictPower(fit, durationS) {
     low: powerW - halfBand,
     high: powerW + halfBand,
     extrapolated,
+    decayed,
     fit,
   };
 }

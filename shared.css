@@ -517,14 +517,16 @@ main {
 .predict-form button:active { transform: translateY(1px); }
 
 .predict-output {
-  display: block;
+  display: none;
   margin-top: 1.5rem;
   padding: 1.25rem 1.5rem;
   background: var(--paper-soft);
   border: 1px solid var(--hair-strong);
   position: relative;
 }
-.predict-output::before, .predict-output::after {
+.predict-output:not([hidden]) { display: block; }
+.predict-output:not([hidden])::before,
+.predict-output:not([hidden])::after {
   content: "";
   position: absolute;
   width: 12px; height: 12px;
@@ -684,6 +686,23 @@ main {
   color: var(--ink);
   margin-bottom: 2rem;
   font-variation-settings: "opsz" 36;
+}
+
+.formula {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  text-align: center;
+  margin: 1rem auto;
+  padding: 1rem 1.5rem;
+  border-top: var(--rule-soft);
+  border-bottom: var(--rule-soft);
+  color: var(--ink);
+  font-variation-settings: "opsz" 36;
+}
+.formula em {
+  font-style: italic;
+  color: var(--oxblood);
+  font-variation-settings: "opsz" 36, "SOFT" 80, "WONK" 1;
 }
 
 /* FOOTER */

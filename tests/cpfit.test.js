@@ -56,17 +56,31 @@ describe('predictPower', () => {
 
   it('applies Riegel fatigue decay beyond the decay threshold', () => {
     const out = predictPower(fit, 3600); // 60 min
-    // anchor at 20 min: 280 + 22000/1200 = 298.33
-    // decay factor: (1200/3600)^0.07 = 0.9255
-    // expected: 298.33 * 0.9255 ≈ 276.1
+    // anchor at 20 min (no longer-duration data on this fit):
+    //   anchor power = 280 + 22000/1200 = 298.33
+    //   decay factor = (1200/3600)^0.10 ≈ 0.8959
+    //   expected = 298.33 × 0.8959 ≈ 267.3
     expect(out.decayed).toBe(true);
-    expect(out.powerW).toBeCloseTo(298.333 * (1200 / 3600) ** 0.07, 2);
-    // And critically: well below CP, matching Coggan's ~95% CP at 1h.
+    expect(out.powerW).toBeCloseTo(298.333 * (1200 / 3600) ** 0.10, 2);
     expect(out.powerW).toBeLessThan(fit.cpW);
   });
 
+  it('anchors decay at the longest observed MMP when one exists', () => {
+    // Same fit but with an extra long-duration data point — predictions
+    // beyond it should anchor on real data, not the model extrapolation.
+    const fitWithLong = fitCp2([
+      ...synth(280, 22000, [180, 300, 600, 900, 1200]),
+      { durationS: 3600, powerW: 260 }, // a real 1h MMP below model
+    ]);
+    expect(fitWithLong.longestS).toBe(3600);
+    expect(fitWithLong.longestW).toBe(260);
+    const out = predictPower(fitWithLong, 7200);
+    // anchor at 1h, k=0.10: 260 × (3600/7200)^0.10 ≈ 242.6
+    expect(out.powerW).toBeCloseTo(260 * (3600 / 7200) ** 0.10, 2);
+  });
+
   it('respects an explicit decay override', () => {
-    const aggressive = predictPower(fit, 7200, { decay: { fromS: 600, k: 0.10 } });
+    const aggressive = predictPower(fit, 7200, { decay: { fromS: 600, k: 0.15 } });
     const standard = predictPower(fit, 7200);
     expect(aggressive.powerW).toBeLessThan(standard.powerW);
   });

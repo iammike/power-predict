@@ -10,6 +10,8 @@ import {
   clearActivities,
   activityCount,
 } from './storage.js';
+import { fitCp2, predictPower, mmpToPoints } from './cpfit.js';
+import { parseDuration } from './duration.js';
 
 const dropZone = document.getElementById('archive-drop');
 const fileInput = document.getElementById('archive-input');
@@ -109,10 +111,16 @@ async function handleArchive(file) {
   renderCurves(all);
 }
 
+// Held in module scope so the predict form can read it on submit.
+let currentFit = null;
+
 function renderCurves(activityMmps, { fromCache = false } = {}) {
   const allTime = rollingBest(activityMmps);
   const last90 = rollingBest(activityMmps, { windowDays: 90 });
   const last30 = rollingBest(activityMmps, { windowDays: 30 });
+
+  // Fit CP/W' on the 90-day curve (falls back to all-time if too sparse).
+  currentFit = fitCp2(mmpToPoints(last90)) || fitCp2(mmpToPoints(allTime));
 
   const rows = DURATIONS_S
     .filter((d) => allTime[d] !== undefined)
@@ -147,10 +155,82 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       </p>
       <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
     </div>
+    ${renderPredictBlock()}
   `;
   resultsEl.hidden = false;
   resultsEl.dataset.revealed = '';
   document.getElementById('clear-cache').addEventListener('click', handleClearCache);
+  wirePredictForm();
+}
+
+function renderPredictBlock() {
+  if (!currentFit) {
+    return `
+      <section class="predict">
+        <header class="results-head">
+          <h2>Predict</h2>
+          <span class="results-head__meta">Need 2+ MMP points in 3-20 min</span>
+        </header>
+        <p class="results-foot__note">Not enough data yet to fit a critical-power model. Drop more activities to populate the 3-20 minute MMP window.</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="predict">
+      <header class="results-head">
+        <h2>Predict</h2>
+        <span class="results-head__meta">Critical-power model · last 90 days</span>
+      </header>
+
+      <dl class="fit-stats">
+        <div><dt>CP</dt><dd>${formatPower(currentFit.cpW)}</dd></div>
+        <div><dt>W'</dt><dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ</dd></div>
+        <div><dt>RMSE</dt><dd>${currentFit.rmse.toFixed(1)} W</dd></div>
+        <div><dt>Points</dt><dd>${currentFit.nPoints}</dd></div>
+      </dl>
+
+      <form class="predict-form" id="predict-form">
+        <label class="predict-form__field">
+          <span>Target duration</span>
+          <input type="text" id="predict-input" placeholder="45m or 2h30m" autocomplete="off" spellcheck="false" required>
+        </label>
+        <button type="submit">Predict</button>
+      </form>
+      <output class="predict-output" id="predict-output" hidden></output>
+    </section>
+  `;
+}
+
+function wirePredictForm() {
+  const form = document.getElementById('predict-form');
+  if (!form) return;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('predict-input');
+    const out = document.getElementById('predict-output');
+    const seconds = parseDuration(input.value);
+    if (!seconds) {
+      out.hidden = false;
+      out.innerHTML = `<p class="predict-output__error">Couldn't parse that. Try "45m", "1h30m", or "90s".</p>`;
+      return;
+    }
+    const result = predictPower(currentFit, seconds);
+    if (!result) {
+      out.hidden = false;
+      out.innerHTML = `<p class="predict-output__error">Prediction failed.</p>`;
+      return;
+    }
+    out.hidden = false;
+    out.innerHTML = `
+      <p class="predict-output__label">Predicted for ${formatDuration(seconds)}</p>
+      <p class="predict-output__value">${Math.round(result.powerW)}<span class="predict-output__unit">W</span></p>
+      <p class="predict-output__band">
+        Range ${Math.round(result.low)}–${Math.round(result.high)} W
+        ${result.extrapolated ? '<span class="predict-output__flag">extrapolated</span>' : ''}
+      </p>
+    `;
+  });
 }
 
 async function handleClearCache() {

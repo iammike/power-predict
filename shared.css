@@ -402,6 +402,176 @@ main {
   border-bottom-color: var(--oxblood-deep);
 }
 
+/* PREDICT */
+
+.predict {
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+}
+
+.fit-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin: 1rem 0 1.75rem;
+  padding: 0;
+  border-top: var(--rule-soft);
+  border-bottom: var(--rule-soft);
+}
+.fit-stats > div {
+  padding: 0.85rem 1rem;
+  border-right: var(--rule-soft);
+}
+.fit-stats > div:last-child { border-right: none; }
+.fit-stats dt {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  margin: 0 0 0.25rem;
+}
+.fit-stats dd {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink);
+  font-variation-settings: "opsz" 36;
+}
+
+.predict-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.predict-form__field {
+  flex: 1 1 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.predict-form__field span {
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.predict-form input {
+  font-family: var(--mono);
+  font-size: 1rem;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.5rem 0;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+.predict-form input::placeholder { color: var(--muted); opacity: 0.7; }
+.predict-form input:focus { border-bottom-color: var(--oxblood); }
+
+.predict-form button {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--paper);
+  background: var(--oxblood);
+  border: none;
+  padding: 0.75rem 1.4rem;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+.predict-form button:hover { background: var(--oxblood-deep); }
+.predict-form button:active { transform: translateY(1px); }
+
+.predict-output {
+  display: block;
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--paper-soft);
+  border: 1px solid var(--hair-strong);
+  position: relative;
+}
+.predict-output::before, .predict-output::after {
+  content: "";
+  position: absolute;
+  width: 12px; height: 12px;
+  border: 1px solid var(--oxblood);
+}
+.predict-output::before {
+  top: -1px; left: -1px;
+  border-right: none; border-bottom: none;
+}
+.predict-output::after {
+  bottom: -1px; right: -1px;
+  border-left: none; border-top: none;
+}
+.predict-output__label {
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  margin: 0 0 0.4rem;
+}
+.predict-output__value {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(2.5rem, 6vw, 3.75rem);
+  line-height: 1;
+  color: var(--oxblood);
+  margin: 0;
+  letter-spacing: -0.02em;
+  font-variation-settings: "opsz" 144, "SOFT" 30;
+}
+.predict-output__unit {
+  font-family: var(--mono);
+  font-size: 0.45em;
+  font-weight: 500;
+  color: var(--ink-soft);
+  margin-left: 0.25em;
+  letter-spacing: 0.04em;
+}
+.predict-output__band {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-soft);
+  margin: 0.6rem 0 0;
+  font-variation-settings: "opsz" 24;
+}
+.predict-output__flag {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--burnt);
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid currentColor;
+}
+.predict-output__error {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--oxblood);
+  margin: 0;
+  font-variation-settings: "opsz" 24;
+}
+
+@media (max-width: 720px) {
+  .fit-stats { grid-template-columns: repeat(2, 1fr); }
+  .fit-stats > div:nth-child(2n) { border-right: none; }
+  .fit-stats > div:nth-child(-n+2) { border-bottom: var(--rule-soft); }
+}
+
 /* ARTICLE PAGES */
 
 .article {

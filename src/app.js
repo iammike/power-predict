@@ -120,25 +120,36 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       <tr>
         <td>${formatDuration(d)}</td>
         <td>${last30[d] !== undefined ? formatPower(last30[d]) : '—'}</td>
-        <td>${last90[d] !== undefined ? formatPower(last90[d]) : '—'}</td>
+        <td class="featured">${last90[d] !== undefined ? formatPower(last90[d]) : '—'}</td>
         <td>${formatPower(allTime[d])}</td>
       </tr>`)
     .join('');
 
   resultsEl.innerHTML = `
-    <h2>Mean Maximal Power</h2>
+    <header class="results-head">
+      <h2>Mean Maximal Power</h2>
+      <span class="results-head__meta">Watts · by duration</span>
+    </header>
     <table class="mmp-table">
       <thead>
-        <tr><th>Duration</th><th>Last 30d</th><th>Last 90d</th><th>All-time</th></tr>
+        <tr>
+          <th>Duration</th>
+          <th>Last 30d</th>
+          <th class="featured">Last 90d</th>
+          <th>All-time</th>
+        </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p class="hint">
-      ${activityMmps.length} activities cached locally${fromCache ? ' (from previous visit)' : ''}.
+    <div class="results-foot">
+      <p class="results-foot__note">
+        ${activityMmps.length} activities cached locally${fromCache ? ', loaded from your last visit.' : '.'}
+      </p>
       <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
-    </p>
+    </div>
   `;
   resultsEl.hidden = false;
+  resultsEl.dataset.revealed = '';
   document.getElementById('clear-cache').addEventListener('click', handleClearCache);
 }
 

@@ -6,6 +6,10 @@ Predict the power output you can sustain for a target race duration, based on yo
 
 Patterned after [`sports-card-checklists`](https://github.com/iammike/sports-card-checklists): static SPA on GitHub Pages, Cloudflare Worker for OAuth + API proxy, Cloudflare D1 for storage.
 
+## How users import data
+
+The primary onboarding flow is the **Strava account archive** &mdash; see [`docs/strava-archive-guide.md`](docs/strava-archive-guide.md) for the user-facing walkthrough.
+
 ## Why archive upload, not API-only
 
 Strava's free-tier API is shared 200 req / 15 min and 2000 / day across **all users of the app**, plus a single-user cap until you apply for an upgrade. Pulling a power stream costs one request per activity, so onboarding a single user with 500 rides exhausts the daily budget for everyone. Power Predict bulk-onboards from the user's downloaded Strava archive (parsed in the browser) and reserves the API for incremental updates via webhook.

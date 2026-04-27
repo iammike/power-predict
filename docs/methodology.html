@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Methodology — Power Predict</title>
+  <meta name="description" content="How Power Predict turns your Strava history into a sustainable-watts forecast.">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../dist/app.min.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../" class="wordmark" aria-label="Power Predict">
+      <span class="wordmark__power">Power</span>
+      <span class="wordmark__rule" aria-hidden="true"></span>
+      <span class="wordmark__predict">Predict</span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="../">Home</a>
+      <a href="strava-archive-guide.html">Archive Guide</a>
+      <a href="https://github.com/iammike/power-predict" target="_blank" rel="noopener">Source</a>
+    </nav>
+  </header>
+
+  <main class="article">
+    <p class="kicker">How it works</p>
+    <h1>Methodology</h1>
+
+    <p class="lead">Power Predict turns your Strava archive into a sustainable-watts forecast in four steps: extract per-activity power streams, build a mean-maximal-power curve, fit a critical-power model, and apply a fatigue decay for endurance durations.</p>
+
+    <h2>1. Per-activity power streams</h2>
+
+    <p>Each FIT file in your Strava archive contains a 1 Hz stream of power-meter readings. Power Predict reads these in your browser and builds a per-activity <strong>mean maximal power</strong> array &mdash; the best average watts you held across every duration window from 1 second up to several hours, using a sliding-window scan over prefix sums.</p>
+
+    <p>Activities without a power stream (older rides, phone-only recordings) are skipped. Only the derived MMP arrays are persisted; raw streams stay in browser memory just long enough to compute, then get discarded.</p>
+
+    <h2>2. Rolling-best aggregation</h2>
+
+    <p>We take the maximum across activities at each duration to build an aggregate MMP curve, computed in three windows:</p>
+
+    <ul>
+      <li><strong>Last 30 days</strong> &mdash; sensitive to current form, but noisy if you haven't done many quality efforts recently.</li>
+      <li><strong>Last 90 days</strong> &mdash; the practical race-prediction window. Stable enough to fit a model, recent enough to reflect current fitness.</li>
+      <li><strong>All time</strong> &mdash; ceiling reference. Useful context, not used for prediction.</li>
+    </ul>
+
+    <p>Power Predict fits the model on Last 90 days by default and falls back to All time if 90 days has too few points in the fitting window.</p>
+
+    <h2>3. The Critical Power model</h2>
+
+    <p>For durations from roughly 3 minutes to 20 minutes, sustainable power is well-described by the <strong>2-parameter Critical Power model</strong>:</p>
+
+    <p class="formula"><em>P</em>(<em>t</em>) = CP + <em>W</em>′ / <em>t</em></p>
+
+    <p>where</p>
+
+    <ul>
+      <li><strong>CP</strong> (watts) is the asymptote &mdash; the power you could theoretically hold indefinitely if no other systems failed first.</li>
+      <li><strong>W&prime;</strong> (joules) is the finite work you can do above CP before exhausting that anaerobic reserve.</li>
+    </ul>
+
+    <p>With <em>x</em> = 1 / <em>t</em>, the formula becomes a line, and we fit it by ordinary least squares. <em>W&prime;</em> falls out as the slope, CP as the intercept. Power Predict reports the fit's RMSE alongside CP and W&prime; so you can see how well your data matches the model.</p>
+
+    <h3>Why 3-20 minutes</h3>
+
+    <p>Below about 3 minutes, anaerobic / neuromuscular contributions distort the simple two-parameter relationship. Above 20 minutes, fatigue and substrate-depletion effects pull power below the model's prediction. Fits done outside this window are unreliable.</p>
+
+    <h2>4. Fatigue decay for endurance durations</h2>
+
+    <p>If you ask the raw CP model what you can hold for 8 hours, it will answer "approximately CP" &mdash; the asymptote. That's wrong: real cyclists fade well below CP over those durations as glycogen runs low.</p>
+
+    <p>For predictions beyond the 20-minute window we apply a <strong>Riegel-style power-law decay</strong>:</p>
+
+    <p class="formula"><em>P</em>(<em>t</em>) = <em>P</em><sub>anchor</sub> × (<em>t</em><sub>anchor</sub> / <em>t</em>)<sup><em>k</em></sup></p>
+
+    <p>where <em>t</em><sub>anchor</sub> = 1200 s (20 min), <em>P</em><sub>anchor</sub> is the model's prediction at that duration, and <em>k</em> = 0.07 &mdash; Skiba's published fatigue exponent for trained cyclists. This matches Coggan's empirical observations of pro and amateur power profiles:</p>
+
+    <table>
+      <thead><tr><th>Duration</th><th>Fraction of CP (typical)</th><th>Power Predict default</th></tr></thead>
+      <tbody>
+        <tr><td>1 hour</td><td>≈ 95%</td><td>≈ 95%</td></tr>
+        <tr><td>4 hours</td><td>≈ 85%</td><td>≈ 86%</td></tr>
+        <tr><td>8 hours</td><td>≈ 75%</td><td>≈ 80%</td></tr>
+      </tbody>
+    </table>
+
+    <p>The "extrapolated" badge in the predict UI marks any duration outside your observed MMP range. The confidence band widens logarithmically with how far out you've reached.</p>
+
+    <h2>References</h2>
+
+    <ul>
+      <li>Riegel, P.S. <em>Athletic Records and Human Endurance</em>. American Scientist, 1981. The original power-law fatigue formula, derived from running.</li>
+      <li>Skiba, P. <em>Scientific Training for Endurance Athletes</em>. Source for the <em>k</em> = 0.07 fatigue exponent for cycling.</li>
+      <li>Coggan, A. and Allen, H. <em>Training and Racing with a Power Meter</em>. Empirical power-profile fractions of CP across durations.</li>
+      <li>Monod, H. and Scherrer, J. <em>The work capacity of a synergic muscular group.</em> Ergonomics, 1965. Origin of the critical-power concept.</li>
+      <li>Hill, A.V. <em>The physiological basis of athletic records</em>. 1925. Earliest hyperbolic power-duration model.</li>
+    </ul>
+
+    <h2>Limitations and planned improvements</h2>
+
+    <p>Today's predictions assume your last 90 days of data accurately reflect your current fitness. Issues planned for upcoming releases:</p>
+
+    <ul>
+      <li><strong>Recency weighting</strong> &mdash; weight recent efforts more heavily within the window so a peak ride from week 1 doesn't outweigh week 12.</li>
+      <li><strong>Effort-quality flagging</strong> &mdash; only count an MMP as a "true" point if the activity's overall intensity suggests you were going hard; treat tempo-pace bests as soft data points.</li>
+      <li><strong>Fitness drift normalization</strong> &mdash; rescale older efforts by the ratio of estimated FTP then vs. now, so a year-old peak doesn't dominate.</li>
+      <li><strong>Manual fitness override</strong> &mdash; a way to tell Power Predict "ignore my zone-2 base block, I'm actually fitter than that suggests" via a CP override or a custom date range.</li>
+    </ul>
+
+    <p>Track these on the <a href="https://github.com/iammike/power-predict/milestones" target="_blank" rel="noopener">project milestones</a>.</p>
+  </main>
+
+  <footer class="site-footer">
+    <p><a href="../">&larr; Back to Power Predict</a></p>
+    <p>Independent project. Not endorsed by Strava.</p>
+  </footer>
+</body>
+</html>

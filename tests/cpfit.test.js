@@ -48,13 +48,37 @@ describe('fitCp2', () => {
 describe('predictPower', () => {
   const fit = fitCp2(synth(280, 22000, [180, 300, 600, 900, 1200]));
 
-  it('predicts P = CP + W/t', () => {
-    const out = predictPower(fit, 2700); // 45 min
-    expect(out.powerW).toBeCloseTo(280 + 22000 / 2700, 3);
+  it('predicts P = CP + W\'/t inside the CP window when decay is disabled', () => {
+    const out = predictPower(fit, 600, { decay: false });
+    expect(out.powerW).toBeCloseTo(280 + 22000 / 600, 3);
+    expect(out.decayed).toBe(false);
+  });
+
+  it('applies Riegel fatigue decay beyond the decay threshold', () => {
+    const out = predictPower(fit, 3600); // 60 min
+    // anchor at 20 min: 280 + 22000/1200 = 298.33
+    // decay factor: (1200/3600)^0.07 = 0.9255
+    // expected: 298.33 * 0.9255 ≈ 276.1
+    expect(out.decayed).toBe(true);
+    expect(out.powerW).toBeCloseTo(298.333 * (1200 / 3600) ** 0.07, 2);
+    // And critically: well below CP, matching Coggan's ~95% CP at 1h.
+    expect(out.powerW).toBeLessThan(fit.cpW);
+  });
+
+  it('respects an explicit decay override', () => {
+    const aggressive = predictPower(fit, 7200, { decay: { fromS: 600, k: 0.10 } });
+    const standard = predictPower(fit, 7200);
+    expect(aggressive.powerW).toBeLessThan(standard.powerW);
+  });
+
+  it('does not decay below the threshold', () => {
+    const out = predictPower(fit, 900); // 15 min, inside CP window
+    expect(out.decayed).toBe(false);
+    expect(out.powerW).toBeCloseTo(280 + 22000 / 900, 3);
   });
 
   it('flags extrapolation outside the observed range', () => {
-    const longer = predictPower(fit, 3600); // 60m, beyond max observed 1200s
+    const longer = predictPower(fit, 3600);
     expect(longer.extrapolated).toBe(true);
     expect(longer.high - longer.low).toBeGreaterThan(0);
 
@@ -70,8 +94,8 @@ describe('predictPower', () => {
   });
 
   it('confidence band widens as duration moves further outside observed range', () => {
-    const just = predictPower(fit, 1500);   // a bit outside
-    const far = predictPower(fit, 7200);    // way outside
+    const just = predictPower(fit, 1500);
+    const far = predictPower(fit, 7200);
     expect(far.high - far.low).toBeGreaterThan(just.high - just.low);
   });
 });

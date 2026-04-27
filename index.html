@@ -3,48 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Power Predict</title>
+  <title>Power Predict — what you can actually hold</title>
+  <meta name="description" content="Predict the watts you can sustain for any race duration, fitted to your Strava history.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="dist/app.min.css">
 </head>
 <body>
   <header class="site-header">
-    <h1>Power Predict</h1>
-    <p class="tagline">Predict your sustainable race power from Strava history.</p>
+    <a href="/" class="wordmark" aria-label="Power Predict">
+      <span class="wordmark__power">Power</span>
+      <span class="wordmark__rule" aria-hidden="true"></span>
+      <span class="wordmark__predict">Predict</span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="docs/strava-archive-guide.html">Archive Guide</a>
+      <a href="https://github.com/iammike/power-predict" target="_blank" rel="noopener">Source</a>
+    </nav>
   </header>
 
   <main>
-    <section class="onboard">
-      <h2>Get started</h2>
-      <ol>
-        <li>Request your Strava archive &mdash; <a href="docs/strava-archive-guide.html">step-by-step guide</a>.</li>
-        <li>Drop the zip below. Your power streams are processed in your browser &mdash; only the derived numbers leave your machine.</li>
-        <li>Optionally connect Strava so new rides sync automatically.</li>
-      </ol>
-      <div id="archive-drop" class="drop-zone">
-        <p>Drag your <code>strava_export_*.zip</code> here, or click to choose.</p>
-        <input type="file" id="archive-input" accept=".zip" hidden>
-      </div>
-      <p id="progress" class="progress" hidden></p>
+    <section class="lede">
+      <p class="kicker">A field manual for cyclists who race with watts</p>
+      <h1 class="headline">What you can <em>actually</em> hold for the whole race.</h1>
+      <p class="dek">Power Predict reads your Strava history, fits a critical-power model to your best efforts, and tells you what's realistic — adjusted for how recent your fitness peaked and whether you were really trying.</p>
     </section>
+
+    <ol class="steps" aria-label="How it works">
+      <li>
+        <span class="step-num">01 / Request</span>
+        <h3>Ask Strava for your archive</h3>
+        <p>They prepare it offline and email a link within hours. <a href="docs/strava-archive-guide.html">Step-by-step</a></p>
+      </li>
+      <li>
+        <span class="step-num">02 / Drop</span>
+        <h3>Drag the zip onto the page</h3>
+        <p>Parsed in your browser. Raw streams never leave your machine.</p>
+      </li>
+      <li>
+        <span class="step-num">03 / Read</span>
+        <h3>See your power-duration curve</h3>
+        <p>Connect Strava later so new rides flow in automatically.</p>
+      </li>
+    </ol>
+
+    <div id="archive-drop" class="drop" tabindex="0" role="button" aria-label="Upload Strava archive">
+      <input type="file" id="archive-input" accept=".zip" hidden>
+      <span class="drop__label">Drop your archive</span>
+      <span class="drop__hint">strava_export_*.zip · or click to browse</span>
+    </div>
+    <p id="progress" class="progress" hidden></p>
 
     <section id="results" hidden></section>
-
-    <section class="predict" hidden>
-      <h2>Predict</h2>
-      <form id="predict-form">
-        <label>
-          Target duration
-          <input type="text" id="target-duration" placeholder="45m or 2h30m">
-        </label>
-        <button type="submit">Predict</button>
-      </form>
-      <output id="predict-result"></output>
-    </section>
   </main>
 
-  <footer>
-    <p>Built with the Strava API. Not endorsed by Strava.</p>
+  <footer class="site-footer">
+    <p>Independent project. Not endorsed by Strava.</p>
+    <p>Built by <a href="https://iammike.org" target="_blank" rel="noopener">Mike Collins</a> · <a href="https://github.com/iammike/power-predict" target="_blank" rel="noopener">GitHub</a></p>
   </footer>
 
   <script src="dist/app.min.js"></script>

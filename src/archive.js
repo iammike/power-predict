@@ -5,7 +5,13 @@
 // smoothly and start parsing FIT files before the rest of the zip
 // has even been read. Important when the archive is multiple GB.
 
-import { Unzip, AsyncUnzipInflate, gunzipSync, strFromU8 } from 'fflate';
+// Sync UnzipInflate runs decompression on the main thread chunk by
+// chunk, yielding to the event loop between chunks via the reader's
+// await. AsyncUnzipInflate spawns a Web Worker via a Blob URL; that
+// path appears to deadlock when bundled by esbuild for some chunks of
+// large archives, so we're avoiding it. Real Web Worker offload is
+// tracked in issue #9.
+import { Unzip, UnzipInflate, gunzipSync, strFromU8 } from 'fflate';
 
 const ACTIVITY_PATH = /^activities\/[^/]+\.(fit|tcx|gpx)(\.gz)?$/i;
 
@@ -69,7 +75,7 @@ export async function streamArchive(file, { onProgress, onActivity, onCsv } = {}
       };
       entry.start();
     });
-    unzipper.register(AsyncUnzipInflate);
+    unzipper.register(UnzipInflate);
 
     (async () => {
       try {

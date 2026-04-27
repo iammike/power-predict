@@ -1,4 +1,4 @@
-import { unzipArchive, listActivityEntries, decodeEntry } from './archive.js';
+import { streamArchive } from './archive.js';
 import { parseFit } from './fit.js';
 import { extractMmp, DURATIONS_S } from './mmp.js';
 import { rollingBest } from './aggregate.js';
@@ -53,22 +53,19 @@ async function hydrateFromCache() {
 }
 
 async function handleArchive(file) {
-  setProgress(`Unzipping ${file.name}…`);
-  const files = await unzipArchive(file);
-  const entries = listActivityEntries(files);
-  const fitEntries = entries.filter((p) => /\.fit(\.gz)?$/i.test(p));
-
-  setProgress(`Found ${entries.length} activities (${fitEntries.length} FIT). Parsing…`);
+  setProgressPhase('Reading', { bytesRead: 0, totalBytes: file.size });
 
   const newActivities = [];
+  let parsedCount = 0;
   let withPower = 0;
   let skipped = 0;
+  let lastTotalActivities = 0;
 
-  for (let i = 0; i < fitEntries.length; i++) {
-    const path = fitEntries[i];
+  const onActivity = async ({ name, ext, bytes }) => {
+    if (ext !== 'fit') return; // TCX/GPX in a follow-up issue
     try {
-      const { bytes } = decodeEntry(files, path);
       const activity = await parseFit(bytes);
+      parsedCount++;
       if (activity?.powerStream) {
         if (await hasActivity(activity.startTime)) {
           skipped++;
@@ -84,14 +81,29 @@ async function handleArchive(file) {
         withPower++;
       }
     } catch (err) {
-      console.warn('parse failed', path, err);
+      console.warn('parse failed', name, err);
     }
-    if (i % 5 === 0 || i === fitEntries.length - 1) {
-      setProgress(
-        `Parsed ${i + 1}/${fitEntries.length} (${withPower} with power, ${skipped} already cached)…`
-      );
-      await tick();
-    }
+  };
+
+  const onProgress = ({ bytesRead, totalBytes, activitiesSeen }) => {
+    const phase = activitiesSeen > 0 ? 'Reading + parsing' : 'Reading';
+    lastTotalActivities = activitiesSeen;
+    setProgressPhase(phase, {
+      bytesRead,
+      totalBytes,
+      activitiesSeen,
+      parsedCount,
+      withPower,
+      skipped,
+    });
+  };
+
+  try {
+    await streamArchive(file, { onProgress, onActivity });
+  } catch (err) {
+    console.error('archive stream failed', err);
+    setProgress(`Archive read failed: ${err.message || err}`);
+    return;
   }
 
   if (newActivities.length > 0) {
@@ -101,14 +113,39 @@ async function handleArchive(file) {
 
   const all = await loadActivities();
   if (all.length === 0) {
-    setProgress('No power-equipped activities found in the archive.');
+    setProgress(
+      `No power-equipped activities found in the archive (${lastTotalActivities} activity files seen).`
+    );
     return;
   }
 
   setProgress(
-    `Done. ${all.length} activities cached locally (${newActivities.length} new this run).`
+    `Done. ${all.length} activities cached locally (${newActivities.length} new this run, ${skipped} already cached, ${withPower} with power).`
   );
   renderCurves(all);
+}
+
+function setProgressPhase(phase, { bytesRead, totalBytes, activitiesSeen, parsedCount, withPower, skipped }) {
+  const pct = totalBytes ? Math.min(100, (bytesRead / totalBytes) * 100) : 0;
+  const readPart = `${phase}: ${formatBytes(bytesRead)} / ${formatBytes(totalBytes)} (${pct.toFixed(0)}%)`;
+  const parsePart = activitiesSeen
+    ? ` · ${parsedCount}/${activitiesSeen} parsed${withPower ? `, ${withPower} with power` : ''}${skipped ? `, ${skipped} cached` : ''}`
+    : '';
+  if (!progressEl) return;
+  progressEl.hidden = false;
+  progressEl.innerHTML = `
+    <span class="progress__text">${readPart}${parsePart}</span>
+    <span class="progress__bar"><span class="progress__bar-fill" style="width: ${pct}%"></span></span>
+  `;
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  let v = bytes;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
 // Held in module scope so the predict form can read it on submit.
@@ -245,8 +282,4 @@ function setProgress(msg) {
   if (!progressEl) return;
   progressEl.textContent = msg;
   progressEl.hidden = false;
-}
-
-function tick() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
 }

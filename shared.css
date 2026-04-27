@@ -290,11 +290,37 @@ main {
 }
 
 .progress {
+  margin: 1.25rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.progress__text {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.progress__bar {
+  display: block;
+  height: 3px;
+  background: var(--paper-deep);
+  position: relative;
+  overflow: hidden;
+}
+.progress__bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--oxblood);
+  transition: width 120ms linear;
+}
+/* Plain-text progress used for save / done states */
+.progress:not(:has(.progress__bar)) {
   font-family: var(--serif);
   font-style: italic;
   font-size: 1rem;
   color: var(--ink-soft);
-  margin: 1.25rem 0 0;
   font-variation-settings: "opsz" 24;
 }
 

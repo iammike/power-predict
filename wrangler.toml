@@ -1,0 +1,30 @@
+# Cloudflare Worker configuration for Power Predict
+# https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "power-predict-api"
+main = "worker.js"
+compatibility_date = "2024-12-01"
+
+# Account ID set via CLOUDFLARE_ACCOUNT_ID secret in GitHub Actions.
+# Secrets (STRAVA_CLIENT_SECRET, STRAVA_WEBHOOK_VERIFY_TOKEN) configured
+# in the Cloudflare dashboard, not committed.
+
+[vars]
+STRAVA_CLIENT_ID = ""           # filled in once Strava app is registered
+ALLOWED_ORIGIN = "https://power.iammike.org"
+
+# D1 database for users, activities, MMP records, CP fits
+[[d1_databases]]
+binding = "DB"
+database_name = "power-predict"
+database_id = ""                # filled after `wrangler d1 create power-predict`
+
+# R2 bucket for archive uploads during onboarding (auto-expire after 24h)
+[[r2_buckets]]
+binding = "ARCHIVES_BUCKET"
+bucket_name = "power-predict-archives"
+
+# KV for rate-limit accounting (app-wide Strava budget)
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = ""                         # filled after `wrangler kv:namespace create RATE_LIMIT`

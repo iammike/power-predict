@@ -1,0 +1,19 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "serve": "python3 -m http.server 8000",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "deploy:worker": "wrangler deploy"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3",
+    "jsdom": "^28.0.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^3.90.0"
+  },
+  "dependencies": {
+    "fit-file-parser": "^1.21.0"
+  }
+}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power Predict</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="dist/app.min.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>Power Predict</h1>
+    <p class="tagline">Predict your sustainable race power from Strava history.</p>
+  </header>
+
+  <main>
+    <section class="onboard">
+      <h2>Get started</h2>
+      <ol>
+        <li>Request your Strava archive (Settings &rarr; My Account &rarr; Download Request).</li>
+        <li>Drop the zip below. Your power streams are processed in your browser &mdash; only the derived numbers leave your machine.</li>
+        <li>Optionally connect Strava so new rides sync automatically.</li>
+      </ol>
+      <div id="archive-drop" class="drop-zone">
+        <p>Drag your <code>strava_export_*.zip</code> here, or click to choose.</p>
+        <input type="file" id="archive-input" accept=".zip" hidden>
+      </div>
+    </section>
+
+    <section class="predict" hidden>
+      <h2>Predict</h2>
+      <form id="predict-form">
+        <label>
+          Target duration
+          <input type="text" id="target-duration" placeholder="45m or 2h30m">
+        </label>
+        <button type="submit">Predict</button>
+      </form>
+      <output id="predict-result"></output>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built with the Strava API. Not endorsed by Strava.</p>
+  </footer>
+
+  <script src="dist/app.min.js"></script>
+</body>
+</html>

@@ -354,17 +354,22 @@ function wireCurveChart() {
   const container = document.getElementById('curve-chart');
   if (!container || !currentFit) return;
   const tabs = document.querySelectorAll('[data-window]');
-  const drawWindow = (key) => {
+  const draw = (key) => {
     renderCurveChart(container, {
       mmp: currentMmpByWindow[key] || {},
       fit: currentFit,
     });
     tabs.forEach((t) => t.classList.toggle('is-active', t.dataset.window === key));
   };
+  if (tabs.length === 0) {
+    // Date range is active — no tabs, just draw the (pre-filtered) 90d set.
+    draw('last90');
+    return;
+  }
   tabs.forEach((t) => {
-    t.addEventListener('click', () => drawWindow(t.dataset.window));
+    t.addEventListener('click', () => draw(t.dataset.window));
   });
-  drawWindow('last90');
+  draw('last90');
 }
 
 function renderPredictBlock() {
@@ -404,11 +409,14 @@ function renderPredictBlock() {
       <div class="curve-chart-section">
         <header class="curve-chart-head">
           <span class="curve-chart-title">Power-duration curve</span>
-          <div class="curve-window-tabs" role="tablist">
-            <button type="button" data-window="last30" role="tab">Last 30d</button>
-            <button type="button" data-window="last90" role="tab" class="is-active">Last 90d</button>
-            <button type="button" data-window="allTime" role="tab">All-time</button>
-          </div>
+          ${(currentSettings.dateFrom || currentSettings.dateTo)
+            ? `<span class="curve-range-label">Range: ${currentSettings.dateFrom || '…'} → ${currentSettings.dateTo || '…'}</span>`
+            : `<div class="curve-window-tabs" role="tablist">
+                <button type="button" data-window="last30" role="tab">Last 30d</button>
+                <button type="button" data-window="last90" role="tab" class="is-active">Last 90d</button>
+                <button type="button" data-window="allTime" role="tab">All-time</button>
+              </div>`
+          }
         </header>
         <div id="curve-chart" class="curve-chart"></div>
       </div>

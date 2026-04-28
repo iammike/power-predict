@@ -126,14 +126,19 @@ export function predictPower(fit, durationS, opts = {}) {
 
   let powerW = fit.cpW + fit.wPrimeJ / durationS;
   let decayed = false;
-  if (decay && durationS > decay.fromS) {
-    // Take the upper envelope of the threshold-anchored decay and
-    // decay curves originating at every observed point that beats
-    // the model. Each underlying curve is monotonically decreasing,
-    // so their max is continuous — no jumps where one anchor takes
-    // over from another.
+  // Apply the observed-anchor envelope at *all* durations so the
+  // chart line is continuous across the fit-window boundary. Inside
+  // the fit window the baseline is the regression model itself; the
+  // envelope only lifts it where a longer-duration observed effort
+  // implies you can do at least as much for the shorter duration.
+  if (decay) {
+    // Inside the fit window the baseline is the model itself.
+    // Outside, the threshold-anchored decay takes over (model at the
+    // top of the fit window, then Riegel from there).
     const thresholdAnchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
-    let best = thresholdAnchorPower * (decay.fromS / durationS) ** decay.k;
+    let best = durationS > decay.fromS
+      ? thresholdAnchorPower * (decay.fromS / durationS) ** decay.k
+      : powerW;
 
     if (Array.isArray(fit.points)) {
       // Every observed point above the model contributes a Riegel
@@ -144,6 +149,10 @@ export function predictPower(fit, durationS, opts = {}) {
       // the formula gives a slightly higher power, which matches the
       // physical intuition: if you held P for 30 min, you held ≥ P
       // for any shorter duration of the same effort.)
+      // Anchor candidates are observations beyond the fit window
+      // whose power exceeds what the regression predicts at their
+      // duration. (Anchors inside the fit window are already encoded
+      // in CP/W'.)
       for (const p of fit.points) {
         if (p.durationS <= decay.fromS) continue;
         const modelAtP = fit.cpW + fit.wPrimeJ / p.durationS;
@@ -159,7 +168,7 @@ export function predictPower(fit, durationS, opts = {}) {
     }
 
     powerW = best;
-    decayed = true;
+    decayed = durationS > decay.fromS;
   }
 
   let extrapolated = false;

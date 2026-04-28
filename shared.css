@@ -449,6 +449,13 @@ main {
   letter-spacing: 0.16em;
   color: var(--muted);
 }
+.curve-range-label {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--oxblood);
+  letter-spacing: 0.04em;
+}
+
 .curve-window-tabs {
   display: inline-flex;
   border: 1px solid var(--hair-strong);

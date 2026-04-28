@@ -73,6 +73,17 @@
 
     <p>With <em>x</em> = 1 / <em>t</em>, the formula becomes a line, and we fit it by ordinary least squares. <em>W&prime;</em> falls out as the slope, CP as the intercept. Power Predict reports the fit's RMSE alongside CP and W&prime; so you can see how well your data matches the model.</p>
 
+    <h3>Why the fit line doesn't pass through every dot</h3>
+
+    <p>The CP fit is a 2-parameter hyperbola &mdash; it has only two knobs (CP and W&prime;) to fit your whole power-duration profile. It approximates your data with a smooth curve; it can't connect every observed dot exactly. Add the recency weighting on top (older observations count less in the regression) and the fit can sit visibly below your raw rolling-best, especially during base blocks where recent rides are softer than older peaks.</p>
+
+    <p>The dots are <em>history</em> &mdash; what you actually rode. The line is the <em>model</em>'s smooth forecast of what you can sustain. If the line reads conservatively, you have two levers:</p>
+
+    <ul>
+      <li><strong>CP override</strong> &mdash; pin CP at a value you trust (e.g. your last hard FTP test). The line shifts to match while W&prime; stays data-derived.</li>
+      <li><strong>Date range</strong> &mdash; restrict the fit to a stretch where you know you were going hard. The recency weighting is dropped while a range is active.</li>
+    </ul>
+
     <h3>Why 3-20 minutes</h3>
 
     <p>Below about 3 minutes, anaerobic / neuromuscular contributions distort the simple two-parameter relationship. Above 20 minutes, fatigue and substrate-depletion effects pull power below the model's prediction. Fits done outside this window are unreliable.</p>

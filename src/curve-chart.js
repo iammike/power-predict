@@ -70,13 +70,17 @@ export function renderCurveChart(container, { mmp, fit }) {
     const idx = observedDurations.indexOf(d);
     return idx >= 0 ? observedPower[idx] : null;
   });
+  // Solid inside the fit window, dashed outside. We deliberately
+  // overlap both series at d == DEFAULT_DECAY.fromS so the two lines
+  // share that point — predictPower returns the same value across
+  // the boundary, so the visual transition is seamless.
   const insideSeries = xs.map((d) => {
     if (d < fit.range.minS || d > DEFAULT_DECAY.fromS) return null;
     const out = predictPower(fit, d);
     return out ? out.powerW : null;
   });
   const outsideSeries = xs.map((d) => {
-    if (d <= DEFAULT_DECAY.fromS) return null;
+    if (d < DEFAULT_DECAY.fromS) return null;
     const out = predictPower(fit, d);
     return out ? out.powerW : null;
   });

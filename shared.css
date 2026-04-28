@@ -703,6 +703,17 @@ main {
   color: var(--ink);
   font-variation-settings: "opsz" 36;
 }
+.fit-stats__quality {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.fit-stats__quality.is-good { color: #2e6b3a; }
+.fit-stats__quality.is-mid  { color: var(--burnt); }
+.fit-stats__quality.is-bad  { color: var(--oxblood); }
 
 .predict-form {
   display: flex;

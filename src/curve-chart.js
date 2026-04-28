@@ -131,8 +131,8 @@ export function renderCurveChart(container, { mmp, fit }) {
       {
         label: 'Observed MMP',
         stroke: oxblood,
-        fill: oxblood,
         width: 0,
+        spanGaps: false,
         points: { show: true, size: 6, stroke: oxblood, fill: oxblood },
         value: (_u, v) => (v == null ? '—' : `${Math.round(v)} W`),
       },

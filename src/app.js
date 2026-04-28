@@ -272,9 +272,11 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const fitWindow = (dateFromMs || dateToMs) ? null : 90;
   const last90Fit = rollingBest(filtered, { windowDays: fitWindow, ...effortOpts });
   const allTimeFit = rollingBest(filtered, effortOpts);
-  currentFit =
-    fitCp2(mmpToPoints(last90Fit), undefined, { observedPoints: mmpToPoints(last90) })
-    || fitCp2(mmpToPoints(allTimeFit), undefined, { observedPoints: mmpToPoints(allTime) });
+  const primaryFit = fitCp2(mmpToPoints(last90Fit), undefined, { observedPoints: mmpToPoints(last90) });
+  const fallbackFit = fitCp2(mmpToPoints(allTimeFit), undefined, { observedPoints: mmpToPoints(allTime) });
+  currentFit = primaryFit
+    ? { ...primaryFit, fallback: false }
+    : (fallbackFit ? { ...fallbackFit, fallback: true } : null);
 
   // Apply CP override on top of the fit (W' stays from the underlying
   // fit so the curve shape is data-derived, not a hand-set hyperbola).
@@ -344,6 +346,28 @@ function pointsQuality(n) {
   if (n >= 4) return { label: 'ok',       cls: 'is-mid'  };
   if (n >= 2) return { label: 'minimal',  cls: 'is-bad'  };
   return            { label: 'too few',  cls: 'is-bad'  };
+}
+function cpQuality(fit) {
+  if (fit.overridden) return { label: 'override', cls: 'is-mid'  };
+  if (fit.fallback)   return { label: 'all-time', cls: 'is-mid'  };
+  return                     { label: 'data',     cls: 'is-good' };
+}
+function cpTooltip(fit) {
+  if (fit.overridden) return 'CP is pinned to your manual override. W\' is still derived from the regression so the curve shape stays data-driven.';
+  if (fit.fallback)   return 'The 90-day window had too few MMP points in the 3-20 min range, so the fit fell back to all-time data.';
+  return 'CP came from a normal regression on the active window (last 90 days or your custom range).';
+}
+function wPrimeQuality(wPrimeJ) {
+  const kJ = wPrimeJ / 1000;
+  if (kJ < 8)  return { label: 'low',       cls: 'is-mid'  };
+  if (kJ < 25) return { label: 'typical',   cls: 'is-good' };
+  if (kJ < 40) return { label: 'high',      cls: 'is-good' };
+  return            { label: 'very high', cls: 'is-mid'  };
+}
+function wPrimeTooltip(wPrimeJ) {
+  return 'Anaerobic work capacity above CP. Trained cyclists typically sit in the 10-25 kJ range; '
+       + 'sprinters and track riders push higher. Very high values from a 2-param fit can also signal '
+       + 'a steep short-duration MMP relative to the threshold end — sanity-check against your sprint efforts.';
 }
 function pointsTooltip(n) {
   return 'Number of MMP points (durations between 3 and 20 minutes) the regression fitted on. '
@@ -477,13 +501,15 @@ function renderPredictBlock() {
       </header>
 
       <dl class="fit-stats">
-        <div data-tooltip="Critical Power — the asymptote of your power-duration curve. The wattage you could theoretically hold indefinitely if no other system failed first.">
+        <div data-tooltip="${cpTooltip(currentFit)}">
           <dt>CP${currentFit.overridden ? ' *' : ''}</dt>
           <dd>${formatPower(currentFit.cpW)}</dd>
+          <span class="fit-stats__quality ${cpQuality(currentFit).cls}">${cpQuality(currentFit).label}</span>
         </div>
-        <div data-tooltip="Anaerobic work capacity (W-prime) — the finite work above CP you can do before exhausting that reserve. Slope of the regression in joules.">
+        <div data-tooltip="${wPrimeTooltip(currentFit.wPrimeJ)}">
           <dt>W'</dt>
           <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
+          <span class="fit-stats__quality ${wPrimeQuality(currentFit.wPrimeJ).cls}">${wPrimeQuality(currentFit.wPrimeJ).label}</span>
         </div>
         <div data-tooltip="${rmseTooltip(currentFit.rmse)}">
           <dt>RMSE</dt>

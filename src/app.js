@@ -451,10 +451,22 @@ function renderPredictBlock() {
       </header>
 
       <dl class="fit-stats">
-        <div><dt>CP${currentFit.overridden ? ' *' : ''}</dt><dd>${formatPower(currentFit.cpW)}</dd></div>
-        <div><dt>W'</dt><dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ</dd></div>
-        <div><dt>RMSE</dt><dd>${currentFit.rmse.toFixed(1)} W</dd></div>
-        <div><dt>Points</dt><dd>${currentFit.nPoints}</dd></div>
+        <div data-tooltip="Critical Power — the asymptote of your power-duration curve. The wattage you could theoretically hold indefinitely if no other system failed first.">
+          <dt>CP${currentFit.overridden ? ' *' : ''}</dt>
+          <dd>${formatPower(currentFit.cpW)}</dd>
+        </div>
+        <div data-tooltip="Anaerobic work capacity (W-prime) — the finite work above CP you can do before exhausting that reserve. Slope of the regression in joules.">
+          <dt>W'</dt>
+          <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
+        </div>
+        <div data-tooltip="Root-mean-squared error of the regression. How closely the CP/W' hyperbola tracks your 3-20 minute MMPs. Lower = tighter fit.">
+          <dt>RMSE</dt>
+          <dd>${currentFit.rmse.toFixed(1)} W</dd>
+        </div>
+        <div data-tooltip="Number of MMP points (durations between 3 and 20 minutes) the regression fitted on.">
+          <dt>Points</dt>
+          <dd>${currentFit.nPoints}</dd>
+        </div>
       </dl>
 
       ${renderOverrideForm()}

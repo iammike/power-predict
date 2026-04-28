@@ -18,6 +18,24 @@ const SAMPLE_DURATIONS = (() => {
   return Array.from(new Set(out));
 })();
 
+// Standard cycling power-profile anchor durations from Allen/Coggan
+// (Training and Racing with a Power Meter). 5s = sprint, 1m =
+// anaerobic capacity, 5m = VO2max, 20m = threshold, 60m = sub-
+// threshold; longer durations follow common ultra reference points.
+const STANDARD_TICKS = [
+  1,                       // 1s
+  15,                      // 15s
+  60,                      // 1m
+  300,                     // 5m
+  1200,                    // 20m
+  3600,                    // 1h
+  7200,                    // 2h
+  14400,                   // 4h
+  28800,                   // 8h
+  43200,                   // 12h
+  86400,                   // 24h
+];
+
 export function renderCurveChart(container, { mmp, fit }) {
   if (!container) return;
   container.innerHTML = '';
@@ -33,49 +51,47 @@ export function renderCurveChart(container, { mmp, fit }) {
     .sort((a, b) => a - b);
   const observedPower = observedDurations.map((d) => mmp[d]);
 
-  // Model: split into two series — CP-validity range (solid) and
-  // decay extrapolation (dashed).
-  const modelInside = [];
-  const modelOutside = [];
-  for (const d of SAMPLE_DURATIONS) {
-    const inside = d >= fit.range.minS && d <= DEFAULT_DECAY.fromS;
-    const out = predictPower(fit, d);
-    const w = out ? out.powerW : null;
-    modelInside.push(inside ? w : null);
-    modelOutside.push(!inside ? w : null);
-  }
-
-  // uPlot wants ALL series on the same x axis, so map observed values
-  // onto the SAMPLE_DURATIONS grid (null elsewhere).
-  const observedAligned = SAMPLE_DURATIONS.map((d) => {
-    const idx = observedDurations.indexOf(d);
-    return idx >= 0 ? observedPower[idx] : null;
-  });
-  // If observed durations don't fall on the grid, add them.
+  // Merge SAMPLE_DURATIONS with observed durations so observed points
+  // land on the same x grid as the model lines.
   const xs = SAMPLE_DURATIONS.slice();
-  for (const d of observedDurations) {
-    if (!xs.includes(d)) xs.push(d);
-  }
+  for (const d of observedDurations) if (!xs.includes(d)) xs.push(d);
   xs.sort((a, b) => a - b);
-  // Re-sample the three series onto the merged xs array.
+
+  // Build three series:
+  //   - obsSeries: observed MMP at recorded durations (else null)
+  //   - insideSeries: CP fit only inside the fitting window (3-20 min)
+  //   - outsideSeries: decay extrapolation only beyond the fitting
+  //     window's CEILING (decay.fromS = 1200 s). We intentionally do
+  //     NOT extrapolate below the fitting window — the 2-parameter CP
+  //     model gives nonsensical kilowatt values at sub-minute
+  //     durations (CP + W'/1s ≈ 22 kW), which would dominate the
+  //     y-axis and make the chart unreadable.
   const obsSeries = xs.map((d) => {
     const idx = observedDurations.indexOf(d);
     return idx >= 0 ? observedPower[idx] : null;
   });
   const insideSeries = xs.map((d) => {
-    const out = (d >= fit.range.minS && d <= DEFAULT_DECAY.fromS)
-      ? predictPower(fit, d)
-      : null;
+    if (d < fit.range.minS || d > DEFAULT_DECAY.fromS) return null;
+    const out = predictPower(fit, d);
     return out ? out.powerW : null;
   });
   const outsideSeries = xs.map((d) => {
-    const out = (d > DEFAULT_DECAY.fromS || d < fit.range.minS)
-      ? predictPower(fit, d)
-      : null;
+    if (d <= DEFAULT_DECAY.fromS) return null;
+    const out = predictPower(fit, d);
     return out ? out.powerW : null;
   });
 
   const data = [xs, obsSeries, insideSeries, outsideSeries];
+
+  // Y-axis range: anchor at 0, top at the observed max with 10%
+  // headroom. Falls back to the threshold-anchored model power when
+  // there's no observed data yet (keeps the axis sensible).
+  const observedMax = observedPower.length ? Math.max(...observedPower) : null;
+  const modelTop = (() => {
+    const at = predictPower(fit, fit.range.minS);
+    return at ? at.powerW : 400;
+  })();
+  const yMax = Math.ceil(((observedMax ?? modelTop) * 1.1) / 50) * 50;
 
   const styles = getComputedStyle(document.body);
   const ink = styles.getPropertyValue('--ink').trim() || '#1a1612';
@@ -86,9 +102,10 @@ export function renderCurveChart(container, { mmp, fit }) {
   const opts = {
     width: container.clientWidth || 720,
     height: 360,
+    padding: [16, 16, 8, 8],
     scales: {
-      x: { distr: 3, log: 10 }, // log10 scale on duration
-      y: { auto: true },
+      x: { distr: 3, log: 10 },          // log10 scale on duration
+      y: { auto: false, range: [0, yMax] },
     },
     axes: [
       {
@@ -96,6 +113,8 @@ export function renderCurveChart(container, { mmp, fit }) {
         grid: { stroke: hair, width: 0.5 },
         ticks: { stroke: hair, width: 0.5 },
         font: '11px "JetBrains Mono", ui-monospace, monospace',
+        size: 28,
+        splits: () => STANDARD_TICKS,
         values: (_u, splits) => splits.map(formatDurationTick),
       },
       {
@@ -103,6 +122,7 @@ export function renderCurveChart(container, { mmp, fit }) {
         grid: { stroke: hair, width: 0.5 },
         ticks: { stroke: hair, width: 0.5 },
         font: '11px "JetBrains Mono", ui-monospace, monospace',
+        size: 56,                        // fits "1500 W" without clipping
         values: (_u, splits) => splits.map((v) => `${Math.round(v)} W`),
       },
     ],

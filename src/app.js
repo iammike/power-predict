@@ -134,7 +134,7 @@ async function handleArchive(file) {
 // Re-query the inner DOM each call rather than caching refs, since
 // caching across setProgress() resets was racy.
 let lastProgressUpdate = 0;
-let phaseStartedAt = null;
+let runStartedAt = null;
 let lastPhase = null;
 const PROGRESS_THROTTLE_MS = 50;
 
@@ -145,13 +145,11 @@ const READ_WEIGHT = 0.5;
 function setProgressPhase(phase, payload) {
   if (!progressEl) return;
   const now = performance.now ? performance.now() : Date.now();
-  // Reset phase timer on phase change, and on a fresh run (Reading
-  // with bytesRead=0) so ETA doesn't carry over from a previous drop.
+  // Reset run timer on a fresh archive drop (Reading with bytesRead=0)
+  // so ETA reflects total wall time, not per-phase.
   const isFreshRun = phase === 'Reading' && !payload.bytesRead;
-  if (lastPhase !== phase || isFreshRun) {
-    lastPhase = phase;
-    phaseStartedAt = now;
-  }
+  if (isFreshRun || runStartedAt == null) runStartedAt = now;
+  lastPhase = phase;
   const readFrac = payload.totalBytes ? Math.min(1, payload.bytesRead / payload.totalBytes) : 0;
   const parseFrac = payload.activitiesSeen ? Math.min(1, payload.parsedCount / payload.activitiesSeen) : 0;
   const isParsing = phase === 'Parsing';
@@ -176,13 +174,15 @@ function setProgressPhase(phase, payload) {
     ? `Parsing: ${payload.parsedCount} / ${payload.activitiesSeen} activities (${(parseFrac * 100).toFixed(0)}%)${payload.withPower ? ` · ${payload.withPower} with power` : ''}${payload.skipped ? `, ${payload.skipped} cached` : ''}`
     : `Reading: ${formatBytes(payload.bytesRead)} / ${formatBytes(payload.totalBytes)} (${(readFrac * 100).toFixed(0)}%)${payload.activitiesSeen ? ` · ${payload.activitiesSeen} entries seen` : ''}`;
 
-  // ETA from phase elapsed and current fraction. Suppressed for the
-  // first few percent where the slope is too noisy to extrapolate.
-  const phaseFrac = isParsing ? parseFrac : readFrac;
+  // Overall ETA from total elapsed and unified bar position, so the
+  // estimate reflects the whole job (read + parse) rather than just
+  // the active phase. Suppressed below 5% / above 99% where the
+  // extrapolation is too noisy or already done.
+  const overallFrac = overall / 100;
   let etaText = '';
-  if (phaseFrac > 0.05 && phaseFrac < 0.99) {
-    const elapsed = (now - phaseStartedAt) / 1000;
-    const remaining = (elapsed / phaseFrac) * (1 - phaseFrac);
+  if (overallFrac > 0.05 && overallFrac < 0.99 && runStartedAt != null) {
+    const elapsed = (now - runStartedAt) / 1000;
+    const remaining = (elapsed / overallFrac) * (1 - overallFrac);
     etaText = ` · ${formatEta(remaining)} remaining`;
   }
 

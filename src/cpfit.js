@@ -136,9 +136,16 @@ export function predictPower(fit, durationS, opts = {}) {
     let best = thresholdAnchorPower * (decay.fromS / durationS) ** decay.k;
 
     if (Array.isArray(fit.points)) {
+      // Every observed point above the model contributes a Riegel
+      // decay curve valid at *all* extrapolation durations. We take
+      // the upper envelope, regardless of whether the anchor sits
+      // before or after the target — that's what makes the curve
+      // continuous across observation boundaries. (For target < anchor,
+      // the formula gives a slightly higher power, which matches the
+      // physical intuition: if you held P for 30 min, you held ≥ P
+      // for any shorter duration of the same effort.)
       for (const p of fit.points) {
         if (p.durationS <= decay.fromS) continue;
-        if (p.durationS > durationS) break; // sorted by durationS
         const modelAtP = fit.cpW + fit.wPrimeJ / p.durationS;
         if (p.powerW <= modelAtP) continue;
         const fromP = p.powerW * (p.durationS / durationS) ** decay.k;
@@ -146,8 +153,7 @@ export function predictPower(fit, durationS, opts = {}) {
       }
 
       // Final safeguard: never predict below a recorded MMP at the
-      // exact target duration, even if the upper-envelope math
-      // somehow lands lower (e.g. floating-point noise).
+      // exact target duration.
       const exact = fit.points.find((p) => p.durationS === durationS);
       if (exact && exact.powerW > best) best = exact.powerW;
     }

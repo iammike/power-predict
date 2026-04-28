@@ -134,7 +134,6 @@ async function handleArchive(file) {
 // Re-query the inner DOM each call rather than caching refs, since
 // caching across setProgress() resets was racy.
 let lastProgressUpdate = 0;
-let runStartedAt = null;
 let lastPhase = null;
 const PROGRESS_THROTTLE_MS = 50;
 
@@ -145,10 +144,6 @@ const READ_WEIGHT = 0.5;
 function setProgressPhase(phase, payload) {
   if (!progressEl) return;
   const now = performance.now ? performance.now() : Date.now();
-  // Reset run timer on a fresh archive drop (Reading with bytesRead=0)
-  // so ETA reflects total wall time, not per-phase.
-  const isFreshRun = phase === 'Reading' && !payload.bytesRead;
-  if (isFreshRun || runStartedAt == null) runStartedAt = now;
   lastPhase = phase;
   const readFrac = payload.totalBytes ? Math.min(1, payload.bytesRead / payload.totalBytes) : 0;
   const parseFrac = payload.activitiesSeen ? Math.min(1, payload.parsedCount / payload.activitiesSeen) : 0;
@@ -174,33 +169,14 @@ function setProgressPhase(phase, payload) {
     ? `Parsing: ${payload.parsedCount} / ${payload.activitiesSeen} activities (${(parseFrac * 100).toFixed(0)}%)${payload.withPower ? ` · ${payload.withPower} with power` : ''}${payload.skipped ? `, ${payload.skipped} cached` : ''}`
     : `Reading: ${formatBytes(payload.bytesRead)} / ${formatBytes(payload.totalBytes)} (${(readFrac * 100).toFixed(0)}%)${payload.activitiesSeen ? ` · ${payload.activitiesSeen} entries seen` : ''}`;
 
-  // Overall ETA from total elapsed and unified bar position, so the
-  // estimate reflects the whole job (read + parse) rather than just
-  // the active phase. Suppressed below 5% / above 99% where the
-  // extrapolation is too noisy or already done.
-  const overallFrac = overall / 100;
-  let etaText = '';
-  if (overallFrac > 0.05 && overallFrac < 0.99 && runStartedAt != null) {
-    const elapsed = (now - runStartedAt) / 1000;
-    const remaining = (elapsed / overallFrac) * (1 - overallFrac);
-    etaText = ` · ${formatEta(remaining)} remaining`;
-  }
+  // ETA removed — read and parse take very different amounts of time
+  // per archive, so any single weighting produced misleading numbers.
+  // The phase counters + bar position are honest enough on their own.
 
   const textEl = progressEl.querySelector('.progress__text');
   const fillEl = progressEl.querySelector('.progress__bar-fill');
-  if (textEl) textEl.textContent = `${phaseDetail}${etaText}`;
+  if (textEl) textEl.textContent = phaseDetail;
   if (fillEl) fillEl.style.width = `${overall}%`;
-}
-
-function formatEta(seconds) {
-  if (!Number.isFinite(seconds) || seconds < 0) return '';
-  if (seconds < 5) return '<5s';
-  if (seconds < 90) return `~${Math.round(seconds)}s`;
-  const m = Math.round(seconds / 60);
-  if (m < 90) return `~${m} min`;
-  const h = Math.floor(seconds / 3600);
-  const mm = Math.round((seconds - h * 3600) / 60);
-  return mm ? `~${h}h ${mm}m` : `~${h}h`;
 }
 
 function formatBytes(bytes) {

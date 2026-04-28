@@ -65,24 +65,49 @@ describe('predictPower', () => {
     expect(out.powerW).toBeLessThan(fit.cpW);
   });
 
-  it('only uses longest-observed MMP as anchor when it exceeds the model', () => {
+  it('only uses an observed-MMP anchor when it exceeds the model', () => {
     // Case A: long observed MMP is BELOW model — use threshold anchor.
     const fitLowLong = fitCp2([
       ...synth(280, 22000, [180, 300, 600, 900, 1200]),
       { durationS: 3600, powerW: 200 }, // low-effort 1h base ride
     ]);
     const lowOut = predictPower(fitLowLong, 7200);
-    // Should ignore the 200W observation and anchor at threshold.
     const expectedThresholdAnchored = (280 + 22000 / 1200) * (1200 / 7200) ** 0.10;
     expect(lowOut.powerW).toBeCloseTo(expectedThresholdAnchored, 2);
 
-    // Case B: long observed MMP EXCEEDS model — use it as anchor.
+    // Case B: long observed MMP EXCEEDS model — anchor on it.
     const fitHighLong = fitCp2([
       ...synth(280, 22000, [180, 300, 600, 900, 1200]),
       { durationS: 3600, powerW: 290 }, // genuinely strong 1h
     ]);
     const highOut = predictPower(fitHighLong, 7200);
     expect(highOut.powerW).toBeCloseTo(290 * (3600 / 7200) ** 0.10, 2);
+  });
+
+  it('never predicts below a real observation at the same duration', () => {
+    // 45-min observed of 242 W in a fit whose 90d CP came out lowish.
+    // Even with decay, the prediction should not undercut a real ride
+    // at the exact target duration.
+    const lowFit = fitCp2([
+      ...synth(220, 14000, [180, 300, 600, 900, 1200]),
+      { durationS: 2700, powerW: 242 },
+      { durationS: 14400, powerW: 150 }, // long low-effort ride
+    ]);
+    const out = predictPower(lowFit, 2700);
+    expect(out.powerW).toBeGreaterThanOrEqual(242);
+  });
+
+  it('anchors closer to target when intermediate observations exceed model', () => {
+    // Same low fit, but predict 60 min — should anchor on the 45-min
+    // observation rather than the threshold or the 4h ride.
+    const lowFit = fitCp2([
+      ...synth(220, 14000, [180, 300, 600, 900, 1200]),
+      { durationS: 2700, powerW: 242 },   // 45 min above model
+      { durationS: 14400, powerW: 150 },  // 4h below model — ignored
+    ]);
+    const out = predictPower(lowFit, 3600);
+    // Should anchor at (2700, 242) and decay to 3600.
+    expect(out.powerW).toBeCloseTo(242 * (2700 / 3600) ** 0.10, 1);
   });
 
   it('respects an explicit decay override', () => {

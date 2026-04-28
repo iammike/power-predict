@@ -57,14 +57,14 @@ export function fitCp2(points, range = DEFAULT_FIT_RANGE) {
   }
   const rmse = Math.sqrt(sse / n);
 
-  // Track the longest-duration MMP across the *full* input (not just
-  // the fitting window) so predictions for endurance durations can
-  // anchor to real data instead of extrapolating from the CP model.
-  let longest = null;
-  for (const p of points) {
-    if (!Number.isFinite(p.durationS) || !Number.isFinite(p.powerW)) continue;
-    if (!longest || p.durationS > longest.durationS) longest = p;
-  }
+  // Keep the full input on the fit so predictPower can anchor decay
+  // on whichever observed point is most relevant for the target
+  // duration — not just the single longest point.
+  const allPoints = points
+    .filter((p) => Number.isFinite(p.durationS) && Number.isFinite(p.powerW))
+    .map((p) => ({ durationS: p.durationS, powerW: p.powerW }))
+    .sort((a, b) => a.durationS - b.durationS);
+  const longest = allPoints[allPoints.length - 1] || null;
 
   return {
     cpW,
@@ -76,6 +76,7 @@ export function fitCp2(points, range = DEFAULT_FIT_RANGE) {
     maxObservedS: filtered.reduce((m, p) => Math.max(m, p.durationS), -Infinity),
     longestS: longest?.durationS ?? null,
     longestW: longest?.powerW ?? null,
+    points: allPoints,
   };
 }
 
@@ -119,28 +120,37 @@ export function predictPower(fit, durationS, opts = {}) {
   let powerW = fit.cpW + fit.wPrimeJ / durationS;
   let decayed = false;
   if (decay && durationS > decay.fromS) {
-    // Default: anchor at the decay threshold using the model's
-    // extrapolated power at that duration.
+    // Walk every observed point in the extrapolation range and pick
+    // the best decay anchor: the one closest to (and not beyond) the
+    // target duration whose observed power exceeds what the CP model
+    // would predict there. Anchoring closer to the target gives a
+    // tighter prediction; requiring "above model" filters out
+    // low-effort base rides that would drag the prediction down.
     let anchorS = decay.fromS;
     let anchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
 
-    // Only override with the longest observed MMP when that real
-    // effort *exceeds* what the model would predict at that
-    // duration. Otherwise the observation reflects a low-effort
-    // base ride rather than a true ceiling, and using it as anchor
-    // would propagate the under-effort to all longer predictions.
-    if (
-      fit.longestS && fit.longestW &&
-      fit.longestS > decay.fromS &&
-      fit.longestS <= durationS
-    ) {
-      const modelAtLongest = fit.cpW + fit.wPrimeJ / fit.longestS;
-      if (fit.longestW > modelAtLongest) {
-        anchorS = fit.longestS;
-        anchorPower = fit.longestW;
+    if (Array.isArray(fit.points)) {
+      for (const p of fit.points) {
+        if (p.durationS <= decay.fromS) continue;
+        if (p.durationS > durationS) break; // points are sorted by durationS
+        const modelAtP = fit.cpW + fit.wPrimeJ / p.durationS;
+        if (p.powerW > modelAtP && p.durationS > anchorS) {
+          anchorS = p.durationS;
+          anchorPower = p.powerW;
+        }
       }
     }
-    powerW = anchorPower * (anchorS / durationS) ** decay.k;
+
+    // If we have an observed point AT the target duration, use it
+    // directly — never predict below an actual recorded value.
+    const exact = Array.isArray(fit.points)
+      ? fit.points.find((p) => p.durationS === durationS)
+      : null;
+    if (exact && exact.powerW > anchorPower * (anchorS / durationS) ** decay.k) {
+      powerW = exact.powerW;
+    } else {
+      powerW = anchorPower * (anchorS / durationS) ** decay.k;
+    }
     decayed = true;
   }
 

@@ -1,5 +1,5 @@
 import { DURATIONS_S } from './mmp.js';
-import { rollingBest } from './aggregate.js';
+import { rollingBest, recencyWeightedBest } from './aggregate.js';
 import { renderCurveChart } from './curve-chart.js';
 import { formatDuration, formatPower } from './format.js';
 import {
@@ -204,8 +204,12 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const last30 = rollingBest(activityMmps, { windowDays: 30 });
   currentMmpByWindow = { last30, last90, allTime };
 
-  // Fit CP/W' on the 90-day curve (falls back to all-time if too sparse).
-  currentFit = fitCp2(mmpToPoints(last90)) || fitCp2(mmpToPoints(allTime));
+  // The fit uses a recency-weighted aggregation of the 90-day window
+  // so a 6-week-old peak doesn't outweigh more recent (and possibly
+  // more representative) rides. Falls back to all-time if too sparse.
+  const last90Weighted = recencyWeightedBest(activityMmps, { windowDays: 90 });
+  const allTimeWeighted = recencyWeightedBest(activityMmps);
+  currentFit = fitCp2(mmpToPoints(last90Weighted)) || fitCp2(mmpToPoints(allTimeWeighted));
 
   const rows = DURATIONS_S
     .filter((d) => allTime[d] !== undefined)
@@ -221,7 +225,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   resultsEl.innerHTML = `
     <header class="results-head">
       <h2>Mean Maximal Power</h2>
-      <span class="results-head__meta">Watts · by duration</span>
+      <span class="results-head__meta">Best avg watts held · raw, not normalized</span>
     </header>
     <table class="mmp-table">
       <thead>
@@ -283,7 +287,7 @@ function renderPredictBlock() {
     <section class="predict">
       <header class="results-head">
         <h2>Predict</h2>
-        <span class="results-head__meta">Critical-power model · last 90 days</span>
+        <span class="results-head__meta">CP model · 90d window, recency-weighted (42d half-life)</span>
       </header>
 
       <dl class="fit-stats">

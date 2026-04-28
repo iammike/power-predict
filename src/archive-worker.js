@@ -105,11 +105,23 @@ async function parseArchive(file) {
       const activity = await parseFit(b);
       if (activity?.powerStream) {
         const mmp = extractMmp(activity.powerStream);
+        // Average power across the activity's full power stream
+        // (including zero / coasting samples) is a coarse proxy for
+        // overall intensity. Used to flag low-effort rides that
+        // shouldn't anchor the recency-weighted CP fit.
+        let totalPower = 0;
+        for (let i = 0; i < activity.powerStream.length; i++) {
+          totalPower += activity.powerStream[i] || 0;
+        }
+        const avgPower = activity.powerStream.length
+          ? totalPower / activity.powerStream.length
+          : 0;
         self.postMessage({
           type: 'activity',
           startTime: activity.startTime,
           durationS: activity.durationS,
           distanceM: activity.distanceM,
+          avgPower,
           mmp,
         });
         withPower++;

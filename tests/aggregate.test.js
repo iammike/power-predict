@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { rollingBest, recencyWeightedBest, normalizedPower, avgPower } from '../src/aggregate.js';
+import {
+  rollingBest,
+  recencyWeightedBest,
+  estimateFtp,
+  effortQualityStats,
+  normalizedPower,
+  avgPower,
+} from '../src/aggregate.js';
 
 describe('rollingBest', () => {
   it('takes the max across activities at each duration', () => {
@@ -17,6 +24,68 @@ describe('rollingBest', () => {
       { startTime: now - 10 * 86400_000, mmp: { 60: 250 } },
     ];
     expect(rollingBest(acts, { windowDays: 90, now })).toEqual({ 60: 250 });
+  });
+});
+
+describe('recencyWeightedBest with effort filter', () => {
+  const now = 100 * 86400_000;
+
+  it('drops activities whose IF falls below the threshold', () => {
+    const acts = [
+      // 5d old, IF = 280/300 = 0.93 → kept
+      { startTime: now - 5 * 86400_000, mmp: { 60: 320 }, avgPower: 280 },
+      // 5d old, IF = 150/300 = 0.50 → dropped
+      { startTime: now - 5 * 86400_000, mmp: { 60: 350 }, avgPower: 150 },
+    ];
+    const out = recencyWeightedBest(acts, { halfLifeDays: 42, now, minIF: 0.70, ftp: 300 });
+    expect(out).toEqual({ 60: 320 });
+  });
+
+  it('includes activities with missing avgPower regardless of filter', () => {
+    const acts = [
+      { startTime: now - 5 * 86400_000, mmp: { 60: 300 } /* no avgPower */ },
+    ];
+    const out = recencyWeightedBest(acts, { halfLifeDays: 42, now, minIF: 0.70, ftp: 300 });
+    expect(out).toEqual({ 60: 300 });
+  });
+
+  it('disables filter when minIF or ftp is missing', () => {
+    const acts = [
+      { startTime: now - 5 * 86400_000, mmp: { 60: 200 }, avgPower: 100 }, // would be IF=0.33
+    ];
+    expect(recencyWeightedBest(acts, { halfLifeDays: 42, now })).toEqual({ 60: 200 });
+  });
+});
+
+describe('estimateFtp', () => {
+  it('uses 95% of all-time best 20-min MMP', () => {
+    const acts = [
+      { mmp: { 1200: 280 } },
+      { mmp: { 1200: 295 } },
+      { mmp: { 1200: 250 } },
+    ];
+    expect(estimateFtp(acts)).toBeCloseTo(295 * 0.95, 4);
+  });
+
+  it('falls back to 15-min × 0.93 when no 20-min data', () => {
+    const acts = [{ mmp: { 900: 300 } }];
+    expect(estimateFtp(acts)).toBeCloseTo(300 * 0.93, 4);
+  });
+
+  it('returns null when neither is available', () => {
+    expect(estimateFtp([{ mmp: { 60: 350 } }])).toBeNull();
+  });
+});
+
+describe('effortQualityStats', () => {
+  it('counts included / excluded / unknown', () => {
+    const acts = [
+      { avgPower: 220 },           // IF 0.78 → included
+      { avgPower: 150 },           // IF 0.53 → excluded
+      { /* no avgPower */ },       // → unknown
+    ];
+    expect(effortQualityStats(acts, { minIF: 0.70, ftp: 281 }))
+      .toEqual({ included: 1, excluded: 1, unknown: 1 });
   });
 });
 

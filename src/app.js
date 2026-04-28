@@ -1,5 +1,5 @@
 import { DURATIONS_S } from './mmp.js';
-import { rollingBest, recencyWeightedBest } from './aggregate.js';
+import { rollingBest, recencyWeightedBest, estimateFtp, effortQualityStats } from './aggregate.js';
 import { renderCurveChart } from './curve-chart.js';
 import { formatDuration, formatPower } from './format.js';
 import {
@@ -41,6 +41,7 @@ if (dropZone && fileInput) {
 // User-settable fit overrides, persisted to IDB.
 let currentSettings = {};
 let currentActivities = [];
+let currentEffortStats = { included: 0, excluded: 0, unknown: 0 };
 
 // Hydrate from IndexedDB on page load — returning visitors see their
 // curve instantly without re-uploading.
@@ -100,6 +101,7 @@ async function handleArchive(file) {
                 startTime: msg.startTime,
                 durationS: msg.durationS,
                 distanceM: msg.distanceM,
+                avgPower: msg.avgPower,
                 mmp: msg.mmp,
               });
             }
@@ -224,6 +226,18 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const last30 = rollingBest(filtered, { windowDays: 30 });
   currentMmpByWindow = { last30, last90, allTime };
 
+  // Effort-quality filter: drop activities whose IF (avg / FTP)
+  // falls below the threshold so low-effort base rides don't anchor
+  // the regression. Default ON. FTP is estimated from all-time best
+  // 20-min MMP via Coggan's 0.95 factor.
+  const effortFilterOn = currentSettings.effortFilterOff !== true;
+  const ftp = estimateFtp(filtered);
+  const minIF = currentSettings.minIF ?? 0.70;
+  const effortOpts = effortFilterOn && ftp ? { minIF, ftp } : {};
+  currentEffortStats = effortFilterOn
+    ? effortQualityStats(filtered, { minIF, ftp })
+    : { included: filtered.length, excluded: 0, unknown: 0 };
+
   // The fit's regression uses a recency-weighted aggregation of the
   // 90-day window so a 6-week-old peak doesn't outweigh more recent
   // rides. The observed-point set (used to anchor decay on real
@@ -235,8 +249,8 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // logic still apply on top of the filtered set. If they prefer the
   // entire range, they can set a wider window.
   const fitWindow = (dateFromMs || dateToMs) ? null : 90;
-  const last90Weighted = recencyWeightedBest(filtered, { windowDays: fitWindow });
-  const allTimeWeighted = recencyWeightedBest(filtered);
+  const last90Weighted = recencyWeightedBest(filtered, { windowDays: fitWindow, ...effortOpts });
+  const allTimeWeighted = recencyWeightedBest(filtered, effortOpts);
   currentFit =
     fitCp2(mmpToPoints(last90Weighted), undefined, { observedPoints: mmpToPoints(last90) })
     || fitCp2(mmpToPoints(allTimeWeighted), undefined, { observedPoints: mmpToPoints(allTime) });
@@ -294,9 +308,15 @@ function renderOverrideForm() {
   const cp = currentSettings.cpOverrideW ?? '';
   const from = currentSettings.dateFrom || '';
   const to = currentSettings.dateTo || '';
+  const effortOff = currentSettings.effortFilterOff === true;
+  const stats = currentEffortStats;
+  const effortNote = effortOff
+    ? 'Effort filter off — all activities feed the fit.'
+    : `Effort filter on: ${stats.included} included, ${stats.excluded} dropped as low-effort${stats.unknown ? `, ${stats.unknown} unknown (re-parse archive to classify)` : ''}.`;
   return `
     <details class="override-panel" ${
-      currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo ? 'open' : ''
+      currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo || effortOff
+        ? 'open' : ''
     }>
       <summary>Adjust the fit</summary>
       <form class="override-form" id="override-form">
@@ -312,14 +332,19 @@ function renderOverrideForm() {
           <span>To</span>
           <input type="date" id="date-to" value="${to}">
         </label>
+        <label class="override-form__check">
+          <input type="checkbox" id="effort-off" ${effortOff ? 'checked' : ''}>
+          <span>Disable effort-quality filter (include all activities)</span>
+        </label>
         <div class="override-form__actions">
           <button type="submit">Apply</button>
           <button type="button" class="link-button" id="reset-override">Reset</button>
         </div>
       </form>
       <p class="results-foot__note">
-        Use a CP override when recent rides don't reflect your real fitness (e.g. base block).
-        Use a date range to fit only a specific period — the recency window is dropped while a date range is active.
+        ${effortNote} The filter drops activities whose average power is below 70% of estimated FTP
+        (≈ 0.95 × all-time best 20-min MMP), so base rides don't drag the regression down.
+        Use a CP override or date range when even the filter doesn't capture your real fitness.
       </p>
     </details>
   `;
@@ -334,11 +359,13 @@ function wireOverrideForm() {
     const from = document.getElementById('date-from').value;
     const to = document.getElementById('date-to').value;
     const cp = cpStr ? Number(cpStr) : null;
+    const effortOff = document.getElementById('effort-off').checked;
     currentSettings = {
       ...currentSettings,
       cpOverrideW: Number.isFinite(cp) ? cp : null,
       dateFrom: from || null,
       dateTo: to || null,
+      effortFilterOff: effortOff,
     };
     await saveSettings(currentSettings);
     renderCurves(currentActivities, { fromCache: true });
@@ -385,7 +412,12 @@ function renderPredictBlock() {
     `;
   }
 
-  const overrideActive = !!(currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo);
+  const overrideActive = !!(
+    currentSettings.cpOverrideW ||
+    currentSettings.dateFrom ||
+    currentSettings.dateTo ||
+    currentSettings.effortFilterOff
+  );
   const headerMeta = overrideActive
     ? `CP model · custom override`
     : `CP model · 90d window, recency-weighted (42d half-life)`;

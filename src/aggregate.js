@@ -28,20 +28,30 @@ export function rollingBest(activityMmps, { windowDays = null, now = Date.now() 
 // outrank an old peak), but the prediction should still calibrate
 // against actual achieved power.
 //
-// Inside `windowDays`, this gives the CP fit a curve that responds to
-// current form: a 6-week-old super-effort no longer dominates if more
-// recent rides tell a different story.
+// Effort-quality filter: when `minIF` and `ftp` are supplied, any
+// activity whose `avgPower / ftp` ratio falls below `minIF` is
+// dropped. This prevents low-effort base rides (zone 2 spinning)
+// from anchoring the regression even when they're recent. Activities
+// without `avgPower` are included unconditionally (legacy cache,
+// re-parse archive to enable filtering on them).
 export function recencyWeightedBest(activityMmps, {
   windowDays = null,
   halfLifeDays = 42,
   now = Date.now(),
+  minIF = null,
+  ftp = null,
 } = {}) {
   const cutoff = windowDays ? now - windowDays * 86400_000 : 0;
   const halfLifeMs = halfLifeDays * 86400_000;
   const ln2 = Math.log(2);
+  const filterEnabled = Number.isFinite(minIF) && Number.isFinite(ftp) && ftp > 0;
   const winner = {}; // { [duration]: { raw, weighted } }
-  for (const { startTime, mmp } of activityMmps) {
+  for (const { startTime, mmp, avgPower } of activityMmps) {
     if (startTime < cutoff) continue;
+    if (filterEnabled && Number.isFinite(avgPower)) {
+      const intensity = avgPower / ftp;
+      if (intensity < minIF) continue;
+    }
     const ageMs = Math.max(0, now - startTime);
     const weight = Math.exp((-ln2 * ageMs) / halfLifeMs);
     for (const d of DURATIONS_S) {
@@ -56,6 +66,40 @@ export function recencyWeightedBest(activityMmps, {
   const out = {};
   for (const d of Object.keys(winner)) out[d] = winner[d].raw;
   return out;
+}
+
+// Estimate FTP from the all-time best 20-min MMP (Coggan): FTP ≈
+// 0.95 × MMP_20min. Falls back to MMP_15min × 0.93 or null if no
+// long-duration data is available. Used to compute IF for the
+// effort-quality filter.
+export function estimateFtp(activityMmps) {
+  const best = {};
+  for (const { mmp } of activityMmps) {
+    for (const d of [1200, 900]) {
+      const v = mmp?.[d];
+      if (typeof v !== 'number') continue;
+      if (best[d] === undefined || v > best[d]) best[d] = v;
+    }
+  }
+  if (best[1200]) return best[1200] * 0.95;
+  if (best[900])  return best[900]  * 0.93;
+  return null;
+}
+
+// Count activities that pass the effort-quality filter, plus those
+// excluded vs unknown — for surfacing in the UI so the user knows
+// how much data the filter is acting on.
+export function effortQualityStats(activityMmps, { minIF, ftp }) {
+  let included = 0, excluded = 0, unknown = 0;
+  if (!Number.isFinite(minIF) || !Number.isFinite(ftp) || ftp <= 0) {
+    return { included: activityMmps.length, excluded: 0, unknown: 0 };
+  }
+  for (const a of activityMmps) {
+    if (!Number.isFinite(a.avgPower)) { unknown++; continue; }
+    if (a.avgPower / ftp < minIF) excluded++;
+    else included++;
+  }
+  return { included, excluded, unknown };
 }
 
 // Average power for a stream segment (used for normalized power below).

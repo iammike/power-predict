@@ -715,12 +715,16 @@ main {
 .fit-stats__quality.is-mid  { color: var(--burnt); }
 .fit-stats__quality.is-bad  { color: var(--oxblood); }
 
+.predict-mode-tabs {
+  margin-bottom: 1rem;
+}
 .predict-form {
   display: flex;
   align-items: flex-end;
   gap: 1rem;
   flex-wrap: wrap;
 }
+.predict-form__field[hidden] { display: none; }
 .predict-form__field {
   flex: 1 1 16rem;
   display: flex;

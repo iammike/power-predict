@@ -119,17 +119,26 @@ export function predictPower(fit, durationS, opts = {}) {
   let powerW = fit.cpW + fit.wPrimeJ / durationS;
   let decayed = false;
   if (decay && durationS > decay.fromS) {
-    // Prefer to anchor at the longest observed MMP when it's beyond
-    // the fitting window — real data beats the model extrapolation.
+    // Default: anchor at the decay threshold using the model's
+    // extrapolated power at that duration.
     let anchorS = decay.fromS;
     let anchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
+
+    // Only override with the longest observed MMP when that real
+    // effort *exceeds* what the model would predict at that
+    // duration. Otherwise the observation reflects a low-effort
+    // base ride rather than a true ceiling, and using it as anchor
+    // would propagate the under-effort to all longer predictions.
     if (
       fit.longestS && fit.longestW &&
       fit.longestS > decay.fromS &&
       fit.longestS <= durationS
     ) {
-      anchorS = fit.longestS;
-      anchorPower = fit.longestW;
+      const modelAtLongest = fit.cpW + fit.wPrimeJ / fit.longestS;
+      if (fit.longestW > modelAtLongest) {
+        anchorS = fit.longestS;
+        anchorPower = fit.longestW;
+      }
     }
     powerW = anchorPower * (anchorS / durationS) ** decay.k;
     decayed = true;

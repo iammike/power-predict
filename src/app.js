@@ -133,12 +133,28 @@ async function handleArchive(file) {
 // Re-query the inner DOM each call rather than caching refs, since
 // caching across setProgress() resets was racy.
 let lastProgressUpdate = 0;
+let phaseStartedAt = null;
+let lastPhase = null;
 const PROGRESS_THROTTLE_MS = 50;
+
+// Roughly equal wall time for read vs. parse on a typical archive,
+// so we split the unified bar 50/50. Tweakable.
+const READ_WEIGHT = 0.5;
 
 function setProgressPhase(phase, payload) {
   if (!progressEl) return;
   const now = performance.now ? performance.now() : Date.now();
-  const isComplete = payload.totalBytes && payload.bytesRead >= payload.totalBytes;
+  // Reset phase timer on phase change, and on a fresh run (Reading
+  // with bytesRead=0) so ETA doesn't carry over from a previous drop.
+  const isFreshRun = phase === 'Reading' && !payload.bytesRead;
+  if (lastPhase !== phase || isFreshRun) {
+    lastPhase = phase;
+    phaseStartedAt = now;
+  }
+  const readFrac = payload.totalBytes ? Math.min(1, payload.bytesRead / payload.totalBytes) : 0;
+  const parseFrac = payload.activitiesSeen ? Math.min(1, payload.parsedCount / payload.activitiesSeen) : 0;
+  const isParsing = phase === 'Parsing';
+  const isComplete = isParsing ? parseFrac >= 1 : false;
   const isFirst = !progressEl.querySelector('.progress__bar');
   if (!isComplete && !isFirst && now - lastProgressUpdate < PROGRESS_THROTTLE_MS) return;
   lastProgressUpdate = now;
@@ -150,17 +166,40 @@ function setProgressPhase(phase, payload) {
   }
   progressEl.hidden = false;
 
-  const pct = payload.totalBytes ? Math.min(100, (payload.bytesRead / payload.totalBytes) * 100) : 0;
-  const readPart =
-    `${phase}: ${formatBytes(payload.bytesRead)} / ${formatBytes(payload.totalBytes)} (${pct.toFixed(0)}%)`;
-  const parsePart = payload.activitiesSeen
-    ? ` · ${payload.parsedCount}/${payload.activitiesSeen} parsed${payload.withPower ? `, ${payload.withPower} with power` : ''}${payload.skipped ? `, ${payload.skipped} cached` : ''}`
-    : '';
+  // Combined 0-100 progress: read fills 0..50%, parse fills 50..100%.
+  const overall = isParsing
+    ? READ_WEIGHT * 100 + (1 - READ_WEIGHT) * parseFrac * 100
+    : READ_WEIGHT * readFrac * 100;
+
+  const phaseDetail = isParsing
+    ? `Parsing: ${payload.parsedCount} / ${payload.activitiesSeen} activities (${(parseFrac * 100).toFixed(0)}%)${payload.withPower ? ` · ${payload.withPower} with power` : ''}${payload.skipped ? `, ${payload.skipped} cached` : ''}`
+    : `Reading: ${formatBytes(payload.bytesRead)} / ${formatBytes(payload.totalBytes)} (${(readFrac * 100).toFixed(0)}%)${payload.activitiesSeen ? ` · ${payload.activitiesSeen} entries seen` : ''}`;
+
+  // ETA from phase elapsed and current fraction. Suppressed for the
+  // first few percent where the slope is too noisy to extrapolate.
+  const phaseFrac = isParsing ? parseFrac : readFrac;
+  let etaText = '';
+  if (phaseFrac > 0.05 && phaseFrac < 0.99) {
+    const elapsed = (now - phaseStartedAt) / 1000;
+    const remaining = (elapsed / phaseFrac) * (1 - phaseFrac);
+    etaText = ` · ${formatEta(remaining)} remaining`;
+  }
 
   const textEl = progressEl.querySelector('.progress__text');
   const fillEl = progressEl.querySelector('.progress__bar-fill');
-  if (textEl) textEl.textContent = `${readPart}${parsePart}`;
-  if (fillEl) fillEl.style.width = `${pct}%`;
+  if (textEl) textEl.textContent = `${phaseDetail}${etaText}`;
+  if (fillEl) fillEl.style.width = `${overall}%`;
+}
+
+function formatEta(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '';
+  if (seconds < 5) return '<5s';
+  if (seconds < 90) return `~${Math.round(seconds)}s`;
+  const m = Math.round(seconds / 60);
+  if (m < 90) return `~${m} min`;
+  const h = Math.floor(seconds / 3600);
+  const mm = Math.round((seconds - h * 3600) / 60);
+  return mm ? `~${h}h ${mm}m` : `~${h}h`;
 }
 
 function formatBytes(bytes) {

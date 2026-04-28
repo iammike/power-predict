@@ -127,37 +127,32 @@ export function predictPower(fit, durationS, opts = {}) {
   let powerW = fit.cpW + fit.wPrimeJ / durationS;
   let decayed = false;
   if (decay && durationS > decay.fromS) {
-    // Walk every observed point in the extrapolation range and pick
-    // the best decay anchor: the one closest to (and not beyond) the
-    // target duration whose observed power exceeds what the CP model
-    // would predict there. Anchoring closer to the target gives a
-    // tighter prediction; requiring "above model" filters out
-    // low-effort base rides that would drag the prediction down.
-    let anchorS = decay.fromS;
-    let anchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
+    // Take the upper envelope of the threshold-anchored decay and
+    // decay curves originating at every observed point that beats
+    // the model. Each underlying curve is monotonically decreasing,
+    // so their max is continuous — no jumps where one anchor takes
+    // over from another.
+    const thresholdAnchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
+    let best = thresholdAnchorPower * (decay.fromS / durationS) ** decay.k;
 
     if (Array.isArray(fit.points)) {
       for (const p of fit.points) {
         if (p.durationS <= decay.fromS) continue;
-        if (p.durationS > durationS) break; // points are sorted by durationS
+        if (p.durationS > durationS) break; // sorted by durationS
         const modelAtP = fit.cpW + fit.wPrimeJ / p.durationS;
-        if (p.powerW > modelAtP && p.durationS > anchorS) {
-          anchorS = p.durationS;
-          anchorPower = p.powerW;
-        }
+        if (p.powerW <= modelAtP) continue;
+        const fromP = p.powerW * (p.durationS / durationS) ** decay.k;
+        if (fromP > best) best = fromP;
       }
+
+      // Final safeguard: never predict below a recorded MMP at the
+      // exact target duration, even if the upper-envelope math
+      // somehow lands lower (e.g. floating-point noise).
+      const exact = fit.points.find((p) => p.durationS === durationS);
+      if (exact && exact.powerW > best) best = exact.powerW;
     }
 
-    // If we have an observed point AT the target duration, use it
-    // directly — never predict below an actual recorded value.
-    const exact = Array.isArray(fit.points)
-      ? fit.points.find((p) => p.durationS === durationS)
-      : null;
-    if (exact && exact.powerW > anchorPower * (anchorS / durationS) ** decay.k) {
-      powerW = exact.powerW;
-    } else {
-      powerW = anchorPower * (anchorS / durationS) ** decay.k;
-    }
+    powerW = best;
     decayed = true;
   }
 

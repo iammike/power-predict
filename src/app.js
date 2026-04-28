@@ -63,6 +63,27 @@ async function hydrateFromCache() {
 async function handleArchive(file) {
   setProgressPhase('Reading', { bytesRead: 0, totalBytes: file.size });
 
+  // Request a screen wake lock so a long parse isn't interrupted by
+  // the system sleeping. Doesn't fully prevent tab-freeze on 5+ min
+  // backgrounding but covers the common case (drop archive, lock the
+  // screen / switch tabs, come back to results). API only available
+  // over HTTPS and in modern browsers.
+  let wakeLock = null;
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (err) {
+    console.warn('wake lock unavailable', err);
+  }
+  // Re-acquire on visibility change in case the lock was released.
+  const onVisibility = async () => {
+    if (document.visibilityState === 'visible' && wakeLock?.released && 'wakeLock' in navigator) {
+      try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+
   // Dedupe by startTime (the IDB primary key) within this run. Two
   // FIT files that share a start instant would otherwise both count
   // as "with power" while only one survives in IDB.
@@ -121,9 +142,13 @@ async function handleArchive(file) {
     console.error('archive worker failed', err);
     setProgress(`Archive read failed: ${err.message || err}`);
     worker.terminate();
+    document.removeEventListener('visibilitychange', onVisibility);
+    if (wakeLock) try { await wakeLock.release(); } catch {}
     return;
   }
   worker.terminate();
+  document.removeEventListener('visibilitychange', onVisibility);
+  if (wakeLock) try { await wakeLock.release(); } catch {}
 
   const newList = Array.from(newActivities.values());
   if (newList.length > 0) {

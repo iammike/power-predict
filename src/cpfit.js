@@ -114,15 +114,18 @@ export const DEFAULT_DECAY = {
 // Predict sustainable power for a target duration.
 // Returns { powerW, low, high, extrapolated, fit, decayed } or null.
 //
-// Pass `opts.decay = false` to disable fatigue decay (raw 2-param CP);
-// pass `opts.decay = { fromS, k }` to override.
-//
-// The confidence band is the fit RMSE plus an extrapolation penalty
-// that grows logarithmically with how far the target sits outside
-// the observed MMP range.
+// Options:
+//   `decay`              - false to disable fatigue decay; `{ fromS, k }` to override
+//   `useObservedAnchors` - default true. When false, predictions follow the
+//                          regression + threshold-anchored Riegel decay only,
+//                          without lifting the line to match observations.
+//                          The chart uses this for a smooth visualization;
+//                          the predict form keeps the default so single-
+//                          duration predictions never undercut a real ride.
 export function predictPower(fit, durationS, opts = {}) {
   if (!fit || !Number.isFinite(durationS) || durationS <= 0) return null;
   const decay = opts.decay === false ? null : { ...DEFAULT_DECAY, ...(opts.decay || {}) };
+  const useObservedAnchors = opts.useObservedAnchors !== false;
 
   let powerW = fit.cpW + fit.wPrimeJ / durationS;
   let decayed = false;
@@ -140,7 +143,7 @@ export function predictPower(fit, durationS, opts = {}) {
       ? thresholdAnchorPower * (decay.fromS / durationS) ** decay.k
       : powerW;
 
-    if (Array.isArray(fit.points)) {
+    if (useObservedAnchors && Array.isArray(fit.points)) {
       // Every observed point above the model contributes a Riegel
       // decay curve valid at *all* extrapolation durations. We take
       // the upper envelope, regardless of whether the anchor sits

@@ -48,6 +48,16 @@
 
     <p>Power Predict fits the model on Last 90 days by default and falls back to All time if 90 days has too few points in the fitting window.</p>
 
+    <h3>What "best" means</h3>
+
+    <p>Each value in the table is <strong>mean maximal power</strong>: the best rolling <em>average</em> power held for that duration in any activity in the window. It is not normalized power. A 20-minute MMP of 280 W means there is a 20-minute slice of one ride that averaged 280 W &mdash; nothing more.</p>
+
+    <h3>Recency weighting (for the fit, not the table)</h3>
+
+    <p>The display table shows the raw rolling-best across the window. The CP fit is different: each effort is weighted by an exponential decay on age, half-life 42 days. A modest 5-minute power from last week can outrank a peak 5-minute power from 8 weeks ago, because we trust recent data more as a signal of current form.</p>
+
+    <p>The fit returns the <em>raw</em> power of whichever effort wins this weighted contest, so predictions are still calibrated against actual achieved watts. The weighting only changes which efforts the fit listens to.</p>
+
     <h2>3. The Critical Power model</h2>
 
     <p>For durations from roughly 3 minutes to 20 minutes, sustainable power is well-described by the <strong>2-parameter Critical Power model</strong>:</p>

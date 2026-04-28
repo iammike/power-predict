@@ -52,6 +52,14 @@
 
     <p>Each value in the table is <strong>mean maximal power</strong>: the best rolling <em>average</em> power held for that duration in any activity in the window. It is not normalized power. A 20-minute MMP of 280 W means there is a 20-minute slice of one ride that averaged 280 W &mdash; nothing more.</p>
 
+    <h3>Effort-quality filter</h3>
+
+    <p>Recency weighting on its own can underread your fitness when recent rides have been low intensity &mdash; a 30-day base block of zone-2 spinning gets weighted heavily even though those rides don't reflect what you can do at threshold.</p>
+
+    <p>Power Predict estimates your FTP from your all-time best 20-minute mean maximal power (Coggan: FTP &approx; 0.95 &times; MMP<sub>20m</sub>) and computes an <strong>intensity factor</strong> (IF = average power / FTP) for each activity. Activities with IF below 0.70 (roughly tempo or harder) are dropped from the recency-weighted regression input. Hard rides anchor the fit; easy rides don't.</p>
+
+    <p>The filter is on by default and visible in the "Adjust the fit" panel. The note there reports how many activities were included, dropped, or marked as unknown (missing average-power data, e.g., legacy IDB cache &mdash; re-parse the archive to classify).</p>
+
     <h3>Recency weighting (for the fit, not the table)</h3>
 
     <p>The display table shows the raw rolling-best across the window. The CP fit is different: each effort is weighted by an exponential decay on age, half-life 42 days. A modest 5-minute power from last week can outrank a peak 5-minute power from 8 weeks ago, because we trust recent data more as a signal of current form.</p>

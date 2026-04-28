@@ -571,6 +571,20 @@ main {
 }
 .override-form input:focus { border-bottom-color: var(--oxblood); }
 
+.override-form__check {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--hair);
+  margin-top: 0.4rem;
+}
+.override-form__check input { margin: 0; }
+
 .override-form__actions {
   grid-column: 1 / -1;
   display: flex;

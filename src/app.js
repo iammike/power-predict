@@ -255,11 +255,10 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // falls below the threshold so low-effort base rides don't anchor
   // the regression. Default ON. FTP is estimated from all-time best
   // 20-min MMP via Coggan's 0.95 factor.
-  const effortFilterOn = currentSettings.effortFilterOff !== true;
   const ftp = estimateFtp(filtered);
   const minIF = currentSettings.minIF ?? 0.70;
-  const effortOpts = effortFilterOn && ftp ? { minIF, ftp } : {};
-  currentEffortStats = effortFilterOn
+  const effortOpts = ftp ? { minIF, ftp } : {};
+  currentEffortStats = ftp
     ? effortQualityStats(filtered, { minIF, ftp })
     : { included: filtered.length, excluded: 0, unknown: 0 };
 
@@ -379,14 +378,11 @@ function renderOverrideForm() {
   const cp = currentSettings.cpOverrideW ?? '';
   const from = currentSettings.dateFrom || '';
   const to = currentSettings.dateTo || '';
-  const effortOff = currentSettings.effortFilterOff === true;
   const stats = currentEffortStats;
-  const effortNote = effortOff
-    ? 'Effort filter off — all activities feed the fit.'
-    : `Effort filter on: ${stats.included} included, ${stats.excluded} dropped as low-effort${stats.unknown ? `, ${stats.unknown} unknown (re-parse archive to classify)` : ''}.`;
+  const effortNote = `Effort filter: ${stats.included} included, ${stats.excluded} dropped as low-effort${stats.unknown ? `, ${stats.unknown} unknown (re-parse archive to classify)` : ''}.`;
   return `
     <details class="override-panel" ${
-      currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo || effortOff
+      currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo
         ? 'open' : ''
     }>
       <summary>Adjust the fit</summary>
@@ -403,19 +399,15 @@ function renderOverrideForm() {
           <span>To</span>
           <input type="date" id="date-to" value="${to}">
         </label>
-        <label class="override-form__check">
-          <input type="checkbox" id="effort-off" ${effortOff ? 'checked' : ''}>
-          <span>Disable effort-quality filter (include all activities)</span>
-        </label>
         <div class="override-form__actions">
           <button type="submit">Apply</button>
           <button type="button" class="link-button" id="reset-override">Reset</button>
         </div>
       </form>
       <p class="results-foot__note">
-        ${effortNote} The filter drops activities whose average power is below 70% of estimated FTP
-        (≈ 0.95 × all-time best 20-min MMP), so base rides don't drag the regression down.
-        Use a CP override or date range when even the filter doesn't capture your real fitness.
+        ${effortNote} Activities below 70% of estimated FTP (≈ 0.95 × all-time best 20-min MMP)
+        are dropped from the regression so base rides don't drag the fit down. Use a CP override
+        or date range when even the filter doesn't capture your real fitness.
       </p>
     </details>
   `;
@@ -430,13 +422,11 @@ function wireOverrideForm() {
     const from = document.getElementById('date-from').value;
     const to = document.getElementById('date-to').value;
     const cp = cpStr ? Number(cpStr) : null;
-    const effortOff = document.getElementById('effort-off').checked;
     currentSettings = {
       ...currentSettings,
       cpOverrideW: Number.isFinite(cp) ? cp : null,
       dateFrom: from || null,
       dateTo: to || null,
-      effortFilterOff: effortOff,
     };
     await saveSettings(currentSettings);
     renderCurves(currentActivities, { fromCache: true });
@@ -486,8 +476,7 @@ function renderPredictBlock() {
   const overrideActive = !!(
     currentSettings.cpOverrideW ||
     currentSettings.dateFrom ||
-    currentSettings.dateTo ||
-    currentSettings.effortFilterOff
+    currentSettings.dateTo
   );
   const headerMeta = overrideActive
     ? `CP model · custom override`

@@ -325,6 +325,32 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   wireOverrideForm();
 }
 
+// Quality bands for the fit stats. Bands are rules of thumb for the
+// 2-param CP fit on real cyclist data; see methodology doc.
+function rmseQuality(rmse) {
+  if (rmse < 5)  return { label: 'excellent', cls: 'is-good' };
+  if (rmse < 15) return { label: 'good',      cls: 'is-good' };
+  if (rmse < 30) return { label: 'noisy',     cls: 'is-mid'  };
+  return                 { label: 'poor fit', cls: 'is-bad'  };
+}
+function rmseTooltip(rmse) {
+  return 'Root-mean-squared error of the regression. Lower = tighter fit. '
+       + 'Typical bands: <5W excellent (clean test data), 5-15W good (real-world riding), '
+       + '15-30W noisy, >30W means the model isn\'t fitting your data well.';
+}
+function pointsQuality(n) {
+  // 9 durations available in our DURATIONS_S between 3 and 20 min.
+  if (n >= 7) return { label: 'full',     cls: 'is-good' };
+  if (n >= 4) return { label: 'ok',       cls: 'is-mid'  };
+  if (n >= 2) return { label: 'minimal',  cls: 'is-bad'  };
+  return            { label: 'too few',  cls: 'is-bad'  };
+}
+function pointsTooltip(n) {
+  return 'Number of MMP points (durations between 3 and 20 minutes) the regression fitted on. '
+       + 'Up to 9 possible. 7+ is a full picture, 4-6 is workable, 2-3 is minimal — '
+       + 'a fit through only 2 points has no error to speak of but very little to corroborate it.';
+}
+
 function renderOverrideForm() {
   const cp = currentSettings.cpOverrideW ?? '';
   const from = currentSettings.dateFrom || '';
@@ -459,13 +485,15 @@ function renderPredictBlock() {
           <dt>W'</dt>
           <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
         </div>
-        <div data-tooltip="Root-mean-squared error of the regression. How closely the CP/W' hyperbola tracks your 3-20 minute MMPs. Lower = tighter fit.">
+        <div data-tooltip="${rmseTooltip(currentFit.rmse)}">
           <dt>RMSE</dt>
           <dd>${currentFit.rmse.toFixed(1)} W</dd>
+          <span class="fit-stats__quality ${rmseQuality(currentFit.rmse).cls}">${rmseQuality(currentFit.rmse).label}</span>
         </div>
-        <div data-tooltip="Number of MMP points (durations between 3 and 20 minutes) the regression fitted on.">
+        <div data-tooltip="${pointsTooltip(currentFit.nPoints)}">
           <dt>Points</dt>
           <dd>${currentFit.nPoints}</dd>
+          <span class="fit-stats__quality ${pointsQuality(currentFit.nPoints).cls}">${pointsQuality(currentFit.nPoints).label}</span>
         </div>
       </dl>
 

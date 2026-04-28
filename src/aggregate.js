@@ -20,8 +20,13 @@ export function rollingBest(activityMmps, { windowDays = null, now = Date.now() 
 
 // Recency-weighted best. For each duration, every activity's MMP is
 // scaled by an exponential weight based on age — half-life
-// configurable, default 42 days (6 weeks). The activity with the
-// highest WEIGHTED power "wins" the duration; we return its RAW power.
+// configurable, default 180 days (≈ 6 months) to roughly match
+// physiological detraining (5-10% loss per month for trained
+// athletes). Shorter half-lives over-penalize older efforts: a
+// 60-day-old peak weighted at 42d half-life lands at 37%, but in
+// reality a rider's capacity drops only ~20% over 60 days even
+// with no training. The activity with the highest WEIGHTED power
+// "wins" the duration; we return its RAW power.
 //
 // Why not return the weighted value? The fit needs realistic watts.
 // Weighting selects which effort to trust (a moderate recent ride can
@@ -36,7 +41,7 @@ export function rollingBest(activityMmps, { windowDays = null, now = Date.now() 
 // re-parse archive to enable filtering on them).
 export function recencyWeightedBest(activityMmps, {
   windowDays = null,
-  halfLifeDays = 42,
+  halfLifeDays = 180,
   now = Date.now(),
   minIF = null,
   ftp = null,

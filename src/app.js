@@ -445,7 +445,7 @@ function renderPredictBlock() {
   );
   const headerMeta = overrideActive
     ? `CP model · custom override`
-    : `CP model · 90d window, recency-weighted (42d half-life)`;
+    : `CP model · 90d window, recency-weighted (180d half-life)`;
 
   return `
     <section class="predict">

@@ -428,6 +428,74 @@ main {
   border-bottom-color: var(--oxblood-deep);
 }
 
+/* CURVE CHART */
+
+.curve-chart-section {
+  margin: 1.5rem 0 0;
+}
+.curve-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.curve-chart-title {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.curve-window-tabs {
+  display: inline-flex;
+  border: 1px solid var(--hair-strong);
+  background: var(--paper-soft);
+}
+.curve-window-tabs button {
+  font-family: var(--sans);
+  font-weight: 500;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--hair);
+  color: var(--ink-soft);
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.curve-window-tabs button:last-child { border-right: none; }
+.curve-window-tabs button:hover { color: var(--ink); }
+.curve-window-tabs button.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.curve-chart {
+  width: 100%;
+  background: var(--paper-soft);
+  border: 1px solid var(--hair);
+  padding: 0.75rem 0.5rem 0.5rem;
+}
+.curve-chart .u-legend {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  text-align: left;
+  padding-top: 0.4rem;
+}
+.curve-chart .u-legend .u-marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.4em;
+}
+.curve-chart .u-legend tr.u-off > * { opacity: 0.4; }
+
 /* PREDICT */
 
 .predict {

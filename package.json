@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "fflate": "^0.8.2",
-    "fit-file-parser": "^1.21.0"
+    "fit-file-parser": "^1.21.0",
+    "uplot": "^1.6.32"
   }
 }

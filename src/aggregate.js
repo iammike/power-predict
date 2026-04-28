@@ -4,11 +4,18 @@
 
 import { DURATIONS_S } from './mmp.js';
 
-export function rollingBest(activityMmps, { windowDays = null, now = Date.now() } = {}) {
+export function rollingBest(activityMmps, {
+  windowDays = null,
+  now = Date.now(),
+  minIF = null,
+  ftp = null,
+} = {}) {
   const cutoff = windowDays ? now - windowDays * 86400_000 : 0;
+  const filterEnabled = Number.isFinite(minIF) && Number.isFinite(ftp) && ftp > 0;
   const best = {};
-  for (const { startTime, mmp } of activityMmps) {
+  for (const { startTime, mmp, avgPower } of activityMmps) {
     if (startTime < cutoff) continue;
+    if (filterEnabled && Number.isFinite(avgPower) && avgPower / ftp < minIF) continue;
     for (const d of DURATIONS_S) {
       const v = mmp[d];
       if (typeof v !== 'number') continue;

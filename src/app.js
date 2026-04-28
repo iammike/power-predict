@@ -1,5 +1,6 @@
 import { DURATIONS_S } from './mmp.js';
 import { rollingBest } from './aggregate.js';
+import { renderCurveChart } from './curve-chart.js';
 import { formatDuration, formatPower } from './format.js';
 import {
   loadActivities,
@@ -211,13 +212,15 @@ function formatBytes(bytes) {
   return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
-// Held in module scope so the predict form can read it on submit.
+// Held in module scope so the predict form + chart toggles can read.
 let currentFit = null;
+let currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
   const allTime = rollingBest(activityMmps);
   const last90 = rollingBest(activityMmps, { windowDays: 90 });
   const last30 = rollingBest(activityMmps, { windowDays: 30 });
+  currentMmpByWindow = { last30, last90, allTime };
 
   // Fit CP/W' on the 90-day curve (falls back to all-time if too sparse).
   currentFit = fitCp2(mmpToPoints(last90)) || fitCp2(mmpToPoints(allTime));
@@ -261,6 +264,24 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   resultsEl.dataset.revealed = '';
   document.getElementById('clear-cache').addEventListener('click', handleClearCache);
   wirePredictForm();
+  wireCurveChart();
+}
+
+function wireCurveChart() {
+  const container = document.getElementById('curve-chart');
+  if (!container || !currentFit) return;
+  const tabs = document.querySelectorAll('[data-window]');
+  const drawWindow = (key) => {
+    renderCurveChart(container, {
+      mmp: currentMmpByWindow[key] || {},
+      fit: currentFit,
+    });
+    tabs.forEach((t) => t.classList.toggle('is-active', t.dataset.window === key));
+  };
+  tabs.forEach((t) => {
+    t.addEventListener('click', () => drawWindow(t.dataset.window));
+  });
+  drawWindow('last90');
 }
 
 function renderPredictBlock() {
@@ -289,6 +310,18 @@ function renderPredictBlock() {
         <div><dt>RMSE</dt><dd>${currentFit.rmse.toFixed(1)} W</dd></div>
         <div><dt>Points</dt><dd>${currentFit.nPoints}</dd></div>
       </dl>
+
+      <div class="curve-chart-section">
+        <header class="curve-chart-head">
+          <span class="curve-chart-title">Power-duration curve</span>
+          <div class="curve-window-tabs" role="tablist">
+            <button type="button" data-window="last30" role="tab">Last 30d</button>
+            <button type="button" data-window="last90" role="tab" class="is-active">Last 90d</button>
+            <button type="button" data-window="allTime" role="tab">All-time</button>
+          </div>
+        </header>
+        <div id="curve-chart" class="curve-chart"></div>
+      </div>
 
       <form class="predict-form" id="predict-form">
         <label class="predict-form__field">

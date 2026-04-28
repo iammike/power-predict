@@ -28,7 +28,12 @@ async function build() {
     outfile: path.join(distDir, 'archive-worker.js'),
   });
 
-  const cssSrc = fs.readFileSync(path.join(__dirname, 'shared.css'), 'utf8');
+  // Bundle uPlot's stylesheet alongside our own.
+  const uplotCss = fs.readFileSync(
+    path.join(__dirname, 'node_modules', 'uplot', 'dist', 'uPlot.min.css'),
+    'utf8'
+  );
+  const cssSrc = uplotCss + '\n' + fs.readFileSync(path.join(__dirname, 'shared.css'), 'utf8');
   const cssResult = await esbuild.transform(cssSrc, { minify: true, loader: 'css' });
   fs.writeFileSync(path.join(distDir, 'app.min.css'), cssResult.code);
 

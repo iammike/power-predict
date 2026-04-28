@@ -1,5 +1,5 @@
 import { DURATIONS_S } from './mmp.js';
-import { rollingBest, estimateFtp, effortQualityStats } from './aggregate.js';
+import { rollingBest, estimateFtp } from './aggregate.js';
 import { renderCurveChart } from './curve-chart.js';
 import { formatDuration, formatPower } from './format.js';
 import {
@@ -41,7 +41,6 @@ if (dropZone && fileInput) {
 // User-settable fit overrides, persisted to IDB.
 let currentSettings = {};
 let currentActivities = [];
-let currentEffortStats = { included: 0, excluded: 0, unknown: 0 };
 
 // Hydrate from IndexedDB on page load — returning visitors see their
 // curve instantly without re-uploading.
@@ -258,9 +257,6 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const ftp = estimateFtp(filtered);
   const minIF = currentSettings.minIF ?? 0.70;
   const effortOpts = ftp ? { minIF, ftp } : {};
-  currentEffortStats = ftp
-    ? effortQualityStats(filtered, { minIF, ftp })
-    : { included: filtered.length, excluded: 0, unknown: 0 };
 
   // The fit's regression uses raw rolling-best from the same window
   // the table displays — within 90 days, peak power IS what the
@@ -378,8 +374,6 @@ function renderOverrideForm() {
   const cp = currentSettings.cpOverrideW ?? '';
   const from = currentSettings.dateFrom || '';
   const to = currentSettings.dateTo || '';
-  const stats = currentEffortStats;
-  const effortNote = `Effort filter: ${stats.included} included, ${stats.excluded} dropped as low-effort${stats.unknown ? `, ${stats.unknown} unknown (re-parse archive to classify)` : ''}.`;
   return `
     <details class="override-panel" ${
       currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo
@@ -404,11 +398,6 @@ function renderOverrideForm() {
           <button type="button" class="link-button" id="reset-override">Reset</button>
         </div>
       </form>
-      <p class="results-foot__note">
-        ${effortNote} Activities below 70% of estimated FTP (≈ 0.95 × all-time best 20-min MMP)
-        are dropped from the regression so base rides don't drag the fit down. Use a CP override
-        or date range when even the filter doesn't capture your real fitness.
-      </p>
     </details>
   `;
 }

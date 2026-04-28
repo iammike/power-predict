@@ -30,7 +30,12 @@ export function mmpToPoints(mmp) {
 
 // Linear-regression fit. Returns null if there aren't at least 2
 // points within the fitting window.
-export function fitCp2(points, range = DEFAULT_FIT_RANGE) {
+// `points` drives the regression. `opts.observedPoints` (defaults to
+// `points`) is what predictPower scans when anchoring decay on real
+// efforts — pass the raw rolling-best here when the regression input
+// is recency-weighted, so a real ride from 50 days ago can still
+// keep predictions honest at long durations.
+export function fitCp2(points, range = DEFAULT_FIT_RANGE, opts = {}) {
   const filtered = points.filter(
     (p) => p.durationS >= range.minS && p.durationS <= range.maxS
   );
@@ -57,14 +62,16 @@ export function fitCp2(points, range = DEFAULT_FIT_RANGE) {
   }
   const rmse = Math.sqrt(sse / n);
 
-  // Keep the full input on the fit so predictPower can anchor decay
-  // on whichever observed point is most relevant for the target
-  // duration — not just the single longest point.
-  const allPoints = points
+  // Keep the observed-point set on the fit so predictPower can
+  // anchor decay on whichever real effort is most relevant for the
+  // target duration. Defaults to the regression points but can be
+  // supplied separately so the regression can use recency-weighted
+  // values while anchoring still trusts raw rolling-best efforts.
+  const observed = (opts.observedPoints || points)
     .filter((p) => Number.isFinite(p.durationS) && Number.isFinite(p.powerW))
     .map((p) => ({ durationS: p.durationS, powerW: p.powerW }))
     .sort((a, b) => a.durationS - b.durationS);
-  const longest = allPoints[allPoints.length - 1] || null;
+  const longest = observed[observed.length - 1] || null;
 
   return {
     cpW,
@@ -76,7 +83,7 @@ export function fitCp2(points, range = DEFAULT_FIT_RANGE) {
     maxObservedS: filtered.reduce((m, p) => Math.max(m, p.durationS), -Infinity),
     longestS: longest?.durationS ?? null,
     longestW: longest?.powerW ?? null,
-    points: allPoints,
+    points: observed,
   };
 }
 

@@ -204,12 +204,17 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const last30 = rollingBest(activityMmps, { windowDays: 30 });
   currentMmpByWindow = { last30, last90, allTime };
 
-  // The fit uses a recency-weighted aggregation of the 90-day window
-  // so a 6-week-old peak doesn't outweigh more recent (and possibly
-  // more representative) rides. Falls back to all-time if too sparse.
+  // The fit's regression uses a recency-weighted aggregation of the
+  // 90-day window so a 6-week-old peak doesn't outweigh more recent
+  // rides. The observed-point set (used to anchor decay on real
+  // efforts) stays as the raw rolling-best — a real ride at 45 min
+  // months ago still proves capability and keeps long-duration
+  // predictions honest.
   const last90Weighted = recencyWeightedBest(activityMmps, { windowDays: 90 });
   const allTimeWeighted = recencyWeightedBest(activityMmps);
-  currentFit = fitCp2(mmpToPoints(last90Weighted)) || fitCp2(mmpToPoints(allTimeWeighted));
+  currentFit =
+    fitCp2(mmpToPoints(last90Weighted), undefined, { observedPoints: mmpToPoints(last90) })
+    || fitCp2(mmpToPoints(allTimeWeighted), undefined, { observedPoints: mmpToPoints(allTime) });
 
   const rows = DURATIONS_S
     .filter((d) => allTime[d] !== undefined)

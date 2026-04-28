@@ -65,18 +65,24 @@ describe('predictPower', () => {
     expect(out.powerW).toBeLessThan(fit.cpW);
   });
 
-  it('anchors decay at the longest observed MMP when one exists', () => {
-    // Same fit but with an extra long-duration data point — predictions
-    // beyond it should anchor on real data, not the model extrapolation.
-    const fitWithLong = fitCp2([
+  it('only uses longest-observed MMP as anchor when it exceeds the model', () => {
+    // Case A: long observed MMP is BELOW model — use threshold anchor.
+    const fitLowLong = fitCp2([
       ...synth(280, 22000, [180, 300, 600, 900, 1200]),
-      { durationS: 3600, powerW: 260 }, // a real 1h MMP below model
+      { durationS: 3600, powerW: 200 }, // low-effort 1h base ride
     ]);
-    expect(fitWithLong.longestS).toBe(3600);
-    expect(fitWithLong.longestW).toBe(260);
-    const out = predictPower(fitWithLong, 7200);
-    // anchor at 1h, k=0.10: 260 × (3600/7200)^0.10 ≈ 242.6
-    expect(out.powerW).toBeCloseTo(260 * (3600 / 7200) ** 0.10, 2);
+    const lowOut = predictPower(fitLowLong, 7200);
+    // Should ignore the 200W observation and anchor at threshold.
+    const expectedThresholdAnchored = (280 + 22000 / 1200) * (1200 / 7200) ** 0.10;
+    expect(lowOut.powerW).toBeCloseTo(expectedThresholdAnchored, 2);
+
+    // Case B: long observed MMP EXCEEDS model — use it as anchor.
+    const fitHighLong = fitCp2([
+      ...synth(280, 22000, [180, 300, 600, 900, 1200]),
+      { durationS: 3600, powerW: 290 }, // genuinely strong 1h
+    ]);
+    const highOut = predictPower(fitHighLong, 7200);
+    expect(highOut.powerW).toBeCloseTo(290 * (3600 / 7200) ** 0.10, 2);
   });
 
   it('respects an explicit decay override', () => {

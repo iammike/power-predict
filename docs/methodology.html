@@ -60,11 +60,11 @@
 
     <p>The filter is on by default and visible in the "Adjust the fit" panel. The note there reports how many activities were included, dropped, or marked as unknown (missing average-power data, e.g., legacy IDB cache &mdash; re-parse the archive to classify).</p>
 
-    <h3>Recency weighting (for the fit, not the table)</h3>
+    <h3>Why no recency weighting</h3>
 
-    <p>The display table shows the raw rolling-best across the window. The CP fit is different: each effort is weighted by an exponential decay on age, half-life 180 days (≈ 6 months) &mdash; chosen to roughly match physiological detraining (a trained rider loses about 5&ndash;10% of capacity per month with no training, putting half-life at the 6-month order). Shorter half-lives over-penalize older efforts and underread real fitness during easy training blocks.</p>
+    <p>Earlier versions of Power Predict applied an exponential recency weight on top of the 90-day window. After testing, that turned out to over-penalize older efforts: physiologically, a trained rider's capacity changes only a few percent over weeks, not the dramatic decay implied by a half-life shorter than a couple of months. Within a 90-day window, peak power is peak power &mdash; if you hit it once, you can almost certainly hit it again.</p>
 
-    <p>The fit returns the <em>raw</em> power of whichever effort wins this weighted contest, so predictions are still calibrated against actual achieved watts. The weighting only changes which efforts the fit listens to.</p>
+    <p>The "soft training block" case &mdash; recent zone-2 rides making the rider <em>look</em> less fit than they are &mdash; is handled by the effort-quality filter rather than time-weighting. Easy rides are excluded from the regression input; the rider's real efforts within the window anchor the fit.</p>
 
     <h2>3. The Critical Power model</h2>
 

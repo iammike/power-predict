@@ -1,5 +1,5 @@
 import { DURATIONS_S } from './mmp.js';
-import { rollingBest, recencyWeightedBest, estimateFtp, effortQualityStats } from './aggregate.js';
+import { rollingBest, estimateFtp, effortQualityStats } from './aggregate.js';
 import { renderCurveChart } from './curve-chart.js';
 import { formatDuration, formatPower } from './format.js';
 import {
@@ -263,22 +263,18 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     ? effortQualityStats(filtered, { minIF, ftp })
     : { included: filtered.length, excluded: 0, unknown: 0 };
 
-  // The fit's regression uses a recency-weighted aggregation of the
-  // 90-day window so a 6-week-old peak doesn't outweigh more recent
-  // rides. The observed-point set (used to anchor decay on real
-  // efforts) stays as the raw rolling-best — a real ride at 45 min
-  // months ago still proves capability and keeps long-duration
-  // predictions honest.
-  //
-  // If the user supplied a custom date range, we let the rolling-90d
-  // logic still apply on top of the filtered set. If they prefer the
-  // entire range, they can set a wider window.
+  // The fit's regression uses raw rolling-best from the same window
+  // the table displays — within 90 days, peak power IS what the
+  // rider has demonstrated they can do. Recency weighting on top of
+  // the window is over-engineering; physiology doesn't decay over
+  // weeks the way the model implied. The effort filter handles the
+  // "tons of zone-2 base" case by excluding low-IF rides outright.
   const fitWindow = (dateFromMs || dateToMs) ? null : 90;
-  const last90Weighted = recencyWeightedBest(filtered, { windowDays: fitWindow, ...effortOpts });
-  const allTimeWeighted = recencyWeightedBest(filtered, effortOpts);
+  const last90Fit = rollingBest(filtered, { windowDays: fitWindow, ...effortOpts });
+  const allTimeFit = rollingBest(filtered, effortOpts);
   currentFit =
-    fitCp2(mmpToPoints(last90Weighted), undefined, { observedPoints: mmpToPoints(last90) })
-    || fitCp2(mmpToPoints(allTimeWeighted), undefined, { observedPoints: mmpToPoints(allTime) });
+    fitCp2(mmpToPoints(last90Fit), undefined, { observedPoints: mmpToPoints(last90) })
+    || fitCp2(mmpToPoints(allTimeFit), undefined, { observedPoints: mmpToPoints(allTime) });
 
   // Apply CP override on top of the fit (W' stays from the underlying
   // fit so the curve shape is data-derived, not a hand-set hyperbola).
@@ -445,7 +441,7 @@ function renderPredictBlock() {
   );
   const headerMeta = overrideActive
     ? `CP model · custom override`
-    : `CP model · 90d window, recency-weighted (180d half-life)`;
+    : `CP model · last 90 days, effort-filtered`;
 
   return `
     <section class="predict">

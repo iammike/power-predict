@@ -62,7 +62,7 @@
 
     <h3>Recency weighting (for the fit, not the table)</h3>
 
-    <p>The display table shows the raw rolling-best across the window. The CP fit is different: each effort is weighted by an exponential decay on age, half-life 42 days. A modest 5-minute power from last week can outrank a peak 5-minute power from 8 weeks ago, because we trust recent data more as a signal of current form.</p>
+    <p>The display table shows the raw rolling-best across the window. The CP fit is different: each effort is weighted by an exponential decay on age, half-life 180 days (≈ 6 months) &mdash; chosen to roughly match physiological detraining (a trained rider loses about 5&ndash;10% of capacity per month with no training, putting half-life at the 6-month order). Shorter half-lives over-penalize older efforts and underread real fitness during easy training blocks.</p>
 
     <p>The fit returns the <em>raw</em> power of whichever effort wins this weighted contest, so predictions are still calibrated against actual achieved watts. The weighting only changes which efforts the fit listens to.</p>
 

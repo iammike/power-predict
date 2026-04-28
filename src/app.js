@@ -518,23 +518,10 @@ function renderPredictBlock() {
         <div id="curve-chart" class="curve-chart"></div>
       </div>
 
-      <div class="predict-mode-tabs curve-window-tabs" role="tablist">
-        <button type="button" data-mode="duration" role="tab" class="is-active">Duration</button>
-        <button type="button" data-mode="distance" role="tab">Distance × speed</button>
-      </div>
-
-      <form class="predict-form" id="predict-form" data-mode="duration">
-        <label class="predict-form__field" data-mode-field="duration">
+      <form class="predict-form" id="predict-form">
+        <label class="predict-form__field">
           <span>Target duration</span>
-          <input type="text" id="predict-input" placeholder="45m or 2h30m" autocomplete="off" spellcheck="false">
-        </label>
-        <label class="predict-form__field" data-mode-field="distance" hidden>
-          <span>Distance (km)</span>
-          <input type="number" id="predict-distance" min="0.1" max="500" step="0.1" placeholder="40" autocomplete="off">
-        </label>
-        <label class="predict-form__field" data-mode-field="distance" hidden>
-          <span>Avg speed (km/h)</span>
-          <input type="number" id="predict-speed" min="1" max="80" step="0.1" placeholder="35" autocomplete="off">
+          <input type="text" id="predict-input" placeholder="45m or 2h30m" autocomplete="off" spellcheck="false" required>
         </label>
         <button type="submit">Predict</button>
       </form>
@@ -546,44 +533,14 @@ function renderPredictBlock() {
 function wirePredictForm() {
   const form = document.getElementById('predict-form');
   if (!form) return;
-  const tabs = document.querySelectorAll('.predict-mode-tabs button');
-  tabs.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const mode = btn.dataset.mode;
-      tabs.forEach((b) => b.classList.toggle('is-active', b === btn));
-      form.dataset.mode = mode;
-      form.querySelectorAll('[data-mode-field]').forEach((field) => {
-        field.hidden = field.dataset.modeField !== mode;
-      });
-      const focusEl = mode === 'duration'
-        ? document.getElementById('predict-input')
-        : document.getElementById('predict-distance');
-      focusEl?.focus();
-    });
-  });
-
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    const input = document.getElementById('predict-input');
     const out = document.getElementById('predict-output');
-    let seconds;
-    let parseError = null;
-
-    if (form.dataset.mode === 'distance') {
-      const km = Number(document.getElementById('predict-distance').value);
-      const kmh = Number(document.getElementById('predict-speed').value);
-      if (!Number.isFinite(km) || km <= 0 || !Number.isFinite(kmh) || kmh <= 0) {
-        parseError = 'Enter a positive distance and speed.';
-      } else {
-        seconds = Math.round((km / kmh) * 3600);
-      }
-    } else {
-      seconds = parseDuration(document.getElementById('predict-input').value);
-      if (!seconds) parseError = 'Couldn\'t parse that. Try "45m", "1h30m", or "90s".';
-    }
-
-    if (parseError) {
+    const seconds = parseDuration(input.value);
+    if (!seconds) {
       out.hidden = false;
-      out.innerHTML = `<p class="predict-output__error">${parseError}</p>`;
+      out.innerHTML = `<p class="predict-output__error">Couldn't parse that. Try "45m", "1h30m", or "90s".</p>`;
       return;
     }
     const result = predictPower(currentFit, seconds);
@@ -592,12 +549,9 @@ function wirePredictForm() {
       out.innerHTML = `<p class="predict-output__error">Prediction failed.</p>`;
       return;
     }
-    const labelExtra = form.dataset.mode === 'distance'
-      ? ` · ${Number(document.getElementById('predict-distance').value)} km @ ${Number(document.getElementById('predict-speed').value)} km/h`
-      : '';
     out.hidden = false;
     out.innerHTML = `
-      <p class="predict-output__label">Predicted for ${formatDuration(seconds)}${labelExtra}</p>
+      <p class="predict-output__label">Predicted for ${formatDuration(seconds)}</p>
       <p class="predict-output__value">${Math.round(result.powerW)}<span class="predict-output__unit">W</span></p>
       <p class="predict-output__band">
         Range ${Math.round(result.low)}–${Math.round(result.high)} W

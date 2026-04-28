@@ -54,7 +54,11 @@ async function hydrateFromCache() {
 async function handleArchive(file) {
   setProgressPhase('Reading', { bytesRead: 0, totalBytes: file.size });
 
-  const newActivities = [];
+  // Dedupe by startTime (the IDB primary key) within this run. Two
+  // FIT files that share a start instant would otherwise both count
+  // as "with power" while only one survives in IDB.
+  const newActivities = new Map();
+  const seenStartTimes = new Set();
   let withPower = 0;
   let skipped = 0;
   let lastActivitiesSeen = 0;
@@ -68,8 +72,7 @@ async function handleArchive(file) {
         const msg = e.data;
         if (msg.type === 'progress') {
           lastActivitiesSeen = msg.activitiesSeen;
-          const phase = msg.phase === 'parsing' ? 'Parsing'
-            : msg.activitiesSeen > 0 ? 'Reading' : 'Reading';
+          const phase = msg.phase === 'parsing' ? 'Parsing' : 'Reading';
           setProgressPhase(phase, {
             bytesRead: msg.bytesRead,
             totalBytes: msg.totalBytes,
@@ -79,11 +82,13 @@ async function handleArchive(file) {
             skipped,
           });
         } else if (msg.type === 'activity') {
+          if (seenStartTimes.has(msg.startTime)) return;
+          seenStartTimes.add(msg.startTime);
           try {
             if (await hasActivity(msg.startTime)) {
               skipped++;
             } else {
-              newActivities.push({
+              newActivities.set(msg.startTime, {
                 startTime: msg.startTime,
                 durationS: msg.durationS,
                 distanceM: msg.distanceM,
@@ -110,9 +115,10 @@ async function handleArchive(file) {
   }
   worker.terminate();
 
-  if (newActivities.length > 0) {
-    setProgress(`Saving ${newActivities.length} new activities to local cache…`);
-    await saveActivities(newActivities);
+  const newList = Array.from(newActivities.values());
+  if (newList.length > 0) {
+    setProgress(`Saving ${newList.length} new activities to local cache…`);
+    await saveActivities(newList);
   }
 
   const all = await loadActivities();
@@ -124,7 +130,7 @@ async function handleArchive(file) {
   }
 
   setProgress(
-    `Done. ${all.length} activities cached locally (${newActivities.length} new this run, ${skipped} already cached, ${withPower} with power).`
+    `Done. ${all.length} activities cached locally (${newList.length} new this run, ${skipped} already cached, ${withPower} with power out of ${lastActivitiesSeen} activity files).`
   );
   renderCurves(all);
 }

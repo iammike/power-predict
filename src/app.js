@@ -8,6 +8,8 @@ import {
   hasActivity,
   clearActivities,
   activityCount,
+  loadSettings,
+  saveSettings,
 } from './storage.js';
 import { fitCp2, predictPower, mmpToPoints } from './cpfit.js';
 import { parseDuration } from './duration.js';
@@ -36,13 +38,19 @@ if (dropZone && fileInput) {
   });
 }
 
+// User-settable fit overrides, persisted to IDB.
+let currentSettings = {};
+let currentActivities = [];
+
 // Hydrate from IndexedDB on page load — returning visitors see their
 // curve instantly without re-uploading.
 hydrateFromCache();
 
 async function hydrateFromCache() {
   try {
-    const cached = await loadActivities();
+    const [cached, settings] = await Promise.all([loadActivities(), loadSettings()]);
+    currentSettings = settings || {};
+    currentActivities = cached;
     if (cached.length > 0) {
       renderCurves(cached, { fromCache: true });
     }
@@ -199,9 +207,21 @@ let currentFit = null;
 let currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
-  const allTime = rollingBest(activityMmps);
-  const last90 = rollingBest(activityMmps, { windowDays: 90 });
-  const last30 = rollingBest(activityMmps, { windowDays: 30 });
+  currentActivities = activityMmps;
+  // Filter activities by the user's date range, if set.
+  const dateFromMs = currentSettings.dateFrom ? Date.parse(currentSettings.dateFrom) : null;
+  const dateToMs = currentSettings.dateTo
+    ? Date.parse(currentSettings.dateTo) + 86400_000 - 1
+    : null;
+  const filtered = (dateFromMs || dateToMs)
+    ? activityMmps.filter((a) =>
+        (!dateFromMs || a.startTime >= dateFromMs) &&
+        (!dateToMs   || a.startTime <= dateToMs))
+    : activityMmps;
+
+  const allTime = rollingBest(filtered);
+  const last90 = rollingBest(filtered, { windowDays: 90 });
+  const last30 = rollingBest(filtered, { windowDays: 30 });
   currentMmpByWindow = { last30, last90, allTime };
 
   // The fit's regression uses a recency-weighted aggregation of the
@@ -210,11 +230,22 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // efforts) stays as the raw rolling-best — a real ride at 45 min
   // months ago still proves capability and keeps long-duration
   // predictions honest.
-  const last90Weighted = recencyWeightedBest(activityMmps, { windowDays: 90 });
-  const allTimeWeighted = recencyWeightedBest(activityMmps);
+  //
+  // If the user supplied a custom date range, we let the rolling-90d
+  // logic still apply on top of the filtered set. If they prefer the
+  // entire range, they can set a wider window.
+  const fitWindow = (dateFromMs || dateToMs) ? null : 90;
+  const last90Weighted = recencyWeightedBest(filtered, { windowDays: fitWindow });
+  const allTimeWeighted = recencyWeightedBest(filtered);
   currentFit =
     fitCp2(mmpToPoints(last90Weighted), undefined, { observedPoints: mmpToPoints(last90) })
     || fitCp2(mmpToPoints(allTimeWeighted), undefined, { observedPoints: mmpToPoints(allTime) });
+
+  // Apply CP override on top of the fit (W' stays from the underlying
+  // fit so the curve shape is data-derived, not a hand-set hyperbola).
+  if (currentFit && Number.isFinite(currentSettings.cpOverrideW)) {
+    currentFit = { ...currentFit, cpW: currentSettings.cpOverrideW, overridden: true };
+  }
 
   const rows = DURATIONS_S
     .filter((d) => allTime[d] !== undefined)
@@ -256,6 +287,67 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   document.getElementById('clear-cache').addEventListener('click', handleClearCache);
   wirePredictForm();
   wireCurveChart();
+  wireOverrideForm();
+}
+
+function renderOverrideForm() {
+  const cp = currentSettings.cpOverrideW ?? '';
+  const from = currentSettings.dateFrom || '';
+  const to = currentSettings.dateTo || '';
+  return `
+    <details class="override-panel" ${
+      currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo ? 'open' : ''
+    }>
+      <summary>Adjust the fit</summary>
+      <form class="override-form" id="override-form">
+        <label class="override-form__field">
+          <span>CP override (W)</span>
+          <input type="number" id="cp-override" min="50" max="600" step="1" value="${cp}" placeholder="e.g. 280">
+        </label>
+        <label class="override-form__field">
+          <span>From</span>
+          <input type="date" id="date-from" value="${from}">
+        </label>
+        <label class="override-form__field">
+          <span>To</span>
+          <input type="date" id="date-to" value="${to}">
+        </label>
+        <div class="override-form__actions">
+          <button type="submit">Apply</button>
+          <button type="button" class="link-button" id="reset-override">Reset</button>
+        </div>
+      </form>
+      <p class="results-foot__note">
+        Use a CP override when recent rides don't reflect your real fitness (e.g. base block).
+        Use a date range to fit only a specific period — the recency window is dropped while a date range is active.
+      </p>
+    </details>
+  `;
+}
+
+function wireOverrideForm() {
+  const form = document.getElementById('override-form');
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cpStr = document.getElementById('cp-override').value.trim();
+    const from = document.getElementById('date-from').value;
+    const to = document.getElementById('date-to').value;
+    const cp = cpStr ? Number(cpStr) : null;
+    currentSettings = {
+      ...currentSettings,
+      cpOverrideW: Number.isFinite(cp) ? cp : null,
+      dateFrom: from || null,
+      dateTo: to || null,
+    };
+    await saveSettings(currentSettings);
+    renderCurves(currentActivities, { fromCache: true });
+  });
+  document.getElementById('reset-override').addEventListener('click', async () => {
+    currentSettings = {};
+    await saveSettings({});
+    renderCurves(currentActivities, { fromCache: true });
+  });
 }
 
 function wireCurveChart() {
@@ -288,19 +380,26 @@ function renderPredictBlock() {
     `;
   }
 
+  const overrideActive = !!(currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo);
+  const headerMeta = overrideActive
+    ? `CP model · custom override`
+    : `CP model · 90d window, recency-weighted (42d half-life)`;
+
   return `
     <section class="predict">
       <header class="results-head">
-        <h2>Predict</h2>
-        <span class="results-head__meta">CP model · 90d window, recency-weighted (42d half-life)</span>
+        <h2>Predict ${overrideActive ? '<span class="override-badge">OVERRIDE</span>' : ''}</h2>
+        <span class="results-head__meta">${headerMeta}</span>
       </header>
 
       <dl class="fit-stats">
-        <div><dt>CP</dt><dd>${formatPower(currentFit.cpW)}</dd></div>
+        <div><dt>CP${currentFit.overridden ? ' *' : ''}</dt><dd>${formatPower(currentFit.cpW)}</dd></div>
         <div><dt>W'</dt><dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ</dd></div>
         <div><dt>RMSE</dt><dd>${currentFit.rmse.toFixed(1)} W</dd></div>
         <div><dt>Points</dt><dd>${currentFit.nPoints}</dd></div>
       </dl>
+
+      ${renderOverrideForm()}
 
       <div class="curve-chart-section">
         <header class="curve-chart-head">

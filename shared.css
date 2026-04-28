@@ -496,6 +496,120 @@ main {
 }
 .curve-chart .u-legend tr.u-off > * { opacity: 0.4; }
 
+/* OVERRIDE PANEL */
+
+.override-panel {
+  margin: 1.25rem 0 0;
+  border: 1px solid var(--hair);
+  background: var(--paper-soft);
+  padding: 0;
+}
+.override-panel > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.6rem 0.9rem;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid transparent;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.override-panel > summary::-webkit-details-marker { display: none; }
+.override-panel > summary::before {
+  content: '+';
+  display: inline-block;
+  width: 1em;
+  font-family: var(--mono);
+  color: var(--oxblood);
+  margin-right: 0.4rem;
+}
+.override-panel[open] > summary::before { content: '−'; }
+.override-panel[open] > summary {
+  border-bottom-color: var(--hair);
+  background: var(--paper);
+}
+
+.override-form {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 1rem 0.9rem 0.5rem;
+  align-items: end;
+}
+.override-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.override-form__field span {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.override-form input {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.3rem 0;
+  outline: none;
+}
+.override-form input:focus { border-bottom-color: var(--oxblood); }
+
+.override-form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.5rem 0 0;
+  border-top: 1px solid var(--hair);
+  margin-top: 0.4rem;
+}
+.override-form button[type="submit"] {
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--paper);
+  background: var(--oxblood);
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.override-form button[type="submit"]:hover { background: var(--oxblood-deep); }
+.override-panel .results-foot__note {
+  padding: 0 0.9rem 0.9rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.override-badge {
+  font-family: var(--mono);
+  font-size: 0.6em;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--paper);
+  background: var(--oxblood);
+  padding: 0.15em 0.5em;
+  margin-left: 0.5em;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+@media (max-width: 720px) {
+  .override-form { grid-template-columns: 1fr; }
+}
+
 /* PREDICT */
 
 .predict {

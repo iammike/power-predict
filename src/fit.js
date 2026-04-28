@@ -31,15 +31,24 @@ function toActivity(data) {
   const tEnd = +new Date(records[records.length - 1].timestamp);
   const durationS = Math.max(1, Math.round((tEnd - t0) / 1000) + 1);
 
+  // Build a 1Hz power stream and count how many samples actually
+  // carry positive power. Some FIT files written by non-power devices
+  // include power=0 in every record, which `typeof === 'number'` would
+  // count as "has power". Require enough non-zero samples to call it
+  // a real power-meter recording — at least 60 seconds' worth, and at
+  // least 5% of the activity's duration. Otherwise treat as no power.
   const powerStream = new Float32Array(durationS);
-  let hasPower = false;
+  let nonZeroSamples = 0;
   for (const r of records) {
     if (typeof r.power !== 'number') continue;
-    hasPower = true;
     const idx = Math.round((+new Date(r.timestamp) - t0) / 1000);
     if (idx >= 0 && idx < durationS) powerStream[idx] = r.power;
+    if (r.power > 0) nonZeroSamples++;
   }
-  if (!hasPower) return { startTime: t0, durationS, distanceM: lastDistance(records), powerStream: null };
+  const minSamples = Math.max(60, Math.floor(durationS * 0.05));
+  if (nonZeroSamples < minSamples) {
+    return { startTime: t0, durationS, distanceM: lastDistance(records), powerStream: null };
+  }
 
   return {
     startTime: t0,

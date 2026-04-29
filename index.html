@@ -55,12 +55,21 @@
       <span class="drop__hint">strava_export_*.zip · or click to browse</span>
     </div>
 
+    <p class="manual-mode-divider"><span>or, in lieu of an archive</span></p>
+
     <details id="manual-mode" class="manual-mode">
-      <summary id="manual-mode-summary">Synthesize CP / W' from FTP</summary>
+      <summary id="manual-mode-summary">Skip the upload — estimate from FTP or CP</summary>
       <form id="manual-form" class="manual-form" novalidate>
         <label class="manual-form__field">
-          <span>FTP (W)</span>
-          <input type="number" id="manual-ftp" min="50" max="600" step="1" placeholder="280" autocomplete="off" required>
+          <span>Threshold</span>
+          <div class="manual-form__combo">
+            <select id="manual-unit" aria-label="Threshold unit">
+              <option value="ftp" selected>FTP</option>
+              <option value="cp">CP</option>
+            </select>
+            <input type="number" id="manual-threshold" min="50" max="600" step="1" placeholder="280" autocomplete="off" required>
+            <span class="manual-form__unit">W</span>
+          </div>
         </label>
         <label class="manual-form__field">
           <span>Best 1-min power (W) <em>optional</em></span>
@@ -71,9 +80,9 @@
         </div>
       </form>
       <p class="results-foot__note">
-        A coarse CP/W' synthesized from FTP. CP is set to 0.95 × FTP; W' comes from your 1-min sprint when given,
-        otherwise defaults to 18 kJ (middle of the trained-cyclist range). Upload your archive when you can —
-        the prediction tightens up considerably with real data.
+        A coarse synthesis. CP is set to 0.95 × FTP (or used directly if you enter CP); W' comes from your 1-min
+        sprint when given, otherwise defaults to 18 kJ (middle of the trained-cyclist range). Upload your archive
+        when you can — the prediction tightens up considerably with real data.
       </p>
     </details>
     <p id="progress" class="progress" hidden></p>

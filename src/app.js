@@ -44,12 +44,14 @@ const manualForm = document.getElementById('manual-form');
 if (manualForm) {
   manualForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const ftpW = Number(document.getElementById('manual-ftp').value);
+    const unit = document.getElementById('manual-unit').value === 'cp' ? 'cp' : 'ftp';
+    const value = Number(document.getElementById('manual-threshold').value);
+    const ftpW = unit === 'cp' ? value / 0.95 : value;
     const sprintRaw = document.getElementById('manual-1min').value.trim();
     const sprint1minW = sprintRaw ? Number(sprintRaw) : null;
     const fit = synthesizeFit({ ftpW, sprint1minW });
     if (!fit) {
-      setProgress('Enter a positive FTP value (typical range 100-450 W).');
+      setProgress('Enter a positive FTP or CP value (typical range 100-450 W).');
       return;
     }
     renderManualMode(fit, { ftpW, sprint1minW });

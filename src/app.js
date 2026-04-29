@@ -623,7 +623,7 @@ function renderManualMode(fit, inputs = {}) {
     <section class="predict predict--manual">
       <header class="results-head">
         <h2>Predict <span class="override-badge">MANUAL MODE</span></h2>
-        <span class="results-head__meta">Synthesized from FTP · edits update live</span>
+        <span class="results-head__meta">Synthesized from FTP</span>
       </header>
 
       <form class="manual-inline" id="manual-inline" novalidate>

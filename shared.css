@@ -390,6 +390,99 @@ main {
 .mmp-table tbody td.featured { color: var(--oxblood); font-weight: 500; }
 .mmp-table tbody tr:hover td { background: var(--paper-soft); }
 
+.manual-mode {
+  margin: 1.5rem auto 0;
+  max-width: 36rem;
+  border: 1px solid var(--hair);
+  background: var(--paper-soft);
+}
+.manual-mode > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.7rem 1rem;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-soft);
+}
+.manual-mode > summary::-webkit-details-marker { display: none; }
+.manual-mode > summary::before {
+  content: '+';
+  display: inline-block;
+  width: 1em;
+  font-family: var(--mono);
+  color: var(--oxblood);
+  margin-right: 0.4rem;
+}
+.manual-mode[open] > summary::before { content: '−'; }
+.manual-mode[open] > summary {
+  border-bottom: 1px solid var(--hair);
+  background: var(--paper);
+}
+.manual-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+}
+.manual-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.manual-form__field span {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.manual-form__field span em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.manual-form input {
+  font-family: var(--mono);
+  font-size: 1rem;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.5rem 0;
+  outline: none;
+}
+.manual-form input:focus { border-bottom-color: var(--oxblood); }
+.manual-form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+.manual-form button {
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--paper);
+  background: var(--oxblood);
+  border: none;
+  padding: 0.7rem 1.4rem;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.manual-form button:hover { background: var(--oxblood-deep); }
+.manual-mode .results-foot__note {
+  padding: 0 1rem 1rem;
+  margin: 0;
+}
+
 .mmp-link {
   color: inherit;
   text-decoration: none;

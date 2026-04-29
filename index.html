@@ -54,6 +54,28 @@
       <span class="drop__label">Drop your archive</span>
       <span class="drop__hint">strava_export_*.zip · or click to browse</span>
     </div>
+
+    <details id="manual-mode" class="manual-mode">
+      <summary>No archive yet? Estimate from FTP</summary>
+      <form id="manual-form" class="manual-form" novalidate>
+        <label class="manual-form__field">
+          <span>FTP (W)</span>
+          <input type="number" id="manual-ftp" min="50" max="600" step="1" placeholder="280" autocomplete="off" required>
+        </label>
+        <label class="manual-form__field">
+          <span>Best 1-min power (W) <em>optional</em></span>
+          <input type="number" id="manual-1min" min="50" max="2000" step="1" placeholder="450" autocomplete="off">
+        </label>
+        <div class="manual-form__actions">
+          <button type="submit">Use these numbers</button>
+        </div>
+      </form>
+      <p class="results-foot__note">
+        A coarse CP/W' synthesized from FTP. CP is set to 0.95 × FTP; W' comes from your 1-min sprint when given,
+        otherwise defaults to 18 kJ (middle of the trained-cyclist range). Upload your archive when you can —
+        the prediction tightens up considerably with real data.
+      </p>
+    </details>
     <p id="progress" class="progress" hidden></p>
 
     <section id="results" hidden></section>

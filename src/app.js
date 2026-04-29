@@ -14,6 +14,7 @@ import {
 } from './storage.js';
 import { fitCp2, predictPower, mmpToPoints } from './cpfit.js';
 import { parseDuration } from './duration.js';
+import { synthesizeFit } from './manual.js';
 
 const dropZone = document.getElementById('archive-drop');
 const fileInput = document.getElementById('archive-input');
@@ -36,6 +37,22 @@ if (dropZone && fileInput) {
   fileInput.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     if (file) handleArchive(file);
+  });
+}
+
+const manualForm = document.getElementById('manual-form');
+if (manualForm) {
+  manualForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const ftpW = Number(document.getElementById('manual-ftp').value);
+    const sprintRaw = document.getElementById('manual-1min').value.trim();
+    const sprint1minW = sprintRaw ? Number(sprintRaw) : null;
+    const fit = synthesizeFit({ ftpW, sprint1minW });
+    if (!fit) {
+      setProgress('Enter a positive FTP value (typical range 100-450 W).');
+      return;
+    }
+    renderManualMode(fit);
   });
 }
 
@@ -541,6 +558,58 @@ function wireCurveChart() {
     t.addEventListener('click', () => draw(t.dataset.window));
   });
   draw('last90');
+}
+
+// Manual mode: synthesize a CP/W' from the rider's FTP and render
+// just the predict block. No MMP table, no chart of history, no
+// override panel — there's nothing of theirs to override.
+function renderManualMode(fit) {
+  currentFit = fit;
+  currentEftpNow = null;
+  currentActivities = [];
+  currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
+  currentSettings = {};
+
+  resultsEl.innerHTML = `
+    <section class="predict predict--manual">
+      <header class="results-head">
+        <h2>Predict <span class="override-badge">MANUAL MODE</span></h2>
+        <span class="results-head__meta">Synthesized from FTP · no ride history</span>
+      </header>
+
+      <dl class="fit-stats">
+        <div data-tooltip="Critical Power synthesized from the FTP you entered. CP ≈ 0.95 × FTP.">
+          <dt>CP</dt>
+          <dd>${formatPower(fit.cpW)}</dd>
+          <span class="fit-stats__quality is-mid">manual</span>
+        </div>
+        <div data-tooltip="Anaerobic work capacity. Derived from your 1-minute sprint number when given, otherwise defaulted to 18 kJ.">
+          <dt>W'</dt>
+          <dd>${(fit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
+          <span class="fit-stats__quality is-mid">manual</span>
+        </div>
+      </dl>
+
+      <p class="results-foot__note">
+        Predictions will be coarse compared to a real archive — the model has no information about your
+        sprint kinetics or your endurance fade. Upload your Strava archive when you can to anchor the
+        long-duration end of the curve.
+      </p>
+
+      <form class="predict-form" id="predict-form">
+        <label class="predict-form__field">
+          <span>Target duration</span>
+          <input type="text" id="predict-input" placeholder="45m or 2h30m" autocomplete="off" spellcheck="false" required>
+        </label>
+        <button type="submit">Predict</button>
+      </form>
+      <output class="predict-output" id="predict-output" hidden></output>
+    </section>
+  `;
+  resultsEl.hidden = false;
+  resultsEl.dataset.revealed = '';
+  wirePredictForm();
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderPredictBlock() {

@@ -52,6 +52,12 @@
 
     <p>Each value in the table is <strong>mean maximal power</strong>: the best rolling <em>average</em> power held for that duration in any activity in the window. It is not normalized power. A 20-minute MMP of 280 W means there is a 20-minute slice of one ride that averaged 280 W &mdash; nothing more.</p>
 
+    <h3>Anomaly filter (power-meter glitches)</h3>
+
+    <p>Real cycling power kinetics bound how much shorter durations can exceed longer ones &mdash; even a world-class sprinter's 1-second peak sits roughly 1.5-1.8&times; their 5-second peak. A power-meter spike (e.g. a single 2000 W sample on a normal ride) or a flatline glitch (a 2-second plateau at 1367 W where the meter reported the same wattage twice in a row) produces ratios well above plausible.</p>
+
+    <p>Before merging each activity's MMP into the rolling-best, Power Predict checks adjacent-duration ratios against caps tuned to the upper edge of trained-cyclist data. Any short-duration value that breaches its cap relative to a longer reference is dropped from <em>that activity only</em> &mdash; the rest of the activity (longer durations, average power, etc.) still feeds the curve. Other rides' best efforts at the dropped duration carry the table.</p>
+
     <h3>Effort-quality filter</h3>
 
     <p>Recency weighting on its own can underread your fitness when recent rides have been low intensity &mdash; a 30-day base block of zone-2 spinning gets weighted heavily even though those rides don't reflect what you can do at threshold.</p>

@@ -308,6 +308,14 @@ let currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
   currentActivities = activityMmps;
+  // The "no archive yet" disclosure is for users without data —
+  // collapse it once they have data showing so it doesn't look like
+  // a competing entry point. Users can still expand it if they want
+  // to compare against an FTP-only synthesis.
+  if (activityMmps.length > 0) {
+    const manualPanel = document.getElementById('manual-mode');
+    if (manualPanel) manualPanel.open = false;
+  }
   // Filter activities by the user's date range, if set.
   const dateFromMs = currentSettings.dateFrom ? Date.parse(currentSettings.dateFrom) : null;
   const dateToMs = currentSettings.dateTo
@@ -564,11 +572,16 @@ function wireCurveChart() {
 // just the predict block. No MMP table, no chart of history, no
 // override panel — there's nothing of theirs to override.
 function renderManualMode(fit) {
+  // Snapshot the existing data-driven state so the user can swap
+  // back without reloading. Manual mode replaces the rendered view
+  // but does not clear IDB or the in-memory activity list — we just
+  // hold onto it for the "Back to my data" link below.
+  const priorActivities = currentActivities;
+  const priorSettings = currentSettings;
   currentFit = fit;
   currentEftpNow = null;
-  currentActivities = [];
   currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
-  currentSettings = {};
+  const hasPriorData = priorActivities.length > 0;
 
   resultsEl.innerHTML = `
     <section class="predict predict--manual">
@@ -594,6 +607,7 @@ function renderManualMode(fit) {
         Predictions will be coarse compared to a real archive — the model has no information about your
         sprint kinetics or your endurance fade. Upload your Strava archive when you can to anchor the
         long-duration end of the curve.
+        ${hasPriorData ? `<button type="button" class="link-button" id="manual-back">← Back to my data (${priorActivities.length} cached activities)</button>` : ''}
       </p>
 
       <form class="predict-form" id="predict-form">
@@ -609,6 +623,14 @@ function renderManualMode(fit) {
   resultsEl.hidden = false;
   resultsEl.dataset.revealed = '';
   wirePredictForm();
+  if (hasPriorData) {
+    document.getElementById('manual-back').addEventListener('click', () => {
+      currentSettings = priorSettings;
+      const manualPanel = document.getElementById('manual-mode');
+      if (manualPanel) manualPanel.open = false;
+      renderCurves(priorActivities, { fromCache: true });
+    });
+  }
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

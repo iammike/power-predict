@@ -639,11 +639,18 @@ function renderManualMode(fit, inputs = {}) {
   resultsEl.dataset.revealed = '';
   wirePredictForm();
   wireManualInline();
+  // Hide the landing-page disclosure while we're in manual mode —
+  // the inline inputs in the predict block are now the source of
+  // truth and the duplicate above looks like a competing UI.
+  const manualPanel = document.getElementById('manual-mode');
+  if (manualPanel) manualPanel.hidden = true;
   if (hasPriorData) {
     document.getElementById('manual-back').addEventListener('click', () => {
       currentSettings = priorSettings;
-      const manualPanel = document.getElementById('manual-mode');
-      if (manualPanel) manualPanel.open = false;
+      if (manualPanel) {
+        manualPanel.hidden = false;
+        manualPanel.open = false;
+      }
       renderCurves(priorActivities, { fromCache: true });
     });
   }

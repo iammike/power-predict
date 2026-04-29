@@ -146,6 +146,12 @@
 
     <p>Drift normalization only feeds the fit's fallback path. The displayed all-time table column stays raw history &mdash; the dots are still what you actually rode. eFTP<sub>now</sub> is reported as a stat on the predict panel.</p>
 
+    <h2>Manual mode (no archive)</h2>
+
+    <p>For users who haven't uploaded an archive but know their FTP, the landing page exposes a "no archive yet" panel that synthesizes a CP/W' fit on the fly: <strong>CP &approx; 0.95 &times; FTP</strong> (Coggan: FTP is roughly 1.05 &times; CP). When the rider also enters a 1-minute sprint number, <em>W&prime;</em> is solved from the 2-parameter hyperbola at <em>t</em> = 60 s. Otherwise <em>W&prime;</em> defaults to 18 kJ &mdash; the middle of the trained-cyclist range. Result is clamped to [5, 40] kJ so a wildly out-of-range sprint number can't produce an absurd hyperbola.</p>
+
+    <p>Manual mode is intentionally coarse. It can't anchor the long-duration end of the curve to real data, so 4-hour and 12-hour predictions fall back to the model's pure decay rather than observed history. Upload an archive when possible &mdash; the prediction quality improves materially.</p>
+
     <h2>Limitations and planned improvements</h2>
 
     <p>Today's predictions assume your last 90 days of data accurately reflect your current fitness. Issues planned for upcoming releases:</p>

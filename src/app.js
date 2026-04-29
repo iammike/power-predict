@@ -498,7 +498,7 @@ function renderOverrideForm() {
       currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo
         ? 'open' : ''
     }>
-      <summary>Adjust the fit</summary>
+      <summary>Manual override (CP or date range)</summary>
       <form class="override-form" id="override-form">
         <label class="override-form__field">
           <span>CP override (W)</span>

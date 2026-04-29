@@ -64,7 +64,7 @@
 
     <p>Power Predict estimates your FTP from your all-time best 20-minute mean maximal power (Coggan: FTP &approx; 0.95 &times; MMP<sub>20m</sub>) and computes an <strong>intensity factor</strong> (IF = average power / FTP) for each activity. Activities with IF below 0.70 (roughly tempo or harder) are dropped from the recency-weighted regression input. Hard rides anchor the fit; easy rides don't.</p>
 
-    <p>The filter is always on. The "Adjust the fit" panel reports how many activities were included, dropped, or marked as unknown (missing average-power data, e.g., legacy IDB cache &mdash; re-parse the archive to classify).</p>
+    <p>The filter is always on. Activities are dropped per-render with no user toggle &mdash; the goal is honest data, not knobs.</p>
 
     <h3>Why no recency weighting</h3>
 

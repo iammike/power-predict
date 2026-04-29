@@ -650,17 +650,11 @@ function renderManualMode(fit, inputs = {}) {
         </div>
       </dl>
 
-      <div class="results-foot">
-        <p class="results-foot__note">
-          Predictions will be coarse compared to a real archive — the model has no information about your
-          sprint kinetics or your endurance fade. Upload your Strava archive when you can to anchor the
-          long-duration end of the curve.
-        </p>
-        <div class="results-foot__actions">
-          ${hasPriorData ? `<button type="button" class="link-button" id="manual-back">← Back to my data (${priorActivities.length})</button>` : ''}
-          <button type="button" class="link-button" id="manual-upload">Upload an archive</button>
-        </div>
-      </div>
+      <p class="results-foot__note manual-note">
+        Predictions will be coarse compared to a real archive — the model has no information about your
+        sprint kinetics or your endurance fade. Upload your Strava archive when you can to anchor the
+        long-duration end of the curve.
+      </p>
 
       <form class="predict-form" id="predict-form">
         <label class="predict-form__field">
@@ -670,6 +664,13 @@ function renderManualMode(fit, inputs = {}) {
         <button type="submit">Predict</button>
       </form>
       <output class="predict-output" id="predict-output" hidden></output>
+
+      <div class="results-foot results-foot--manual">
+        <div class="results-foot__actions">
+          ${hasPriorData ? `<button type="button" class="link-button" id="manual-back">← Back to my data (${priorActivities.length})</button>` : ''}
+          <button type="button" class="link-button" id="manual-upload">Upload an archive</button>
+        </div>
+      </div>
     </section>
   `;
   resultsEl.hidden = false;

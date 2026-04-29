@@ -154,11 +154,14 @@ async function handleArchive(file) {
     document.removeEventListener('visibilitychange', onVisibility);
     if (wakeLock) try { await wakeLock.release(); } catch {}
     audio?.stop();
+    resetTitle();
     return;
   }
   worker.terminate();
   document.removeEventListener('visibilitychange', onVisibility);
   if (wakeLock) try { await wakeLock.release(); } catch {}
+  audio?.stop();
+  resetTitle();
 
   const newList = Array.from(newActivities.values());
   if (newList.length > 0) {
@@ -257,6 +260,19 @@ function setProgressPhase(phase, payload) {
   const fillEl = progressEl.querySelector('.progress__bar-fill');
   if (textEl) textEl.textContent = phaseDetail;
   if (fillEl) fillEl.style.width = `${overall}%`;
+
+  // Mirror progress into document.title so the tab strip shows
+  // movement even when the tab is hidden — browsers don't paint
+  // hidden tabs, so the progress bar visually freezes for a tabbed-
+  // away user even though the worker keeps running.
+  document.title = isComplete
+    ? 'Power Predict'
+    : `${overall.toFixed(0)}% · ${phase} — Power Predict`;
+}
+
+const ORIGINAL_TITLE = typeof document !== 'undefined' ? document.title : 'Power Predict';
+function resetTitle() {
+  if (typeof document !== 'undefined') document.title = ORIGINAL_TITLE;
 }
 
 function formatBytes(bytes) {

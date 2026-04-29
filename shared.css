@@ -390,24 +390,47 @@ main {
 .mmp-table tbody td.featured { color: var(--oxblood); font-weight: 500; }
 .mmp-table tbody tr:hover td { background: var(--paper-soft); }
 
-/* App-state-driven layout. The body's data-app-state attribute
-   ("onboarding" | "data" | "manual") controls which top-level
-   sections are visible. The site-header wordmark serves as the
-   page identity in data/manual states; the marketing lede only
-   appears for fresh visitors. */
-body[data-app-state="data"] .lede,
+/* App-state-driven layout. The lede stays visible in every state
+   (it's the page header). State controls the secondary sections:
+   onboarding shows the steps + drop zone + synth disclosure;
+   data and manual hide all of those in favor of the results. */
 body[data-app-state="data"] .steps,
 body[data-app-state="data"] #archive-drop,
 body[data-app-state="data"] #manual-mode,
-body[data-app-state="manual"] .lede,
 body[data-app-state="manual"] .steps,
 body[data-app-state="manual"] #archive-drop,
 body[data-app-state="manual"] #manual-mode {
   display: none;
 }
 
+.manual-mode-divider {
+  text-align: center;
+  margin: 1.75rem auto 0.25rem;
+  max-width: 36rem;
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.manual-mode-divider::before,
+.manual-mode-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hair-strong);
+}
+.manual-mode-divider span { white-space: nowrap; }
+body[data-app-state="data"] .manual-mode-divider,
+body[data-app-state="manual"] .manual-mode-divider { display: none; }
+
 .manual-mode {
-  margin: 1.5rem auto 0;
+  margin: 0.5rem auto 0;
   max-width: 36rem;
   border: 1px solid var(--hair);
   background: var(--paper-soft);
@@ -480,6 +503,37 @@ body[data-app-state="manual"] #manual-mode {
   outline: none;
 }
 .manual-form input:focus { border-bottom-color: var(--oxblood); }
+
+.manual-form__combo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.4rem 0;
+}
+.manual-form__combo:focus-within { border-bottom-color: var(--oxblood); }
+.manual-form__combo select {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--hair-strong);
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.manual-form__combo input {
+  flex: 1;
+  border: none;
+  padding: 0;
+}
+.manual-form__unit {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 .manual-form__actions {
   grid-column: 1 / -1;
   display: flex;

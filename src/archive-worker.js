@@ -116,6 +116,10 @@ async function parseArchive(file) {
         const avgPower = activity.powerStream.length
           ? totalPower / activity.powerStream.length
           : 0;
+        // Strava archive paths look like "activities/14228334907.fit.gz".
+        // Capture the numeric ID so MMP cells can deep-link to the
+        // source ride on strava.com.
+        const stravaId = extractStravaId(name);
         self.postMessage({
           type: 'activity',
           startTime: activity.startTime,
@@ -123,6 +127,7 @@ async function parseArchive(file) {
           distanceM: activity.distanceM,
           avgPower,
           mmp,
+          stravaId,
         });
         withPower++;
       }
@@ -137,4 +142,13 @@ async function parseArchive(file) {
   pendingFits.length = 0;
 
   self.postMessage({ type: 'done', activitiesSeen, parsedCount, withPower });
+}
+
+function extractStravaId(name) {
+  // "activities/14228334907.fit.gz" → "14228334907"
+  // Tolerate paths without a leading directory and the .fit / .fit.gz
+  // / .tcx.gz / .gpx.gz variants. Returns null if no numeric ID found.
+  const base = name.split('/').pop() || name;
+  const m = base.match(/^(\d+)\./);
+  return m ? m[1] : null;
 }

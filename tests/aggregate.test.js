@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   rollingBest,
+  rollingBestWithOwners,
   recencyWeightedBest,
   estimateFtp,
   effortQualityStats,
@@ -24,6 +25,26 @@ describe('rollingBest', () => {
       { startTime: now - 10 * 86400_000, mmp: { 60: 250 } },
     ];
     expect(rollingBest(acts, { windowDays: 90, now })).toEqual({ 60: 250 });
+  });
+});
+
+describe('rollingBestWithOwners', () => {
+  it('attaches the winning activity\'s stravaId to each duration', () => {
+    const acts = [
+      { startTime: 1, stravaId: 'A', mmp: { 60: 250, 300: 220 } },
+      { startTime: 2, stravaId: 'B', mmp: { 60: 300, 300: 200 } },
+    ];
+    expect(rollingBestWithOwners(acts)).toEqual({
+      60: { value: 300, stravaId: 'B' },
+      300: { value: 220, stravaId: 'A' },
+    });
+  });
+
+  it('records null stravaId when activity has none', () => {
+    const acts = [{ startTime: 1, mmp: { 60: 200 } }];
+    expect(rollingBestWithOwners(acts)).toEqual({
+      60: { value: 200, stravaId: null },
+    });
   });
 });
 

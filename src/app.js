@@ -1,5 +1,5 @@
 import { DURATIONS_S } from './mmp.js';
-import { rollingBest, estimateFtp } from './aggregate.js';
+import { rollingBest, rollingBestWithOwners, estimateFtp } from './aggregate.js';
 import { normalizeForDrift } from './drift.js';
 import { renderCurveChart } from './curve-chart.js';
 import { formatDuration, formatPower } from './format.js';
@@ -124,6 +124,7 @@ async function handleArchive(file) {
                 distanceM: msg.distanceM,
                 avgPower: msg.avgPower,
                 mmp: msg.mmp,
+                stravaId: msg.stravaId ?? null,
               });
             }
             withPower++;
@@ -250,6 +251,9 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const allTime = rollingBest(filtered);
   const last90 = rollingBest(filtered, { windowDays: 90 });
   const last30 = rollingBest(filtered, { windowDays: 30 });
+  const allTimeOwners = rollingBestWithOwners(filtered);
+  const last90Owners = rollingBestWithOwners(filtered, { windowDays: 90 });
+  const last30Owners = rollingBestWithOwners(filtered, { windowDays: 30 });
   currentMmpByWindow = { last30, last90, allTime };
 
   // Effort-quality filter: drop activities whose IF (avg / FTP)
@@ -294,9 +298,9 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     .map((d) => `
       <tr>
         <td>${formatDuration(d)}</td>
-        <td>${last30[d] !== undefined ? formatPower(last30[d]) : '—'}</td>
-        <td class="featured">${last90[d] !== undefined ? formatPower(last90[d]) : '—'}</td>
-        <td>${formatPower(allTime[d])}</td>
+        <td>${renderMmpCell(last30Owners[d])}</td>
+        <td class="featured">${renderMmpCell(last90Owners[d])}</td>
+        <td>${renderMmpCell(allTimeOwners[d])}</td>
       </tr>`)
     .join('');
 
@@ -374,6 +378,17 @@ function wPrimeTooltip(wPrimeJ) {
        + 'sprinters and track riders push higher. Very high values from a 2-param fit can also signal '
        + 'a steep short-duration MMP relative to the threshold end — sanity-check against your sprint efforts.';
 }
+// Render an MMP table cell. When the owning activity has a Strava
+// ID, link out to strava.com so the user can jump straight to the
+// source ride. Activities cached before this field was tracked render
+// as plain text — re-parse the archive to populate the link.
+function renderMmpCell(owner) {
+  if (!owner || typeof owner.value !== 'number') return '—';
+  const watts = formatPower(owner.value);
+  if (!owner.stravaId) return watts;
+  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" title="Open this activity on Strava">${watts}</a>`;
+}
+
 // Combined fit-quality summary: pick whichever of RMSE / points is
 // the worse of the two so the headline label reflects the limiting
 // factor. Tooltip lists both numbers + the per-axis interpretation.

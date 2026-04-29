@@ -25,6 +25,32 @@ export function rollingBest(activityMmps, {
   return best;
 }
 
+// Same selection logic as rollingBest, but also tracks which
+// activity owns each per-duration max so the UI can deep-link cells
+// to the source ride. Returns { [duration]: { value, stravaId } }.
+export function rollingBestWithOwners(activityMmps, {
+  windowDays = null,
+  now = Date.now(),
+  minIF = null,
+  ftp = null,
+} = {}) {
+  const cutoff = windowDays ? now - windowDays * 86400_000 : 0;
+  const filterEnabled = Number.isFinite(minIF) && Number.isFinite(ftp) && ftp > 0;
+  const best = {};
+  for (const a of activityMmps) {
+    if (a.startTime < cutoff) continue;
+    if (filterEnabled && Number.isFinite(a.avgPower) && a.avgPower / ftp < minIF) continue;
+    for (const d of DURATIONS_S) {
+      const v = a.mmp?.[d];
+      if (typeof v !== 'number') continue;
+      if (best[d] === undefined || v > best[d].value) {
+        best[d] = { value: v, stravaId: a.stravaId ?? null };
+      }
+    }
+  }
+  return best;
+}
+
 // Recency-weighted best. For each duration, every activity's MMP is
 // scaled by an exponential weight based on age — half-life
 // configurable, default 180 days (≈ 6 months) to roughly match

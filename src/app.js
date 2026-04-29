@@ -499,16 +499,6 @@ function renderPredictBlock() {
           <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
           <span class="fit-stats__quality ${wPrimeQuality(currentFit.wPrimeJ).cls}">${wPrimeQuality(currentFit.wPrimeJ).label}</span>
         </div>
-        <div data-tooltip="${rmseTooltip(currentFit.rmse)}">
-          <dt>RMSE</dt>
-          <dd>${currentFit.rmse.toFixed(1)} W</dd>
-          <span class="fit-stats__quality ${rmseQuality(currentFit.rmse).cls}">${rmseQuality(currentFit.rmse).label}</span>
-        </div>
-        <div data-tooltip="${pointsTooltip(currentFit.nPoints)}">
-          <dt>Points</dt>
-          <dd>${currentFit.nPoints}</dd>
-          <span class="fit-stats__quality ${pointsQuality(currentFit.nPoints).cls}">${pointsQuality(currentFit.nPoints).label}</span>
-        </div>
         ${currentEftpNow ? `
         <div data-tooltip="Estimated FTP from your most recent 90 days: 0.95 × best 20-min MMP. Used to drift-normalize older efforts when the fit falls back to all-time data.">
           <dt>eFTP</dt>
@@ -516,6 +506,22 @@ function renderPredictBlock() {
           <span class="fit-stats__quality is-good">last 90d</span>
         </div>` : ''}
       </dl>
+
+      <details class="fit-details">
+        <summary>Fit diagnostics</summary>
+        <dl class="fit-stats fit-stats--secondary">
+          <div data-tooltip="${rmseTooltip(currentFit.rmse)}">
+            <dt>RMSE</dt>
+            <dd>${currentFit.rmse.toFixed(1)} W</dd>
+            <span class="fit-stats__quality ${rmseQuality(currentFit.rmse).cls}">${rmseQuality(currentFit.rmse).label}</span>
+          </div>
+          <div data-tooltip="${pointsTooltip(currentFit.nPoints)}">
+            <dt>Points</dt>
+            <dd>${currentFit.nPoints}</dd>
+            <span class="fit-stats__quality ${pointsQuality(currentFit.nPoints).cls}">${pointsQuality(currentFit.nPoints).label}</span>
+          </div>
+        </dl>
+      </details>
 
       ${renderOverrideForm()}
 

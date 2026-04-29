@@ -751,6 +751,37 @@ body[data-app-state="manual"] .lede .dek {
 }
 .override-form input:focus { border-bottom-color: var(--oxblood); }
 
+.override-form__combo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.25rem 0;
+}
+.override-form__combo:focus-within { border-bottom-color: var(--oxblood); }
+.override-form__combo select {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--hair-strong);
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.override-form__combo input {
+  flex: 1;
+  border: none;
+  padding: 0;
+}
+.override-form__unit {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .override-form__check {
   grid-column: 1 / -1;
   display: flex;

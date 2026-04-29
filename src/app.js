@@ -490,7 +490,15 @@ function pointsTooltip(n) {
 }
 
 function renderOverrideForm() {
-  const cp = currentSettings.cpOverrideW ?? '';
+  // The applied override is always stored as cpOverrideW. The
+  // input mode (`overrideUnit`: 'ftp' | 'cp') controls how we
+  // round-trip the number through the form: FTP mode displays
+  // cpOverrideW / 0.95 and saves user_value × 0.95 back.
+  const unit = currentSettings.overrideUnit === 'cp' ? 'cp' : 'ftp';
+  const cpW = currentSettings.cpOverrideW;
+  const displayValue = Number.isFinite(cpW)
+    ? (unit === 'ftp' ? Math.round(cpW / 0.95) : Math.round(cpW))
+    : '';
   const from = currentSettings.dateFrom || '';
   const to = currentSettings.dateTo || '';
   return `
@@ -498,11 +506,18 @@ function renderOverrideForm() {
       currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo
         ? 'open' : ''
     }>
-      <summary>Manual override (CP or date range)</summary>
+      <summary>Manual override (FTP/CP or date range)</summary>
       <form class="override-form" id="override-form">
         <label class="override-form__field">
-          <span>CP override (W)</span>
-          <input type="number" id="cp-override" min="50" max="600" step="1" value="${cp}" placeholder="e.g. 280">
+          <span>Override</span>
+          <div class="override-form__combo">
+            <select id="override-unit" aria-label="Override unit">
+              <option value="ftp" ${unit === 'ftp' ? 'selected' : ''}>FTP</option>
+              <option value="cp" ${unit === 'cp' ? 'selected' : ''}>CP</option>
+            </select>
+            <input type="number" id="cp-override" min="50" max="600" step="1" value="${displayValue}" placeholder="e.g. 280">
+            <span class="override-form__unit">W</span>
+          </div>
         </label>
         <label class="override-form__field">
           <span>From</span>
@@ -526,13 +541,18 @@ function wireOverrideForm() {
   if (!form) return;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const cpStr = document.getElementById('cp-override').value.trim();
+    const valueStr = document.getElementById('cp-override').value.trim();
+    const unit = document.getElementById('override-unit').value === 'cp' ? 'cp' : 'ftp';
     const from = document.getElementById('date-from').value;
     const to = document.getElementById('date-to').value;
-    const cp = cpStr ? Number(cpStr) : null;
+    const value = valueStr ? Number(valueStr) : null;
+    const cpW = Number.isFinite(value)
+      ? (unit === 'ftp' ? value * 0.95 : value)
+      : null;
     currentSettings = {
       ...currentSettings,
-      cpOverrideW: Number.isFinite(cp) ? cp : null,
+      cpOverrideW: cpW,
+      overrideUnit: unit,
       dateFrom: from || null,
       dateTo: to || null,
     };

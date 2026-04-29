@@ -54,7 +54,7 @@ if (manualForm) {
       setProgress('Enter a positive FTP or CP value (typical range 100-450 W).');
       return;
     }
-    renderManualMode(fit, { ftpW, sprint1minW });
+    renderManualMode(fit, { ftpW, sprint1minW, unit });
   });
 }
 
@@ -414,14 +414,12 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     fileInput?.click();
   });
   document.getElementById('manual-from-data').addEventListener('click', () => {
-    // Drop into manual mode with default starting numbers — the
-    // inline editor inside the manual block lets the user adjust
-    // from there. Pre-seed FTP from the override if one exists.
-    const seedFtp = Number.isFinite(currentSettings.cpOverrideW)
-      ? Math.round(currentSettings.cpOverrideW / 0.95)
-      : 280;
-    const fit = synthesizeFit({ ftpW: seedFtp });
-    if (fit) renderManualMode(fit, { ftpW: seedFtp });
+    // Pre-seed from the current fit — CP is the natural unit here
+    // since we have a fitted CP from data, not an FTP guess.
+    const seedCp = Number.isFinite(currentFit?.cpW) ? currentFit.cpW : 266;
+    const ftpW = seedCp / 0.95;
+    const fit = synthesizeFit({ ftpW });
+    if (fit) renderManualMode(fit, { ftpW, unit: 'cp' });
   });
   wirePredictForm();
   wireCurveChart();
@@ -616,20 +614,31 @@ function renderManualMode(fit, inputs = {}) {
   currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
   const hasPriorData = priorActivities.length > 0;
 
-  const ftpInit = Number.isFinite(inputs.ftpW) ? inputs.ftpW : '';
-  const sprintInit = Number.isFinite(inputs.sprint1minW) ? inputs.sprint1minW : '';
+  const unit = inputs.unit === 'cp' ? 'cp' : 'ftp';
+  const thresholdInit = Number.isFinite(inputs.ftpW)
+    ? Math.round(unit === 'cp' ? inputs.ftpW * 0.95 : inputs.ftpW)
+    : '';
+  const sprintInit = Number.isFinite(inputs.sprint1minW) ? Math.round(inputs.sprint1minW) : '';
+  const headerMeta = unit === 'cp' ? 'Synthesized from CP' : 'Synthesized from FTP';
 
   resultsEl.innerHTML = `
     <section class="predict predict--manual">
       <header class="results-head">
         <h2>Predict <span class="override-badge">MANUAL MODE</span></h2>
-        <span class="results-head__meta">Synthesized from FTP</span>
+        <span class="results-head__meta">${headerMeta}</span>
       </header>
 
       <form class="manual-inline" id="manual-inline" novalidate>
         <label class="manual-inline__field">
-          <span>FTP (W)</span>
-          <input type="number" id="manual-inline-ftp" min="50" max="600" step="1" value="${ftpInit}" autocomplete="off">
+          <span>Threshold</span>
+          <div class="manual-inline__combo">
+            <select id="manual-inline-unit" aria-label="Threshold unit">
+              <option value="ftp" ${unit === 'ftp' ? 'selected' : ''}>FTP</option>
+              <option value="cp" ${unit === 'cp' ? 'selected' : ''}>CP</option>
+            </select>
+            <input type="number" id="manual-inline-threshold" min="50" max="600" step="1" value="${thresholdInit}" autocomplete="off">
+            <span class="manual-inline__unit">W</span>
+          </div>
         </label>
         <label class="manual-inline__field">
           <span>1-min sprint (W) <em>optional</em></span>
@@ -699,11 +708,14 @@ function setAppState(state) {
 }
 
 function wireManualInline() {
-  const ftpInput = document.getElementById('manual-inline-ftp');
+  const unitSelect = document.getElementById('manual-inline-unit');
+  const valueInput = document.getElementById('manual-inline-threshold');
   const sprintInput = document.getElementById('manual-inline-1min');
-  if (!ftpInput || !sprintInput) return;
+  if (!unitSelect || !valueInput || !sprintInput) return;
   const recompute = () => {
-    const ftpW = Number(ftpInput.value);
+    const unit = unitSelect.value === 'cp' ? 'cp' : 'ftp';
+    const value = Number(valueInput.value);
+    const ftpW = unit === 'cp' ? value / 0.95 : value;
     const sprintRaw = sprintInput.value.trim();
     const sprint1minW = sprintRaw ? Number(sprintRaw) : null;
     const fit = synthesizeFit({ ftpW, sprint1minW });
@@ -713,13 +725,16 @@ function wireManualInline() {
     const wpEl = document.getElementById('manual-wprime');
     if (cpEl) cpEl.textContent = formatPower(fit.cpW);
     if (wpEl) wpEl.textContent = `${(fit.wPrimeJ / 1000).toFixed(1)} kJ`;
+    const metaEl = document.querySelector('.predict--manual .results-head__meta');
+    if (metaEl) metaEl.textContent = unit === 'cp' ? 'Synthesized from CP' : 'Synthesized from FTP';
     // If a prediction is already showing, refresh it against the new fit.
     const out = document.getElementById('predict-output');
     if (out && !out.hidden) {
       document.getElementById('predict-form')?.dispatchEvent(new Event('submit', { cancelable: true }));
     }
   };
-  ftpInput.addEventListener('input', recompute);
+  unitSelect.addEventListener('change', recompute);
+  valueInput.addEventListener('input', recompute);
   sprintInput.addEventListener('input', recompute);
 }
 

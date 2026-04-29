@@ -574,6 +574,37 @@ body[data-app-state="manual"] #manual-mode {
 }
 .manual-inline input:focus { border-bottom-color: var(--oxblood); }
 
+.manual-inline__combo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.4rem 0;
+}
+.manual-inline__combo:focus-within { border-bottom-color: var(--oxblood); }
+.manual-inline__combo select {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--hair-strong);
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.manual-inline__combo input {
+  flex: 1;
+  border: none;
+  padding: 0;
+}
+.manual-inline__unit {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
 .mmp-link {
   color: inherit;
   text-decoration: none;

@@ -52,7 +52,7 @@ if (manualForm) {
       setProgress('Enter a positive FTP value (typical range 100-450 W).');
       return;
     }
-    renderManualMode(fit);
+    renderManualMode(fit, { ftpW, sprint1minW });
   });
 }
 
@@ -571,7 +571,7 @@ function wireCurveChart() {
 // Manual mode: synthesize a CP/W' from the rider's FTP and render
 // just the predict block. No MMP table, no chart of history, no
 // override panel — there's nothing of theirs to override.
-function renderManualMode(fit) {
+function renderManualMode(fit, inputs = {}) {
   // Snapshot the existing data-driven state so the user can swap
   // back without reloading. Manual mode replaces the rendered view
   // but does not clear IDB or the in-memory activity list — we just
@@ -583,22 +583,36 @@ function renderManualMode(fit) {
   currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
   const hasPriorData = priorActivities.length > 0;
 
+  const ftpInit = Number.isFinite(inputs.ftpW) ? inputs.ftpW : '';
+  const sprintInit = Number.isFinite(inputs.sprint1minW) ? inputs.sprint1minW : '';
+
   resultsEl.innerHTML = `
     <section class="predict predict--manual">
       <header class="results-head">
         <h2>Predict <span class="override-badge">MANUAL MODE</span></h2>
-        <span class="results-head__meta">Synthesized from FTP · no ride history</span>
+        <span class="results-head__meta">Synthesized from FTP · edits update live</span>
       </header>
 
-      <dl class="fit-stats">
+      <form class="manual-inline" id="manual-inline" novalidate>
+        <label class="manual-inline__field">
+          <span>FTP (W)</span>
+          <input type="number" id="manual-inline-ftp" min="50" max="600" step="1" value="${ftpInit}" autocomplete="off">
+        </label>
+        <label class="manual-inline__field">
+          <span>1-min sprint (W) <em>optional</em></span>
+          <input type="number" id="manual-inline-1min" min="50" max="2000" step="1" value="${sprintInit}" autocomplete="off">
+        </label>
+      </form>
+
+      <dl class="fit-stats" id="manual-fit-stats">
         <div data-tooltip="Critical Power synthesized from the FTP you entered. CP ≈ 0.95 × FTP.">
           <dt>CP</dt>
-          <dd>${formatPower(fit.cpW)}</dd>
+          <dd id="manual-cp">${formatPower(fit.cpW)}</dd>
           <span class="fit-stats__quality is-mid">manual</span>
         </div>
         <div data-tooltip="Anaerobic work capacity. Derived from your 1-minute sprint number when given, otherwise defaulted to 18 kJ.">
           <dt>W'</dt>
-          <dd>${(fit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
+          <dd id="manual-wprime">${(fit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
           <span class="fit-stats__quality is-mid">manual</span>
         </div>
       </dl>
@@ -623,6 +637,7 @@ function renderManualMode(fit) {
   resultsEl.hidden = false;
   resultsEl.dataset.revealed = '';
   wirePredictForm();
+  wireManualInline();
   if (hasPriorData) {
     document.getElementById('manual-back').addEventListener('click', () => {
       currentSettings = priorSettings;
@@ -632,6 +647,31 @@ function renderManualMode(fit) {
     });
   }
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function wireManualInline() {
+  const ftpInput = document.getElementById('manual-inline-ftp');
+  const sprintInput = document.getElementById('manual-inline-1min');
+  if (!ftpInput || !sprintInput) return;
+  const recompute = () => {
+    const ftpW = Number(ftpInput.value);
+    const sprintRaw = sprintInput.value.trim();
+    const sprint1minW = sprintRaw ? Number(sprintRaw) : null;
+    const fit = synthesizeFit({ ftpW, sprint1minW });
+    if (!fit) return;
+    currentFit = fit;
+    const cpEl = document.getElementById('manual-cp');
+    const wpEl = document.getElementById('manual-wprime');
+    if (cpEl) cpEl.textContent = formatPower(fit.cpW);
+    if (wpEl) wpEl.textContent = `${(fit.wPrimeJ / 1000).toFixed(1)} kJ`;
+    // If a prediction is already showing, refresh it against the new fit.
+    const out = document.getElementById('predict-output');
+    if (out && !out.hidden) {
+      document.getElementById('predict-form')?.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  };
+  ftpInput.addEventListener('input', recompute);
+  sprintInput.addEventListener('input', recompute);
 }
 
 function renderPredictBlock() {

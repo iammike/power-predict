@@ -483,6 +483,48 @@ main {
   margin: 0;
 }
 
+.manual-inline {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--hair);
+}
+.manual-inline__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 12rem;
+}
+.manual-inline__field span {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.manual-inline__field span em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.manual-inline input {
+  font-family: var(--mono);
+  font-size: 1rem;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.4rem 0;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+.manual-inline input:focus { border-bottom-color: var(--oxblood); }
+
 .mmp-link {
   color: inherit;
   text-decoration: none;

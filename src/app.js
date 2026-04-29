@@ -1,5 +1,6 @@
 import { DURATIONS_S } from './mmp.js';
 import { rollingBest, estimateFtp } from './aggregate.js';
+import { normalizeForDrift } from './drift.js';
 import { renderCurveChart } from './curve-chart.js';
 import { formatDuration, formatPower } from './format.js';
 import {
@@ -230,6 +231,7 @@ function formatBytes(bytes) {
 
 // Held in module scope so the predict form + chart toggles can read.
 let currentFit = null;
+let currentEftpNow = null;
 let currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
@@ -266,9 +268,17 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // "tons of zone-2 base" case by excluding low-IF rides outright.
   const fitWindow = (dateFromMs || dateToMs) ? null : 90;
   const last90Fit = rollingBest(filtered, { windowDays: fitWindow, ...effortOpts });
-  const allTimeFit = rollingBest(filtered, effortOpts);
+
+  // Drift-normalize for the all-time fallback so an old peak ridden
+  // when the rider was demonstrably fitter doesn't anchor today's
+  // prediction. Only the fallback path uses normalized data — the
+  // displayed all-time table stays raw history.
+  const drift = normalizeForDrift(filtered);
+  const allTimeFitNorm = rollingBest(drift.activities, effortOpts);
+  currentEftpNow = drift.eftpNow;
+
   const primaryFit = fitCp2(mmpToPoints(last90Fit), undefined, { observedPoints: mmpToPoints(last90) });
-  const fallbackFit = fitCp2(mmpToPoints(allTimeFit), undefined, { observedPoints: mmpToPoints(allTime) });
+  const fallbackFit = fitCp2(mmpToPoints(allTimeFitNorm), undefined, { observedPoints: mmpToPoints(allTime) });
   currentFit = primaryFit
     ? { ...primaryFit, fallback: false }
     : (fallbackFit ? { ...fallbackFit, fallback: true } : null);
@@ -499,6 +509,12 @@ function renderPredictBlock() {
           <dd>${currentFit.nPoints}</dd>
           <span class="fit-stats__quality ${pointsQuality(currentFit.nPoints).cls}">${pointsQuality(currentFit.nPoints).label}</span>
         </div>
+        ${currentEftpNow ? `
+        <div data-tooltip="Estimated FTP from your most recent 90 days: 0.95 × best 20-min MMP. Used to drift-normalize older efforts when the fit falls back to all-time data.">
+          <dt>eFTP</dt>
+          <dd>${formatPower(currentEftpNow)}</dd>
+          <span class="fit-stats__quality is-good">last 90d</span>
+        </div>` : ''}
       </dl>
 
       ${renderOverrideForm()}

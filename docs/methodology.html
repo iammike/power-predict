@@ -132,15 +132,21 @@
       <li>Hill, A.V. <em>The physiological basis of athletic records</em>. 1925. Earliest hyperbolic power-duration model.</li>
     </ul>
 
+    <h3>Fitness drift on the all-time fallback</h3>
+
+    <p>When the last-90-days window has too few MMP points to fit a model, Power Predict falls back to your all-time data. The all-time set is dominated by peak efforts that may be years old, when the rider was demonstrably fitter (or less fit) than today &mdash; an unmodified fallback would anchor the fit to a stranger.</p>
+
+    <p>To correct for this we estimate eFTP at each activity's date as 0.95 × best 20-min MMP across the surrounding 90 days, then anchor eFTP<sub>now</sub> from the same window ending today. Each activity's MMP values are scaled by <em>eFTP<sub>now</sub> / eFTP<sub>then</sub></em> before merging into the all-time rolling-best, with the ratio clamped to [0.7, 1.3] so a sparse historical window can't produce wild adjustments. Activities whose window has no 20-min effort pass through unchanged.</p>
+
+    <p>Drift normalization only feeds the fit's fallback path. The displayed all-time table column stays raw history &mdash; the dots are still what you actually rode. eFTP<sub>now</sub> is reported as a stat on the predict panel.</p>
+
     <h2>Limitations and planned improvements</h2>
 
     <p>Today's predictions assume your last 90 days of data accurately reflect your current fitness. Issues planned for upcoming releases:</p>
 
     <ul>
-      <li><strong>Recency weighting</strong> &mdash; weight recent efforts more heavily within the window so a peak ride from week 1 doesn't outweigh week 12.</li>
-      <li><strong>Effort-quality flagging</strong> &mdash; only count an MMP as a "true" point if the activity's overall intensity suggests you were going hard; treat tempo-pace bests as soft data points.</li>
-      <li><strong>Fitness drift normalization</strong> &mdash; rescale older efforts by the ratio of estimated FTP then vs. now, so a year-old peak doesn't dominate.</li>
-      <li><strong>Manual fitness override</strong> &mdash; CP override and custom date range are now available under "Adjust the fit" on the predict panel. CP override replaces the model's CP while keeping the data-derived W'. Date range filters which activities feed the fit, useful for "my best 90 days from earlier this year".</li>
+      <li><strong>3-parameter CP fit</strong> &mdash; add a P<sub>max</sub> term so the model behaves on the &lt;3 minute end. Today the regression window starts at 3 min because the 2-parameter form distorts below that.</li>
+      <li><strong>Training-load adjustment</strong> &mdash; modulate predictions by recent CTL/ATL/TSB so a rider mid-taper doesn't get the same forecast as a rider mid-build.</li>
     </ul>
 
     <p>Track these on the <a href="https://github.com/iammike/power-predict/milestones" target="_blank" rel="noopener">project milestones</a>.</p>

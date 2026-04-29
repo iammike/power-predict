@@ -554,6 +554,11 @@ main {
   margin: 0;
   font-variation-settings: "opsz" 24;
 }
+.results-foot__actions {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
 
 .link-button {
   background: none;

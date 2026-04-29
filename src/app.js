@@ -315,7 +315,14 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   updateManualSummary(activityMmps.length > 0);
   if (activityMmps.length > 0) {
     const manualPanel = document.getElementById('manual-mode');
-    if (manualPanel) manualPanel.open = false;
+    if (manualPanel) {
+      manualPanel.hidden = false;
+      manualPanel.open = false;
+    }
+    // Hide the giant drop zone now that we're showing real results.
+    // A compact "Upload another archive" link in the results foot
+    // covers re-uploads.
+    if (dropZone) dropZone.hidden = true;
   }
   // Filter activities by the user's date range, if set.
   const dateFromMs = currentSettings.dateFrom ? Date.parse(currentSettings.dateFrom) : null;
@@ -404,13 +411,19 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       <p class="results-foot__note">
         ${activityMmps.length} activities cached locally${fromCache ? ', loaded from your last visit.' : '.'}
       </p>
-      <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
+      <div class="results-foot__actions">
+        <button type="button" class="link-button" id="upload-another">Upload another archive</button>
+        <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
+      </div>
     </div>
     ${renderPredictBlock()}
   `;
   resultsEl.hidden = false;
   resultsEl.dataset.revealed = '';
   document.getElementById('clear-cache').addEventListener('click', handleClearCache);
+  document.getElementById('upload-another').addEventListener('click', () => {
+    fileInput?.click();
+  });
   wirePredictForm();
   wireCurveChart();
   wireOverrideForm();
@@ -641,9 +654,12 @@ function renderManualMode(fit, inputs = {}) {
   wireManualInline();
   // Hide the landing-page disclosure while we're in manual mode —
   // the inline inputs in the predict block are now the source of
-  // truth and the duplicate above looks like a competing UI.
+  // truth and the duplicate above looks like a competing UI. Same
+  // for the giant drop zone: the user has explicitly opted out of
+  // uploading right now, so leaving it visible just adds noise.
   const manualPanel = document.getElementById('manual-mode');
   if (manualPanel) manualPanel.hidden = true;
+  if (dropZone) dropZone.hidden = true;
   if (hasPriorData) {
     document.getElementById('manual-back').addEventListener('click', () => {
       currentSettings = priorSettings;
@@ -651,6 +667,10 @@ function renderManualMode(fit, inputs = {}) {
         manualPanel.hidden = false;
         manualPanel.open = false;
       }
+      // renderCurves re-hides the drop zone via its own logic, but
+      // restoring it here covers the brief flicker between "Back"
+      // and the next render pass.
+      if (dropZone) dropZone.hidden = false;
       renderCurves(priorActivities, { fromCache: true });
     });
   }
@@ -808,6 +828,9 @@ async function handleClearCache() {
   await clearActivities();
   resultsEl.hidden = true;
   resultsEl.innerHTML = '';
+  currentActivities = [];
+  if (dropZone) dropZone.hidden = false;
+  updateManualSummary(false);
   setProgress(`Cache cleared. ${await activityCount()} activities remaining.`);
 }
 

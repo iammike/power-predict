@@ -374,6 +374,20 @@ function wPrimeTooltip(wPrimeJ) {
        + 'sprinters and track riders push higher. Very high values from a 2-param fit can also signal '
        + 'a steep short-duration MMP relative to the threshold end — sanity-check against your sprint efforts.';
 }
+// Combined fit-quality summary: pick whichever of RMSE / points is
+// the worse of the two so the headline label reflects the limiting
+// factor. Tooltip lists both numbers + the per-axis interpretation.
+const QUALITY_RANK = { 'is-good': 0, 'is-mid': 1, 'is-bad': 2 };
+function combinedFitQuality(fit) {
+  const r = rmseQuality(fit.rmse);
+  const p = pointsQuality(fit.nPoints);
+  return QUALITY_RANK[p.cls] >= QUALITY_RANK[r.cls] ? p : r;
+}
+function combinedFitTooltip(fit) {
+  return `Fit quality summary. RMSE ${fit.rmse.toFixed(1)} W (${rmseQuality(fit.rmse).label}) · ${fit.nPoints} points (${pointsQuality(fit.nPoints).label}). `
+       + 'RMSE is regression error in watts; points is how many MMP durations between 3 and 20 min the fit had to work with.';
+}
+
 function pointsTooltip(n) {
   return 'Number of MMP points (durations between 3 and 20 minutes) the regression fitted on. '
        + 'Up to 9 possible. 7+ is a full picture, 4-6 is workable, 2-3 is minimal — '
@@ -505,23 +519,12 @@ function renderPredictBlock() {
           <dd>${formatPower(currentEftpNow)}</dd>
           <span class="fit-stats__quality is-good">last 90d</span>
         </div>` : ''}
+        <div data-tooltip="${combinedFitTooltip(currentFit)}">
+          <dt>Fit</dt>
+          <dd>${currentFit.rmse.toFixed(1)}W · ${currentFit.nPoints}pt</dd>
+          <span class="fit-stats__quality ${combinedFitQuality(currentFit).cls}">${combinedFitQuality(currentFit).label}</span>
+        </div>
       </dl>
-
-      <details class="fit-details">
-        <summary>Fit diagnostics</summary>
-        <dl class="fit-stats fit-stats--secondary">
-          <div data-tooltip="${rmseTooltip(currentFit.rmse)}">
-            <dt>RMSE</dt>
-            <dd>${currentFit.rmse.toFixed(1)} W</dd>
-            <span class="fit-stats__quality ${rmseQuality(currentFit.rmse).cls}">${rmseQuality(currentFit.rmse).label}</span>
-          </div>
-          <div data-tooltip="${pointsTooltip(currentFit.nPoints)}">
-            <dt>Points</dt>
-            <dd>${currentFit.nPoints}</dd>
-            <span class="fit-stats__quality ${pointsQuality(currentFit.nPoints).cls}">${pointsQuality(currentFit.nPoints).label}</span>
-          </div>
-        </dl>
-      </details>
 
       ${renderOverrideForm()}
 

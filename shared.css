@@ -715,35 +715,6 @@ main {
 .fit-stats__quality.is-mid  { color: var(--burnt); }
 .fit-stats__quality.is-bad  { color: var(--oxblood); }
 
-.fit-details {
-  margin: 0.75rem 0 0;
-}
-.fit-details > summary {
-  cursor: pointer;
-  list-style: none;
-  font-family: var(--sans);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--muted);
-  padding: 0.25rem 0;
-}
-.fit-details > summary::-webkit-details-marker { display: none; }
-.fit-details > summary::before {
-  content: '+';
-  display: inline-block;
-  width: 1em;
-  font-family: var(--mono);
-  color: var(--oxblood);
-  margin-right: 0.4rem;
-}
-.fit-details[open] > summary::before { content: '−'; }
-.fit-details[open] > summary { color: var(--ink-soft); }
-.fit-stats--secondary {
-  margin-top: 0.5rem;
-}
-.fit-stats--secondary dd { font-size: 1.1rem; }
 
 .predict-form {
   display: flex;

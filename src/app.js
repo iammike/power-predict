@@ -65,6 +65,7 @@ let currentActivities = [];
 hydrateFromCache();
 
 async function hydrateFromCache() {
+  setAppState('onboarding');
   try {
     const [cached, settings] = await Promise.all([loadActivities(), loadSettings()]);
     currentSettings = settings || {};
@@ -308,22 +309,7 @@ let currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
   currentActivities = activityMmps;
-  // The manual-mode disclosure is for users without data — collapse
-  // it once they have data showing, and reword the summary so the
-  // copy makes sense when they're already working from a real
-  // archive ("compare" rather than "no archive yet?").
-  updateManualSummary(activityMmps.length > 0);
-  if (activityMmps.length > 0) {
-    const manualPanel = document.getElementById('manual-mode');
-    if (manualPanel) {
-      manualPanel.hidden = false;
-      manualPanel.open = false;
-    }
-    // Hide the giant drop zone now that we're showing real results.
-    // A compact "Upload another archive" link in the results foot
-    // covers re-uploads.
-    if (dropZone) dropZone.hidden = true;
-  }
+  setAppState(activityMmps.length > 0 ? 'data' : 'onboarding');
   // Filter activities by the user's date range, if set.
   const dateFromMs = currentSettings.dateFrom ? Date.parse(currentSettings.dateFrom) : null;
   const dateToMs = currentSettings.dateTo
@@ -631,12 +617,17 @@ function renderManualMode(fit, inputs = {}) {
         </div>
       </dl>
 
-      <p class="results-foot__note">
-        Predictions will be coarse compared to a real archive — the model has no information about your
-        sprint kinetics or your endurance fade. Upload your Strava archive when you can to anchor the
-        long-duration end of the curve.
-        ${hasPriorData ? `<button type="button" class="link-button" id="manual-back">← Back to my data (${priorActivities.length} cached activities)</button>` : ''}
-      </p>
+      <div class="results-foot">
+        <p class="results-foot__note">
+          Predictions will be coarse compared to a real archive — the model has no information about your
+          sprint kinetics or your endurance fade. Upload your Strava archive when you can to anchor the
+          long-duration end of the curve.
+        </p>
+        <div class="results-foot__actions">
+          ${hasPriorData ? `<button type="button" class="link-button" id="manual-back">← Back to my data (${priorActivities.length})</button>` : ''}
+          <button type="button" class="link-button" id="manual-upload">Upload an archive</button>
+        </div>
+      </div>
 
       <form class="predict-form" id="predict-form">
         <label class="predict-form__field">
@@ -652,37 +643,25 @@ function renderManualMode(fit, inputs = {}) {
   resultsEl.dataset.revealed = '';
   wirePredictForm();
   wireManualInline();
-  // Hide the landing-page disclosure while we're in manual mode —
-  // the inline inputs in the predict block are now the source of
-  // truth and the duplicate above looks like a competing UI. Same
-  // for the giant drop zone: the user has explicitly opted out of
-  // uploading right now, so leaving it visible just adds noise.
-  const manualPanel = document.getElementById('manual-mode');
-  if (manualPanel) manualPanel.hidden = true;
-  if (dropZone) dropZone.hidden = true;
+  setAppState('manual');
   if (hasPriorData) {
     document.getElementById('manual-back').addEventListener('click', () => {
       currentSettings = priorSettings;
-      if (manualPanel) {
-        manualPanel.hidden = false;
-        manualPanel.open = false;
-      }
-      // renderCurves re-hides the drop zone via its own logic, but
-      // restoring it here covers the brief flicker between "Back"
-      // and the next render pass.
-      if (dropZone) dropZone.hidden = false;
       renderCurves(priorActivities, { fromCache: true });
     });
   }
+  document.getElementById('manual-upload')?.addEventListener('click', () => {
+    fileInput?.click();
+  });
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function updateManualSummary(hasData) {
-  const el = document.getElementById('manual-mode-summary');
-  if (!el) return;
-  el.textContent = hasData
-    ? 'Compare against an FTP-only estimate'
-    : 'No archive yet? Estimate from FTP';
+// App states drive top-level layout visibility via CSS:
+//   onboarding — fresh visitor, drop zone + steps + manual disclosure shown
+//   data       — archive loaded, only results visible
+//   manual     — FTP-only synthesis, only manual predict block visible
+function setAppState(state) {
+  document.body.dataset.appState = state;
 }
 
 function wireManualInline() {
@@ -829,8 +808,7 @@ async function handleClearCache() {
   resultsEl.hidden = true;
   resultsEl.innerHTML = '';
   currentActivities = [];
-  if (dropZone) dropZone.hidden = false;
-  updateManualSummary(false);
+  setAppState('onboarding');
   setProgress(`Cache cleared. ${await activityCount()} activities remaining.`);
 }
 

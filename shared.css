@@ -390,6 +390,19 @@ main {
 .mmp-table tbody td.featured { color: var(--oxblood); font-weight: 500; }
 .mmp-table tbody tr:hover td { background: var(--paper-soft); }
 
+/* App-state-driven layout. The body's data-app-state attribute
+   ("onboarding" | "data" | "manual") controls which top-level
+   sections are visible so each state shows only what's relevant. */
+body[data-app-state="data"] .lede,
+body[data-app-state="data"] .steps,
+body[data-app-state="data"] #archive-drop,
+body[data-app-state="data"] #manual-mode,
+body[data-app-state="manual"] .steps,
+body[data-app-state="manual"] #archive-drop,
+body[data-app-state="manual"] #manual-mode {
+  display: none;
+}
+
 .manual-mode {
   margin: 1.5rem auto 0;
   max-width: 36rem;

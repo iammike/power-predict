@@ -2,7 +2,7 @@
 // Optionally filter by `windowDays` (e.g. 90) so we only consider recent
 // activities for the "current fitness" curve.
 
-import { DURATIONS_S } from './mmp.js';
+import { DURATIONS_S, dropAnomalies } from './mmp.js';
 
 export function rollingBest(activityMmps, {
   windowDays = null,
@@ -16,8 +16,9 @@ export function rollingBest(activityMmps, {
   for (const { startTime, mmp, avgPower } of activityMmps) {
     if (startTime < cutoff) continue;
     if (filterEnabled && Number.isFinite(avgPower) && avgPower / ftp < minIF) continue;
+    const cleaned = dropAnomalies(mmp);
     for (const d of DURATIONS_S) {
-      const v = mmp[d];
+      const v = cleaned[d];
       if (typeof v !== 'number') continue;
       if (best[d] === undefined || v > best[d]) best[d] = v;
     }
@@ -40,8 +41,9 @@ export function rollingBestWithOwners(activityMmps, {
   for (const a of activityMmps) {
     if (a.startTime < cutoff) continue;
     if (filterEnabled && Number.isFinite(a.avgPower) && a.avgPower / ftp < minIF) continue;
+    const cleaned = dropAnomalies(a.mmp);
     for (const d of DURATIONS_S) {
-      const v = a.mmp?.[d];
+      const v = cleaned?.[d];
       if (typeof v !== 'number') continue;
       if (best[d] === undefined || v > best[d].value) {
         best[d] = { value: v, stravaId: a.stravaId ?? null };

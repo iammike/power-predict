@@ -84,6 +84,14 @@ async function handleArchive(file) {
   };
   document.addEventListener('visibilitychange', onVisibility);
 
+  // Browsers throttle background tabs aggressively (Chrome's
+  // "intensive wake-up throttling" affects Web Workers after a few
+  // minutes hidden). A silent audio source keeps the tab classified
+  // as actively playing media so the parsing worker runs full-speed
+  // even when the tab loses focus. The tradeoff is a small "audio
+  // playing" indicator on the tab strip while parsing.
+  const audio = startSilentAudio();
+
   // Dedupe by startTime (the IDB primary key) within this run. Two
   // FIT files that share a start instant would otherwise both count
   // as "with power" while only one survives in IDB.
@@ -145,6 +153,7 @@ async function handleArchive(file) {
     worker.terminate();
     document.removeEventListener('visibilitychange', onVisibility);
     if (wakeLock) try { await wakeLock.release(); } catch {}
+    audio?.stop();
     return;
   }
   worker.terminate();
@@ -182,6 +191,35 @@ const PROGRESS_THROTTLE_MS = 50;
 // Roughly equal wall time for read vs. parse on a typical archive,
 // so we split the unified bar 50/50. Tweakable.
 const READ_WEIGHT = 0.5;
+
+// A muted oscillator running through an audible-but-silent gain
+// (1e-4) is enough to register as "media playing" with the browser
+// and bypass background-tab throttling. We avoid 0 gain because some
+// Chromium builds short-circuit truly silent graphs and stop
+// counting the tab as active. Returned object exposes stop() so the
+// caller can tear it down when parsing finishes.
+function startSilentAudio() {
+  try {
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    const ctx = new Ctor();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0001;
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    return {
+      stop() {
+        try { osc.stop(); } catch {}
+        try { ctx.close(); } catch {}
+      },
+    };
+  } catch (err) {
+    console.warn('silent audio unavailable', err);
+    return null;
+  }
+}
 
 function setProgressPhase(phase, payload) {
   if (!progressEl) return;

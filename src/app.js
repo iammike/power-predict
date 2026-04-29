@@ -308,10 +308,11 @@ let currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
   currentActivities = activityMmps;
-  // The "no archive yet" disclosure is for users without data —
-  // collapse it once they have data showing so it doesn't look like
-  // a competing entry point. Users can still expand it if they want
-  // to compare against an FTP-only synthesis.
+  // The manual-mode disclosure is for users without data — collapse
+  // it once they have data showing, and reword the summary so the
+  // copy makes sense when they're already working from a real
+  // archive ("compare" rather than "no archive yet?").
+  updateManualSummary(activityMmps.length > 0);
   if (activityMmps.length > 0) {
     const manualPanel = document.getElementById('manual-mode');
     if (manualPanel) manualPanel.open = false;
@@ -647,6 +648,14 @@ function renderManualMode(fit, inputs = {}) {
     });
   }
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function updateManualSummary(hasData) {
+  const el = document.getElementById('manual-mode-summary');
+  if (!el) return;
+  el.textContent = hasData
+    ? 'Compare against an FTP-only estimate'
+    : 'No archive yet? Estimate from FTP';
 }
 
 function wireManualInline() {

@@ -416,14 +416,16 @@ function wPrimeTooltip(wPrimeJ) {
        + 'sprinters and track riders push higher. Very high values from a 2-param fit can also signal '
        + 'a steep short-duration MMP relative to the threshold end — sanity-check against your sprint efforts.';
 }
-// Render an MMP table cell. Linking to Strava is disabled — the ID
-// captured from the archive filename is the upload ID, not the public
-// activity ID, so the link lands on a different user's ride. Real
-// activity IDs live in activities.csv in the archive root; once we
-// parse that file the linking can come back. See issue #71.
+// Render an MMP table cell. Activity IDs are resolved through the
+// archive's activities.csv during parsing — never from the FIT
+// filename, which is Strava's upload ID and points to a different
+// public activity. Cells without a resolved ID (legacy cache or an
+// archive without activities.csv) render as plain text.
 function renderMmpCell(owner) {
   if (!owner || typeof owner.value !== 'number') return '—';
-  return formatPower(owner.value);
+  const watts = formatPower(owner.value);
+  if (!owner.stravaId) return watts;
+  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" title="Open this activity on Strava">${watts}</a>`;
 }
 
 // Combined fit-quality summary: pick whichever of RMSE / points is

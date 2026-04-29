@@ -608,6 +608,15 @@ body[data-app-state="manual"] #manual-mode {
   gap: 1.25rem;
   flex-wrap: wrap;
 }
+.results-foot--manual {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--hair);
+  justify-content: flex-end;
+}
+.manual-note {
+  margin-bottom: 1.5rem;
+}
 
 .link-button {
   background: none;

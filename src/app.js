@@ -399,6 +399,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       </p>
       <div class="results-foot__actions">
         <button type="button" class="link-button" id="upload-another">Upload another archive</button>
+        <button type="button" class="link-button" id="manual-from-data">Synthesize from FTP instead</button>
         <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
       </div>
     </div>
@@ -409,6 +410,16 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   document.getElementById('clear-cache').addEventListener('click', handleClearCache);
   document.getElementById('upload-another').addEventListener('click', () => {
     fileInput?.click();
+  });
+  document.getElementById('manual-from-data').addEventListener('click', () => {
+    // Drop into manual mode with default starting numbers — the
+    // inline editor inside the manual block lets the user adjust
+    // from there. Pre-seed FTP from the override if one exists.
+    const seedFtp = Number.isFinite(currentSettings.cpOverrideW)
+      ? Math.round(currentSettings.cpOverrideW / 0.95)
+      : 280;
+    const fit = synthesizeFit({ ftpW: seedFtp });
+    if (fit) renderManualMode(fit, { ftpW: seedFtp });
   });
   wirePredictForm();
   wireCurveChart();

@@ -392,28 +392,17 @@ main {
 
 /* App-state-driven layout. The body's data-app-state attribute
    ("onboarding" | "data" | "manual") controls which top-level
-   sections are visible so each state shows only what's relevant.
-   The lede stays visible in every state (it's the page header).
-   The manual-override disclosure is available in onboarding and
-   data states; it's only hidden in manual state because the
-   predict block already has the inline editors. */
+   sections are visible. The site-header wordmark serves as the
+   page identity in data/manual states; the marketing lede only
+   appears for fresh visitors. */
+body[data-app-state="data"] .lede,
 body[data-app-state="data"] .steps,
 body[data-app-state="data"] #archive-drop,
+body[data-app-state="data"] #manual-mode,
+body[data-app-state="manual"] .lede,
 body[data-app-state="manual"] .steps,
 body[data-app-state="manual"] #archive-drop,
 body[data-app-state="manual"] #manual-mode {
-  display: none;
-}
-body[data-app-state="data"] .lede,
-body[data-app-state="manual"] .lede {
-  margin-bottom: 0;
-}
-body[data-app-state="data"] .lede .headline,
-body[data-app-state="manual"] .lede .headline {
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
-}
-body[data-app-state="data"] .lede .dek,
-body[data-app-state="manual"] .lede .dek {
   display: none;
 }
 
@@ -435,6 +424,11 @@ body[data-app-state="manual"] .lede .dek {
   color: var(--ink-soft);
 }
 .manual-mode > summary::-webkit-details-marker { display: none; }
+.manual-mode > summary:focus { outline: none; }
+.manual-mode > summary:focus-visible {
+  outline: 2px solid var(--oxblood);
+  outline-offset: -2px;
+}
 .manual-mode > summary::before {
   content: '+';
   display: inline-block;

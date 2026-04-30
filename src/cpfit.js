@@ -16,6 +16,12 @@
 
 export const DEFAULT_FIT_RANGE = { minS: 180, maxS: 1200 };
 
+// 3-parameter (Morton) range can extend further down because the
+// pMax term tames the short-end behavior the 2-param hyperbola
+// can't represent. Lower bound 30s is a practical floor — below
+// that, neuromuscular contributions still dominate.
+export const DEFAULT_FIT_RANGE_3P = { minS: 30, maxS: 1200 };
+
 // Convert an MMP map ({60: 350, 300: 280, ...}) to an array of points.
 export function mmpToPoints(mmp) {
   const out = [];
@@ -87,6 +93,90 @@ export function fitCp2(points, range = DEFAULT_FIT_RANGE, opts = {}) {
   };
 }
 
+// 3-parameter Critical Power (Morton):
+//   P(t) = CP + W' / (t + W'/(P_max - CP))
+//        = CP + W' / (t + τ),  τ = W'/(P_max - CP)
+//
+// P_max is the asymptotic short-duration power. The extra
+// parameter eliminates the 2-param model's runaway behavior at
+// very short durations and lets the fit window extend down to
+// roughly 30 seconds.
+//
+// We fit by searching τ on a dense grid: for each candidate τ,
+// the model collapses to a linear regression (P = CP + W' / (t+τ)),
+// which we solve in closed form. Across the τ grid we pick the
+// one with minimum residual subject to physical sanity bounds:
+// CP ∈ [50, 600] W, W' ∈ [1, 60] kJ, P_max ∈ [CP+100, 2500] W.
+//
+// Falls back to null if no τ in range produces a sane fit. Caller
+// is expected to fall back to the 2-param fit in that case.
+export function fitCp3(points, range = DEFAULT_FIT_RANGE_3P, opts = {}) {
+  const filtered = points.filter(
+    (p) => p.durationS >= range.minS && p.durationS <= range.maxS
+  );
+  if (filtered.length < 3) return null;
+
+  let best = null;
+  for (let tau = 1; tau <= 90; tau += 0.5) {
+    const fit = fitLinearWithTau(filtered, tau);
+    if (!fit) continue;
+    if (fit.cpW < 50 || fit.cpW > 600) continue;
+    if (fit.wPrimeJ < 1000 || fit.wPrimeJ > 60000) continue;
+    if (fit.pMaxW < fit.cpW + 100 || fit.pMaxW > 2500) continue;
+    if (!best || fit.sse < best.sse) best = { ...fit, tauS: tau };
+  }
+  if (!best) return null;
+
+  const n = filtered.length;
+  const rmse = Math.sqrt(best.sse / n);
+
+  const observed = (opts.observedPoints || points)
+    .filter((p) => Number.isFinite(p.durationS) && Number.isFinite(p.powerW))
+    .map((p) => ({ durationS: p.durationS, powerW: p.powerW }))
+    .sort((a, b) => a.durationS - b.durationS);
+  const longest = observed[observed.length - 1] || null;
+
+  return {
+    cpW: best.cpW,
+    wPrimeJ: best.wPrimeJ,
+    pMaxW: best.pMaxW,
+    tauS: best.tauS,
+    rmse,
+    nPoints: n,
+    range,
+    minObservedS: filtered.reduce((m, p) => Math.min(m, p.durationS), Infinity),
+    maxObservedS: filtered.reduce((m, p) => Math.max(m, p.durationS), -Infinity),
+    longestS: longest?.durationS ?? null,
+    longestW: longest?.powerW ?? null,
+    points: observed,
+    model: '3p',
+  };
+}
+
+function fitLinearWithTau(points, tau) {
+  const n = points.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+  for (const { durationS, powerW } of points) {
+    const x = 1 / (durationS + tau);
+    sumX += x;
+    sumY += powerW;
+    sumXY += x * powerW;
+    sumX2 += x * x;
+  }
+  const denom = n * sumX2 - sumX * sumX;
+  if (denom === 0) return null;
+  const wPrimeJ = (n * sumXY - sumX * sumY) / denom;
+  const cpW = (sumY - wPrimeJ * sumX) / n;
+  if (wPrimeJ <= 0) return null;
+  const pMaxW = cpW + wPrimeJ / tau;
+  let sse = 0;
+  for (const { durationS, powerW } of points) {
+    const predicted = cpW + wPrimeJ / (durationS + tau);
+    sse += (powerW - predicted) ** 2;
+  }
+  return { cpW, wPrimeJ, pMaxW, sse };
+}
+
 // Riegel-style fatigue decay applied beyond the CP-validity window.
 //   P(t) = P_anchor × (t_anchor / t)^k
 //
@@ -111,6 +201,13 @@ export const DEFAULT_DECAY = {
   k: 0.10,
 };
 
+// Baseline P(t) for the fit. 3-param fits include a tauS term;
+// 2-param fits don't, and the baseline collapses to CP + W'/t.
+function baselinePower(fit, t) {
+  const tau = Number.isFinite(fit.tauS) ? fit.tauS : 0;
+  return fit.cpW + fit.wPrimeJ / (t + tau);
+}
+
 // Predict sustainable power for a target duration.
 // Returns { powerW, low, high, extrapolated, fit, decayed } or null.
 //
@@ -127,7 +224,7 @@ export function predictPower(fit, durationS, opts = {}) {
   const decay = opts.decay === false ? null : { ...DEFAULT_DECAY, ...(opts.decay || {}) };
   const useObservedAnchors = opts.useObservedAnchors !== false;
 
-  let powerW = fit.cpW + fit.wPrimeJ / durationS;
+  let powerW = baselinePower(fit, durationS);
   let decayed = false;
   // Apply the observed-anchor envelope at *all* durations so the
   // chart line is continuous across the fit-window boundary. Inside
@@ -138,7 +235,7 @@ export function predictPower(fit, durationS, opts = {}) {
     // Inside the fit window the baseline is the model itself.
     // Outside, the threshold-anchored decay takes over (model at the
     // top of the fit window, then Riegel from there).
-    const thresholdAnchorPower = fit.cpW + fit.wPrimeJ / decay.fromS;
+    const thresholdAnchorPower = baselinePower(fit, decay.fromS);
     let best = durationS > decay.fromS
       ? thresholdAnchorPower * (decay.fromS / durationS) ** decay.k
       : powerW;
@@ -158,7 +255,7 @@ export function predictPower(fit, durationS, opts = {}) {
       // in CP/W'.)
       for (const p of fit.points) {
         if (p.durationS <= decay.fromS) continue;
-        const modelAtP = fit.cpW + fit.wPrimeJ / p.durationS;
+        const modelAtP = baselinePower(fit, p.durationS);
         if (p.powerW <= modelAtP) continue;
         const fromP = p.powerW * (p.durationS / durationS) ** decay.k;
         if (fromP > best) best = fromP;

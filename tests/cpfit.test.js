@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fitCp2, predictPower, mmpToPoints } from '../src/cpfit.js';
+import { fitCp2, fitCp3, predictPower, mmpToPoints } from '../src/cpfit.js';
 
 // Generate synthetic MMP points from a known CP/W' so we can verify
 // the fit recovers them.
@@ -155,5 +155,55 @@ describe('mmpToPoints', () => {
   it('skips invalid values', () => {
     const points = mmpToPoints({ 60: 350, 300: null, 600: undefined });
     expect(points).toHaveLength(1);
+  });
+});
+
+describe('fitCp3', () => {
+  // Synth from a known 3-param CP model so we can verify recovery.
+  function synth3p(cp, wPrime, pMax, durationsS) {
+    const tau = wPrime / (pMax - cp);
+    return durationsS.map((t) => ({ durationS: t, powerW: cp + wPrime / (t + tau) }));
+  }
+
+  it('recovers CP, W\', and P_max from noiseless 3-param synthetic data', () => {
+    const points = synth3p(260, 18000, 1400, [30, 60, 120, 300, 600, 900, 1200]);
+    const fit = fitCp3(points);
+    expect(fit).not.toBeNull();
+    // The τ search has 0.5 s resolution, so recovery is approximate
+    // rather than exact — bound to a few percent of each parameter.
+    expect(Math.abs(fit.cpW - 260)).toBeLessThan(5);
+    expect(Math.abs(fit.wPrimeJ - 18000)).toBeLessThan(500);
+    expect(Math.abs(fit.pMaxW - 1400)).toBeLessThan(50);
+    expect(fit.model).toBe('3p');
+    expect(fit.tauS).toBeGreaterThan(0);
+  });
+
+  it('returns null when fewer than 3 points fall in the fitting window', () => {
+    expect(fitCp3([])).toBeNull();
+    expect(fitCp3([
+      { durationS: 60, powerW: 500 },
+      { durationS: 300, powerW: 300 },
+    ])).toBeNull();
+  });
+
+  it('rejects fits whose parameters land outside physical bounds', () => {
+    // Pure 2-param hyperbola has effectively infinite P_max (no
+    // taper at short durations). The 3-param search should fail
+    // its sanity bounds.
+    const points = [
+      { durationS: 30, powerW: 1900 },   // 2-param would imply P_max ≫ 2500
+      { durationS: 60, powerW: 1100 },
+      { durationS: 300, powerW: 380 },
+      { durationS: 1200, powerW: 280 },
+    ];
+    const fit = fitCp3(points);
+    if (fit) expect(fit.pMaxW).toBeLessThanOrEqual(2500);
+  });
+
+  it('predictPower uses the 3-param baseline when tauS is present', () => {
+    const fit = fitCp3(synth3p(260, 18000, 1400, [30, 60, 120, 300, 600, 1200]));
+    const at60 = predictPower(fit, 60, { decay: false });
+    const expected = fit.cpW + fit.wPrimeJ / (60 + fit.tauS);
+    expect(at60.powerW).toBeCloseTo(expected, 4);
   });
 });

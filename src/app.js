@@ -539,13 +539,29 @@ function renderMmpCell(owner) {
 
 // eFTP is computed from a 90-day window ending at the most recent
 // activity in the fit's input set. With no override that's "now," so
-// the chip reads "last 90d." With a date range the anchor moves to
-// the range's end, so we say "to {dateTo}" instead — accurate to the
-// window the eFTP value actually reflects.
+// the chip reads "last 90d." With an override we describe the actual
+// range: a preset (dateTo = today) collapses to "last Nd"; an explicit
+// span renders as "Mar 31 → Apr 30"; a one-sided bound renders as
+// "since X" or "through X".
 function eftpWindowLabel() {
-  if (currentSettings.dateTo) return `to ${currentSettings.dateTo}`;
-  if (currentSettings.dateFrom) return `from ${currentSettings.dateFrom}`;
-  return 'last 90d';
+  const { dateFrom, dateTo } = currentSettings;
+  if (!dateFrom && !dateTo) return 'last 90d';
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const fmt = (iso) => {
+    const d = new Date(`${iso}T00:00:00`);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+  if (dateFrom && dateTo) {
+    if (dateTo >= todayIso) {
+      const days = Math.round(
+        (Date.parse(dateTo) - Date.parse(dateFrom)) / 86400_000
+      );
+      if (days > 0) return `last ${days}d`;
+    }
+    return `${fmt(dateFrom)} → ${fmt(dateTo)}`;
+  }
+  if (dateFrom) return `since ${fmt(dateFrom)}`;
+  return `through ${fmt(dateTo)}`;
 }
 function eftpTooltip() {
   const range = currentSettings.dateFrom || currentSettings.dateTo

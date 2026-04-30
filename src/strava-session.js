@@ -59,3 +59,45 @@ export function authorizeUrl(returnTo = '/') {
   const params = new URLSearchParams({ return_to: returnTo });
   return `${API_BASE}/auth/strava/authorize?${params.toString()}`;
 }
+
+// Drive the multi-call sync loop. `onProgress` is invoked after each
+// slice with the cumulative counts; resolves when done. Throws on
+// transport errors so the caller can surface them.
+export async function syncRecent({ session, days = 180, onProgress }) {
+  let cursor = null;
+  let cumulativeProcessed = 0;
+  while (true) {
+    const res = await fetch(`${API_BASE}/sync/recent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session, days, cursor }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`sync failed: ${res.status} ${text}`);
+    }
+    const slice = await res.json();
+    cumulativeProcessed += slice.processed || 0;
+    onProgress?.({
+      processed: cumulativeProcessed,
+      totalWithPower: slice.totalWithPower,
+      remaining: slice.remaining,
+      errors: slice.errors,
+    });
+    if (slice.done) return { processed: cumulativeProcessed, totalWithPower: slice.totalWithPower };
+    cursor = slice.cursor;
+  }
+}
+
+// Pull the synced activities + MMP arrays out of the worker so the
+// frontend can drop them into IDB and render the same way archive
+// uploads do.
+export async function fetchSyncedActivities(session) {
+  const res = await fetch(`${API_BASE}/activities/recent?session=${encodeURIComponent(session)}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`activities load failed: ${res.status} ${text}`);
+  }
+  const body = await res.json();
+  return body.activities || [];
+}

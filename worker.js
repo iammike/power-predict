@@ -7,6 +7,11 @@ import {
   exchangeCodeForTokens,
   generateRandomToken,
 } from './worker/strava-oauth.js';
+import {
+  resolveSession,
+  runSyncSlice,
+  loadActivities,
+} from './worker/sync.js';
 
 const ALLOWED_ORIGINS = [
   'https://power.iammike.org',
@@ -85,6 +90,16 @@ export default {
     // Persist derived MMP data computed in the browser
     if (url.pathname === '/mmp/ingest') {
       return handleMmpIngest(request, env, origin);
+    }
+
+    // Strava sync — pull activities + streams, compute MMP server-side.
+    if (url.pathname === '/sync/recent') {
+      return handleSyncRecent(request, env, origin);
+    }
+
+    // Read the synced MMP records back out for the frontend.
+    if (url.pathname === '/activities/recent') {
+      return handleActivitiesRecent(request, env, origin);
     }
 
     return json({ error: 'not found' }, { status: 404 }, origin);
@@ -223,4 +238,46 @@ function handleArchiveUpload(_request, _env, _origin) {
 function handleMmpIngest(_request, _env, _origin) {
   // TODO Phase 2: validate auth, upsert MMP arrays + activity meta into D1.
   return new Response('not implemented', { status: 501 });
+}
+
+// POST /sync/recent
+// Body: { session, days?, cursor? }
+// Returns the per-slice progress object from runSyncSlice. The
+// frontend re-calls until done=true, passing back the prior cursor
+// so we don't re-list activities on every slice.
+async function handleSyncRecent(request, env, origin) {
+  if (request.method !== 'POST') {
+    return json({ error: 'method not allowed' }, { status: 405 }, origin);
+  }
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'bad json' }, { status: 400 }, origin); }
+  const athleteId = await resolveSession(env, body?.session);
+  if (!athleteId) return json({ error: 'unauthenticated' }, { status: 401 }, origin);
+  try {
+    const result = await runSyncSlice({
+      env,
+      athleteId,
+      days: body.days || 180,
+      cursor: body.cursor || null,
+    });
+    return json(result, {}, origin);
+  } catch (err) {
+    return json({ error: err?.message || 'sync failed' }, { status: 500 }, origin);
+  }
+}
+
+// GET /activities/recent?session=...
+// Returns the user's stored activities + per-duration MMP arrays in
+// the shape the frontend's IDB cache expects.
+async function handleActivitiesRecent(request, env, origin) {
+  const url = new URL(request.url);
+  const session = url.searchParams.get('session');
+  const athleteId = await resolveSession(env, session);
+  if (!athleteId) return json({ error: 'unauthenticated' }, { status: 401 }, origin);
+  try {
+    const activities = await loadActivities(env, athleteId);
+    return json({ activities }, {}, origin);
+  } catch (err) {
+    return json({ error: err?.message || 'load failed' }, { status: 500 }, origin);
+  }
 }

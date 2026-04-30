@@ -18,6 +18,7 @@ import { synthesizeFit } from './manual.js';
 import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
 import {
   parseAuthHash, clearAuthHash, loadSession, saveSession, clearSession, authorizeUrl,
+  syncRecent, fetchSyncedActivities,
 } from './strava-session.js';
 
 const dropZone = document.getElementById('archive-drop');
@@ -128,12 +129,48 @@ document.getElementById('strava-disconnect')?.addEventListener('click', async ()
 
 document.getElementById('strava-sync-btn')?.addEventListener('click', triggerStravaSync);
 
-// Single source of truth for the sync action. The /sync/recent
-// endpoint isn't wired yet, so all three entry points (onboarding
-// card + data results-foot + manual results-foot) currently surface
-// the same placeholder.
-function triggerStravaSync() {
-  alert('Sync endpoint coming in the next PR. The Connect step is live.');
+// Single source of truth for the sync action. Drives the
+// /sync/recent loop, then pulls the resulting MMP records back out
+// of D1 and merges them into the local IDB cache so the rest of the
+// app renders the same way as archive uploads.
+async function triggerStravaSync() {
+  const session = await loadSession();
+  if (!session) return;
+  setProgressPhase('Reading', { bytesRead: 0, totalBytes: 1 });
+  setProgress('Pulling activity list from Strava…');
+  try {
+    await syncRecent({
+      session: session.session,
+      days: 180,
+      onProgress: ({ processed, totalWithPower, remaining }) => {
+        const total = Number.isFinite(totalWithPower) ? totalWithPower : '?';
+        setProgress(`Syncing from Strava… ${processed} / ${total} activities (${remaining} remaining).`);
+      },
+    });
+    setProgress('Loading synced data…');
+    const remoteActivities = await fetchSyncedActivities(session.session);
+    if (remoteActivities.length === 0) {
+      setProgress('No power-equipped rides in the synced window.');
+      return;
+    }
+    // Merge into IDB by startTime (the primary key). New rides land,
+    // existing ones get refreshed with whatever the worker computed.
+    const fresh = [];
+    for (const a of remoteActivities) {
+      if (!(await hasActivity(a.startTime))) fresh.push(a);
+    }
+    if (fresh.length) await saveActivities(fresh);
+    const all = await loadActivities();
+    if (progressEl) {
+      progressEl.textContent = '';
+      progressEl.hidden = true;
+      progressEl.innerHTML = '';
+    }
+    renderCurves(all);
+  } catch (err) {
+    console.error('strava sync failed', err);
+    setProgress(`Strava sync failed: ${err.message || err}`);
+  }
 }
 
 async function handleArchive(file) {

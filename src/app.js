@@ -578,11 +578,14 @@ function wPrimeTooltip(wPrimeJ) {
 function renderMmpCell(owner) {
   if (!owner || typeof owner.value !== 'number') return '—';
   const watts = formatPower(owner.value);
-  const dateStr = Number.isFinite(owner.startTime)
-    ? `<span class="mmp-cell__date">${new Date(owner.startTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>`
-    : '';
-  if (!owner.stravaId) return `${watts}${dateStr}`;
-  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" title="Open this activity on Strava">${watts}</a>${dateStr}`;
+  const date = Number.isFinite(owner.startTime)
+    ? new Date(owner.startTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : null;
+  if (!owner.stravaId) {
+    return date ? `<span title="${date}">${watts}</span>` : watts;
+  }
+  const title = date ? `${date} · open on Strava` : 'Open this activity on Strava';
+  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" title="${title}">${watts}</a>`;
 }
 
 // eFTP is computed from a 90-day window ending at the most recent

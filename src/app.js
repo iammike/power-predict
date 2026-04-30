@@ -126,12 +126,15 @@ document.getElementById('strava-disconnect')?.addEventListener('click', async ()
   await refreshStravaUi();
 });
 
-document.getElementById('strava-sync-btn')?.addEventListener('click', () => {
-  // Wired up in the next PR — /sync/recent endpoint isn't implemented
-  // yet, so for now we just mark the intent so the user sees the
-  // button works at the click level.
+document.getElementById('strava-sync-btn')?.addEventListener('click', triggerStravaSync);
+
+// Single source of truth for the sync action. The /sync/recent
+// endpoint isn't wired yet, so all three entry points (onboarding
+// card + data results-foot + manual results-foot) currently surface
+// the same placeholder.
+function triggerStravaSync() {
   alert('Sync endpoint coming in the next PR. The Connect step is live.');
-});
+}
 
 async function handleArchive(file) {
   setProgressPhase('Reading', { bytesRead: 0, totalBytes: file.size });
@@ -538,6 +541,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       </p>
       <div class="results-foot__actions">
         <button type="button" class="link-button" id="upload-another">Upload another archive</button>
+        ${currentSettings.stravaSession ? `<button type="button" class="link-button" id="results-foot-sync">Sync from Strava</button>` : ''}
         <button type="button" class="link-button" id="manual-from-data">Synthesize from FTP instead</button>
         <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
       </div>
@@ -550,6 +554,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   document.getElementById('upload-another').addEventListener('click', () => {
     fileInput?.click();
   });
+  document.getElementById('results-foot-sync')?.addEventListener('click', triggerStravaSync);
   document.getElementById('manual-from-data').addEventListener('click', () => {
     // Pre-seed from the current fit — CP is the natural unit here
     // since we have a fitted CP from data, not an FTP guess.
@@ -991,6 +996,7 @@ function renderManualMode(fit, inputs = {}) {
         <div class="results-foot__actions">
           ${hasPriorData ? `<button type="button" class="link-button" id="manual-back">← Back to my data (${priorActivities.length})</button>` : ''}
           <button type="button" class="link-button" id="manual-upload">Upload an archive</button>
+          ${currentSettings.stravaSession ? `<button type="button" class="link-button" id="manual-strava-sync">Sync from Strava</button>` : ''}
         </div>
       </div>
     </section>
@@ -1000,6 +1006,7 @@ function renderManualMode(fit, inputs = {}) {
   wirePredictForm();
   wireManualInline();
   setAppState('manual');
+  document.getElementById('manual-strava-sync')?.addEventListener('click', triggerStravaSync);
   if (hasPriorData) {
     document.getElementById('manual-back').addEventListener('click', () => {
       currentSettings = priorSettings;

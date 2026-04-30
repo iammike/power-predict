@@ -46,7 +46,7 @@ export function rollingBestWithOwners(activityMmps, {
       const v = cleaned?.[d];
       if (typeof v !== 'number') continue;
       if (best[d] === undefined || v > best[d].value) {
-        best[d] = { value: v, stravaId: a.stravaId ?? null };
+        best[d] = { value: v, stravaId: a.stravaId ?? null, startTime: a.startTime };
       }
     }
   }

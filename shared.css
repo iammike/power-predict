@@ -616,6 +616,15 @@ body[data-app-state="manual"] #manual-mode {
   color: var(--oxblood);
   border-bottom-color: var(--oxblood);
 }
+.mmp-cell__date {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
 
 
 .results-foot {

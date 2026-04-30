@@ -745,18 +745,21 @@ body[data-app-state="manual"] #manual-mode {
 }
 .curve-chart .u-legend tr.u-off > * { opacity: 0.4; }
 
-/* Cursor markers (one per series at the snapped x). Filled ink
-   squares — registration-mark feel that sits inside the editorial
-   typographic palette, distinct from the round oxblood MMP dots so
-   the tracer never gets read as data. uPlot sizes them inline via
-   cursor.points.size; we strip the inherited circle styling. */
-.curve-chart .u-cursor-pt {
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: var(--ink) !important;
-  box-shadow: none !important;
-  transition: transform 80ms ease-out;
+/* The cursor x-line is a tick rising from the x-axis baseline rather
+   than a full-height crosshair. Reads as a typographic register
+   mark — just enough to indicate which duration is hovered, without
+   slicing the chart in half. uPlot positions .u-cursor-x with
+   top:0;bottom:0; we override to bottom-anchor it and clip to ~28%
+   of the plot height. */
+.curve-chart .u-cursor-x {
+  top: auto !important;
+  bottom: 0 !important;
+  height: 28% !important;
+  border-color: var(--ink) !important;
+  opacity: 0.55;
 }
+/* Cursor point markers stay off — see cursor.points.show:false. */
+.curve-chart .u-cursor-pt { display: none !important; }
 
 /* OVERRIDE PANEL */
 

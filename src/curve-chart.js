@@ -163,13 +163,13 @@ export function renderCurveChart(container, { mmp, fit }) {
     ],
     cursor: {
       drag: { x: false, y: false },
-      // Suppress the full-length crosshair lines — they read too busy
-      // against the editorial chart style. Per-series cursor markers
-      // stay enabled (uPlot default), so hovering traces the curve
-      // and highlights the snapped MMP point at the cursor's x.
-      x: false,
+      // Vertical x-cursor enabled, but visually trimmed via CSS to a
+      // short tick rising from the x-axis (see .u-cursor-x styling).
+      // Horizontal cursor + per-series point markers stay off so the
+      // chart reads cleanly while still indicating the hovered duration.
+      x: true,
       y: false,
-      points: { size: 6 },
+      points: { show: false },
     },
     legend: {
       show: true,

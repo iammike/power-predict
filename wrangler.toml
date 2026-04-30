@@ -10,7 +10,7 @@ compatibility_date = "2024-12-01"
 # in the Cloudflare dashboard, not committed.
 
 [vars]
-STRAVA_CLIENT_ID = ""           # filled in once Strava app is registered
+STRAVA_CLIENT_ID = "233411"
 ALLOWED_ORIGIN = "https://power.iammike.org"
 FRONTEND_URL    = "https://power.iammike.org"
 
@@ -18,14 +18,14 @@ FRONTEND_URL    = "https://power.iammike.org"
 [[d1_databases]]
 binding = "DB"
 database_name = "power-predict"
-database_id = ""                # filled after `wrangler d1 create power-predict`
+database_id = "5bd7e5df-5b36-4b20-a2a4-00bc2cc966ef"
 
-# R2 bucket for archive uploads during onboarding (auto-expire after 24h)
+# R2 bucket for archive uploads during onboarding
 [[r2_buckets]]
 binding = "ARCHIVES_BUCKET"
 bucket_name = "power-predict-archives"
 
-# KV for rate-limit accounting (app-wide Strava budget)
+# KV for rate-limit accounting (app-wide Strava budget) and OAuth state.
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
-id = ""                         # filled after `wrangler kv:namespace create RATE_LIMIT`
+id = "784b7751395e4a5e88cac287495fdbe0"

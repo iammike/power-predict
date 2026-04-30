@@ -173,12 +173,16 @@ export function renderCurveChart(container, { mmp, fit }) {
       // duration, the line tracer naturally lands on top of the
       // existing oxblood dot, giving the "lock onto a point" feel
       // without doubling up markers.
+      // uPlot calls cursor.points.show per series at init (before
+      // u.data exists) and again on each cursor move. Returning a
+      // boolean here governs whether the DOM marker exists at all,
+      // not its per-frame visibility — so we enable it for the line
+      // series and let uPlot suppress drawing when the data value at
+      // the snapped x is null. (Series 2 = fit, 3 = extrapolation;
+      // null elsewhere, so the marker simply doesn't render outside
+      // each segment's domain.)
       points: {
-        show: (u, sidx) => {
-          if (sidx !== 2 && sidx !== 3) return false;
-          const val = u.data[sidx]?.[u.cursor.idx];
-          return val != null;
-        },
+        show: (_u, sidx) => sidx === 2 || sidx === 3,
         size: 5,
         fill: () => {
           const styles = getComputedStyle(document.body);

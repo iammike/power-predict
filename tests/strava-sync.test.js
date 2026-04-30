@@ -52,9 +52,8 @@ function makeDb(state = {}) {
       async all() {
         const b = getBound();
         if (sql.startsWith('SELECT id FROM activities')) {
-          const ids = b.slice(1);
           const results = [...state.activities.values()]
-            .filter((a) => a.user_id === b[0] && ids.includes(a.id))
+            .filter((a) => a.user_id === b[0])
             .map((a) => ({ id: a.id }));
           return { results };
         }
@@ -122,18 +121,14 @@ describe('getValidAccessToken', () => {
 });
 
 describe('runSyncSlice', () => {
-  it('lists, filters power-equipped, fetches stream, and writes MMP rows', async () => {
+  it('first slice lists + dedupes + builds the worklist (no streams)', async () => {
     const db = makeDb();
     db.state.users.set(42, {
       access_token: 'tok', refresh_token: 'r',
       token_expires_at: Math.floor(Date.now() / 1000) + 3600,
     });
-    const calls = [];
-    const stream = Array.from({ length: 600 }, () => 220); // 10-min steady 220 W
     const fakeFetch = async (urlStr) => {
-      calls.push(urlStr);
       if (urlStr.includes('/athlete/activities')) {
-        // Two rides; only one has device_watts.
         return new Response(JSON.stringify([
           { id: 1001, type: 'Ride', device_watts: true, average_watts: 200,
             start_date: '2026-01-01T00:00:00Z', elapsed_time: 600, distance: 5000 },
@@ -141,32 +136,47 @@ describe('runSyncSlice', () => {
             start_date: '2026-01-02T00:00:00Z', elapsed_time: 600, distance: 5000 },
         ]), { status: 200 });
       }
+      throw new Error('first slice should not fetch streams');
+    };
+    const env = { DB: db, RATE_LIMIT: makeKv(), STRAVA_CLIENT_ID: 'c', STRAVA_CLIENT_SECRET: 's' };
+    const out = await runSyncSlice({ env, athleteId: 42, days: 180, fetchImpl: fakeFetch });
+    expect(out.processed).toBe(0);
+    expect(out.totalSeen).toBe(2);
+    expect(out.totalWithPower).toBe(1);
+    expect(out.remaining).toBe(1);
+    expect(out.done).toBe(false);
+    expect(out.cursor.pending).toHaveLength(1);
+    expect(out.cursor.pending[0].id).toBe(1001);
+  });
+
+  it('second slice fetches streams and writes MMP rows', async () => {
+    const db = makeDb();
+    db.state.users.set(42, {
+      access_token: 'tok', refresh_token: 'r',
+      token_expires_at: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const stream = Array.from({ length: 600 }, () => 220);
+    const fakeFetch = async (urlStr) => {
       if (urlStr.includes('/streams')) {
         return new Response(JSON.stringify({ watts: { data: stream } }), { status: 200 });
       }
       throw new Error(`unexpected url: ${urlStr}`);
     };
-    const env = {
-      DB: db,
-      RATE_LIMIT: makeKv(),
-      STRAVA_CLIENT_ID: 'cid',
-      STRAVA_CLIENT_SECRET: 'sec',
+    const env = { DB: db, RATE_LIMIT: makeKv(), STRAVA_CLIENT_ID: 'c', STRAVA_CLIENT_SECRET: 's' };
+    const cursor = {
+      pending: [{ id: 1001, startTime: 1735689600, durationS: 600, distanceM: 5000, avgPower: 200 }],
+      totalSeen: 1, totalWithPower: 1,
     };
-    const out = await runSyncSlice({ env, athleteId: 42, days: 180, fetchImpl: fakeFetch });
-    expect(out.totalSeen).toBe(2);
-    expect(out.totalWithPower).toBe(1);
+    const out = await runSyncSlice({ env, athleteId: 42, days: 180, cursor, fetchImpl: fakeFetch });
     expect(out.processed).toBe(1);
     expect(out.done).toBe(true);
-    expect(out.errors).toHaveLength(0);
-    // Activity row written:
     expect(db.state.activities.get(1001)).toBeDefined();
-    // MMP records written for the durations covered by a 600-sample stream:
     const durations = db.state.mmp.filter((m) => m.activity_id === 1001).map((m) => m.duration_s);
     expect(durations).toContain(60);
     expect(durations).toContain(300);
   });
 
-  it('skips activities already present in D1 to avoid re-ingesting', async () => {
+  it('skips activities already in D1', async () => {
     const db = makeDb();
     db.state.users.set(42, {
       access_token: 'tok', refresh_token: 'r',
@@ -180,12 +190,39 @@ describe('runSyncSlice', () => {
             start_date: '2026-01-01T00:00:00Z', elapsed_time: 600, distance: 5000 },
         ]), { status: 200 });
       }
-      throw new Error('should not fetch streams when already ingested');
+      throw new Error('should not fetch streams for already-ingested rides');
     };
     const env = { DB: db, RATE_LIMIT: makeKv(), STRAVA_CLIENT_ID: 'c', STRAVA_CLIENT_SECRET: 's' };
     const out = await runSyncSlice({ env, athleteId: 42, fetchImpl: fakeFetch });
     expect(out.totalWithPower).toBe(1);
-    expect(out.processed).toBe(0);
+    expect(out.remaining).toBe(0);
     expect(out.done).toBe(true);
+    expect(out.cursor).toBeNull();
+  });
+
+  it('skips activities listed in knownIds (IDB cache from archive)', async () => {
+    const db = makeDb();
+    db.state.users.set(42, {
+      access_token: 'tok', refresh_token: 'r',
+      token_expires_at: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const fakeFetch = async (urlStr) => {
+      if (urlStr.includes('/athlete/activities')) {
+        return new Response(JSON.stringify([
+          { id: 1001, type: 'Ride', device_watts: true, average_watts: 200,
+            start_date: '2026-01-01T00:00:00Z', elapsed_time: 600, distance: 5000 },
+          { id: 1002, type: 'Ride', device_watts: true, average_watts: 200,
+            start_date: '2026-01-02T00:00:00Z', elapsed_time: 600, distance: 5000 },
+        ]), { status: 200 });
+      }
+      throw new Error('first slice should not fetch streams');
+    };
+    const env = { DB: db, RATE_LIMIT: makeKv(), STRAVA_CLIENT_ID: 'c', STRAVA_CLIENT_SECRET: 's' };
+    const out = await runSyncSlice({
+      env, athleteId: 42, knownIds: ['1001'], fetchImpl: fakeFetch,
+    });
+    expect(out.totalWithPower).toBe(2);
+    expect(out.remaining).toBe(1);
+    expect(out.cursor.pending[0].id).toBe(1002);
   });
 });

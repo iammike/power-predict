@@ -161,9 +161,16 @@ async function triggerStravaSync() {
   };
   setSync('Pulling activity list from Strava…');
   try {
+    // Tell the worker which Strava ids the IDB cache already has so it
+    // skips them in the worklist — no point re-fetching streams the
+    // user already ingested via archive upload.
+    const knownIds = currentActivities
+      .map((a) => a.stravaId)
+      .filter((id) => id != null && id !== '');
     await syncRecent({
       session: session.session,
       days: 180,
+      knownIds,
       onProgress: ({ processed, totalWithPower, remaining }) => {
         const total = Number.isFinite(totalWithPower) ? totalWithPower : '?';
         setSync(`Syncing from Strava… ${processed} / ${total} activities (${remaining} remaining).`);

@@ -9,8 +9,10 @@ import { refreshTokens } from './strava-oauth.js';
 
 // Each /sync/recent call processes at most this many power-equipped
 // rides before returning. Caps wall time well below the worker's
-// 30 s ceiling and keeps progress feedback responsive.
-const ACTIVITIES_PER_CALL = 20;
+// 30 s ceiling and keeps progress feedback responsive. The first
+// call (no cursor) does the activity listing only and processes 0
+// streams, so the streams-only call rate is a clean N per slice.
+const ACTIVITIES_PER_CALL = 10;
 
 // Resolve a session token to an athlete id, or return null when the
 // session is missing / expired.
@@ -57,39 +59,37 @@ export async function runSyncSlice({
   athleteId,
   days = 180,
   cursor = null,
+  knownIds = [],
   fetchImpl = fetch,
 }) {
   const accessToken = await getValidAccessToken(env, athleteId, fetchImpl);
 
-  // Resume the activity-id worklist if the client passed one;
-  // otherwise list fresh. The worklist is the set of activity ids
-  // we still need to ingest.
-  let pending;
-  let totalSeen;
-  let totalWithPower;
-  if (cursor && Array.isArray(cursor.pending)) {
-    pending = cursor.pending;
-    totalSeen = cursor.totalSeen;
-    totalWithPower = cursor.totalWithPower;
-  } else {
+  // The first slice (no cursor) does the listing + dedup + builds
+  // the worklist, then returns immediately with zero processed.
+  // Streams are fetched only on subsequent calls — keeps each slice
+  // well under the worker's 30 s budget even if Strava is sluggish
+  // during listing or any single stream fetch is slow.
+  if (!cursor) {
     const after = Math.floor(Date.now() / 1000) - days * 86400;
     const all = await listActivitiesAfter({ accessToken, afterEpoch: after }, fetchImpl);
-    totalSeen = all.length;
+    const totalSeen = all.length;
     const powered = all.filter(hasRealPower);
-    totalWithPower = powered.length;
-    // Skip the ones we've already ingested. Strava activity ids are
-    // stable, so we trust the rows already in D1. We pull every id
-    // for this user (typically a few thousand at most) and filter in
-    // memory — D1 caps bind parameters per query around 100, so an
-    // IN-list with the full powered set blows past it on large
-    // archives.
+    const totalWithPower = powered.length;
+    // Skip the ones we've already ingested in D1, plus anything the
+    // client tells us is already in its IndexedDB cache (archive
+    // ingest doesn't write to D1, so the worker would otherwise
+    // re-fetch streams the client already has).
     const existing = await env.DB
       .prepare('SELECT id FROM activities WHERE user_id = ?')
       .bind(athleteId)
       .all();
-    const existingIds = new Set((existing.results || []).map((r) => r.id));
-    pending = powered
-      .filter((a) => !existingIds.has(a.id))
+    const skip = new Set((existing.results || []).map((r) => r.id));
+    for (const id of knownIds) {
+      const n = Number(id);
+      if (Number.isFinite(n)) skip.add(n);
+    }
+    const pending = powered
+      .filter((a) => !skip.has(a.id))
       .map((a) => ({
         id: a.id,
         startTime: Math.floor(new Date(a.start_date).getTime() / 1000),
@@ -97,8 +97,21 @@ export async function runSyncSlice({
         distanceM: a.distance,
         avgPower: a.average_watts ?? null,
       }));
+    return {
+      done: pending.length === 0,
+      processed: 0,
+      totalSeen,
+      totalWithPower,
+      remaining: pending.length,
+      errors: [],
+      cursor: pending.length > 0 ? { pending, totalSeen, totalWithPower } : null,
+    };
   }
 
+  // Subsequent slice: process up to ACTIVITIES_PER_CALL streams.
+  const pending = cursor.pending;
+  const totalSeen = cursor.totalSeen;
+  const totalWithPower = cursor.totalWithPower;
   const slice = pending.slice(0, ACTIVITIES_PER_CALL);
   const remaining = pending.slice(slice.length);
   const errors = [];

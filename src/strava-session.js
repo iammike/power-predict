@@ -63,14 +63,27 @@ export function authorizeUrl(returnTo = '/') {
 // Drive the multi-call sync loop. `onProgress` is invoked after each
 // slice with the cumulative counts; resolves when done. Throws on
 // transport errors so the caller can surface them.
-export async function syncRecent({ session, days = 180, onProgress }) {
+//
+// `knownIds` is the list of Strava activity ids already in the
+// browser's IndexedDB cache (typically from a prior archive upload).
+// Sending them lets the worker dedupe up front so we don't re-fetch
+// streams the user already has.
+export async function syncRecent({ session, days = 180, knownIds = [], onProgress }) {
   let cursor = null;
   let cumulativeProcessed = 0;
   while (true) {
     const res = await fetch(`${API_BASE}/sync/recent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session, days, cursor }),
+      // knownIds only travels on the first call — once the worker
+      // has the dedup'd worklist on the cursor, subsequent slices
+      // don't need it.
+      body: JSON.stringify({
+        session,
+        days,
+        cursor,
+        knownIds: cursor ? [] : knownIds,
+      }),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');

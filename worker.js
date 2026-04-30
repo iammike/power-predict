@@ -259,6 +259,7 @@ async function handleSyncRecent(request, env, origin) {
       athleteId,
       days: body.days || 180,
       cursor: body.cursor || null,
+      knownIds: Array.isArray(body.knownIds) ? body.knownIds : [],
     });
     return json(result, {}, origin);
   } catch (err) {

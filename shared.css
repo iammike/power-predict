@@ -1090,7 +1090,8 @@ body[data-app-state="manual"] #manual-mode {
 
 .fit-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: 0;
   margin: 1rem 0 1.75rem;
   padding: 0;
@@ -1098,9 +1099,10 @@ body[data-app-state="manual"] #manual-mode {
   border-bottom: var(--rule-soft);
 }
 .fit-stats > div {
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 0.85rem;
   border-right: var(--rule-soft);
   position: relative;
+  min-width: 0;
 }
 .fit-stats > div[data-tooltip] { cursor: help; }
 .fit-stats > div[data-tooltip]:hover::after,
@@ -1148,11 +1150,12 @@ body[data-app-state="manual"] #manual-mode {
 .fit-stats dd {
   font-family: var(--serif);
   font-weight: 500;
-  font-size: 1.35rem;
+  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
   letter-spacing: -0.01em;
   margin: 0;
   color: var(--ink);
   font-variation-settings: "opsz" 36;
+  white-space: nowrap;
 }
 .fit-stats__quality {
   display: block;

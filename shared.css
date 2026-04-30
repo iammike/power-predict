@@ -745,6 +745,13 @@ body[data-app-state="manual"] #manual-mode {
 }
 .curve-chart .u-legend tr.u-off > * { opacity: 0.4; }
 
+/* Cursor markers (one per series at the snapped x). Pin to oxblood
+   on a paper fill so the tracer reads as a marker, not a hairline. */
+.curve-chart .u-cursor-pt {
+  border-color: var(--oxblood) !important;
+  background: var(--paper) !important;
+}
+
 /* OVERRIDE PANEL */
 
 .override-panel {

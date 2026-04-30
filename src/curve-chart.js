@@ -173,14 +173,13 @@ export function renderCurveChart(container, { mmp, fit }) {
       // duration, the line tracer naturally lands on top of the
       // existing oxblood dot, giving the "lock onto a point" feel
       // without doubling up markers.
-      // Cursor markers only on the line series (2 = fit, 3 =
-      // extrapolation). Visual styling lives in CSS — uPlot's
-      // fill/stroke callbacks weren't applying reliably, and a
-      // static CSS rule is simpler. Marker auto-hides on null data.
-      points: {
-        show: (_u, sidx) => sidx === 2 || sidx === 3,
-        size: 6,
-      },
+      // Cursor markers on every series; uPlot suppresses rendering
+      // when the underlying data value is null, so the line tracer
+      // only shows along the fit and extrapolation segments and the
+      // observed-MMP marker only shows at recorded durations. All
+      // visual styling lives in CSS (.u-cursor-pt) — uPlot's
+      // fill/stroke options weren't applying reliably here.
+      points: { size: 7 },
     },
     legend: {
       show: true,

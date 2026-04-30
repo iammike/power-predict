@@ -1006,9 +1006,9 @@ function wirePredictForm() {
     }
     // Apply the form-based multiplier to the predicted wattage and
     // its confidence band. Capped at ±5% inside formMultiplier so
-    // it's a nudge, not a rewrite.
+    // it's a nudge, not a rewrite. The Form cell's tooltip carries
+    // the adjustment %; we don't repeat it on the prediction output.
     const mult = currentLoad.hasFtp ? formMultiplier(currentLoad.tsb) : 1;
-    const adjPct = Math.round((mult - 1) * 100);
     const result = mult === 1 ? raw : {
       ...raw,
       powerW: raw.powerW * mult,
@@ -1022,7 +1022,6 @@ function wirePredictForm() {
       <p class="predict-output__band">
         Range ${Math.round(result.low)}–${Math.round(result.high)} W
         ${result.extrapolated ? '<span class="predict-output__flag">extrapolated</span>' : ''}
-        ${adjPct !== 0 ? `<span class="predict-output__flag">${adjPct > 0 ? '+' : ''}${adjPct}% form</span>` : ''}
       </p>
     `;
   });

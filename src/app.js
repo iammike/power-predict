@@ -121,6 +121,8 @@ async function handleArchive(file) {
   let withPower = 0;
   let skipped = 0;
   let lastActivitiesSeen = 0;
+  let parseFailed = 0;
+  let parseFailedSamples = [];
 
   const worker = new Worker('dist/archive-worker.js');
 
@@ -162,6 +164,8 @@ async function handleArchive(file) {
             console.warn('cache check failed', err);
           }
         } else if (msg.type === 'done') {
+          parseFailed = msg.failed || 0;
+          parseFailedSamples = msg.failedSamples || [];
           resolve();
         } else if (msg.type === 'error') {
           reject(new Error(msg.message));
@@ -202,11 +206,22 @@ async function handleArchive(file) {
   // The activity count is already in the results foot note, so we
   // skip the "Done. N activities cached…" toast and just render —
   // leaving it up between the lede and the table read as orphaned
-  // copy.
+  // copy. The exception is when files failed to parse: that's
+  // information the user needs, so we keep the progress slot for a
+  // brief notice listing how many files were skipped.
   if (progressEl) {
-    progressEl.textContent = '';
-    progressEl.hidden = true;
-    progressEl.innerHTML = '';
+    if (parseFailed > 0) {
+      const sampleStr = parseFailedSamples.length
+        ? ` (${parseFailedSamples.slice(0, 3).join(', ')}${parseFailed > 3 ? ', …' : ''})`
+        : '';
+      const noun = parseFailed === 1 ? 'file' : 'files';
+      progressEl.hidden = false;
+      progressEl.innerHTML = `<p class="progress__note">Skipped ${parseFailed} ${noun} that couldn’t be parsed${sampleStr}. See console for details.</p>`;
+    } else {
+      progressEl.textContent = '';
+      progressEl.hidden = true;
+      progressEl.innerHTML = '';
+    }
   }
   renderCurves(all);
 }

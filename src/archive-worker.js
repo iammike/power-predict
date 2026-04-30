@@ -37,6 +37,11 @@ async function parseArchive(file) {
   let activitiesSeen = 0;
   let parsedCount = 0;
   let withPower = 0;
+  let failed = 0;
+  // Sample of basenames for the first few failures, for the post-parse
+  // notice. Cap at 5 so a fully corrupt archive doesn't bloat the
+  // postMessage payload.
+  const failedSamples = [];
 
   // Buffers per pending activity entry. We can't parse FIT inside
   // ondata because parseFit is synchronous and slow — instead we
@@ -172,6 +177,10 @@ async function parseArchive(file) {
       }
     } catch (err) {
       console.warn('parse failed', name, err);
+      failed++;
+      if (failedSamples.length < 5) {
+        failedSamples.push(name.split('/').pop() || name);
+      }
     }
     parsedCount++;
     if (parsedCount % 5 === 0 || parsedCount === pendingFits.length) {
@@ -180,7 +189,7 @@ async function parseArchive(file) {
   }
   pendingFits.length = 0;
 
-  self.postMessage({ type: 'done', activitiesSeen, parsedCount, withPower });
+  self.postMessage({ type: 'done', activitiesSeen, parsedCount, withPower, failed, failedSamples });
 }
 
 export { buildIdMap, parseCsv };

@@ -506,6 +506,23 @@ function renderMmpCell(owner) {
   return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" title="Open this activity on Strava">${watts}</a>`;
 }
 
+// eFTP is computed from a 90-day window ending at the most recent
+// activity in the fit's input set. With no override that's "now," so
+// the chip reads "last 90d." With a date range the anchor moves to
+// the range's end, so we say "to {dateTo}" instead — accurate to the
+// window the eFTP value actually reflects.
+function eftpWindowLabel() {
+  if (currentSettings.dateTo) return `to ${currentSettings.dateTo}`;
+  if (currentSettings.dateFrom) return `from ${currentSettings.dateFrom}`;
+  return 'last 90d';
+}
+function eftpTooltip() {
+  const range = currentSettings.dateFrom || currentSettings.dateTo
+    ? 'within your selected date range'
+    : 'from your most recent 90 days';
+  return `Estimated FTP ${range}: 0.95 × best 20-min MMP. Used to drift-normalize older efforts when the fit falls back to all-time data.`;
+}
+
 // Combined fit-quality summary: pick whichever of RMSE / points is
 // the worse of the two so the headline label reflects the limiting
 // factor. Tooltip lists both numbers + the per-axis interpretation.
@@ -543,10 +560,10 @@ function renderOverrideForm() {
       currentSettings.cpOverrideW || currentSettings.dateFrom || currentSettings.dateTo
         ? 'open' : ''
     }>
-      <summary>Manual override (FTP/CP or date range)</summary>
+      <summary>Manual override</summary>
       <form class="override-form" id="override-form">
-        <label class="override-form__field">
-          <span>Override</span>
+        <fieldset class="override-form__group">
+          <legend>Threshold</legend>
           <div class="override-form__combo">
             <select id="override-unit" aria-label="Override unit">
               <option value="ftp" ${unit === 'ftp' ? 'selected' : ''}>FTP</option>
@@ -555,25 +572,33 @@ function renderOverrideForm() {
             <input type="number" id="cp-override" min="50" max="600" step="1" value="${displayValue}" placeholder="e.g. 280">
             <span class="override-form__unit">W</span>
           </div>
-        </label>
-        <label class="override-form__field">
-          <span>From</span>
-          <input type="date" id="date-from" value="${from}">
-        </label>
-        <label class="override-form__field">
-          <span>To</span>
-          <input type="date" id="date-to" value="${to}">
-        </label>
-        <div class="override-form__presets" role="group" aria-label="Date range presets">
-          <span class="override-form__presets-label">Last</span>
-          <button type="button" data-preset-days="15">15d</button>
-          <button type="button" data-preset-days="30">30d</button>
-          <button type="button" data-preset-days="45">45d</button>
-          <button type="button" data-preset-days="60">60d</button>
-          <button type="button" data-preset-days="90">90d</button>
-          <button type="button" data-preset-days="180">6mo</button>
-          <button type="button" data-preset-days="365">1y</button>
-        </div>
+        </fieldset>
+
+        <fieldset class="override-form__group">
+          <legend>Date range</legend>
+          <div class="override-form__presets" role="group" aria-label="Date range presets">
+            <span class="override-form__presets-label">Last</span>
+            <button type="button" data-preset-days="15">15d</button>
+            <button type="button" data-preset-days="30">30d</button>
+            <button type="button" data-preset-days="45">45d</button>
+            <button type="button" data-preset-days="60">60d</button>
+            <button type="button" data-preset-days="90">90d</button>
+            <button type="button" data-preset-days="180">6mo</button>
+            <button type="button" data-preset-days="365">1y</button>
+          </div>
+          <div class="override-form__custom-range">
+            <span class="override-form__custom-label">or pick exact dates</span>
+            <label>
+              <span>From</span>
+              <input type="date" id="date-from" value="${from}">
+            </label>
+            <label>
+              <span>To</span>
+              <input type="date" id="date-to" value="${to}">
+            </label>
+          </div>
+        </fieldset>
+
         <div class="override-form__actions">
           <button type="submit">Apply</button>
           <button type="button" class="link-button" id="reset-override">Reset</button>
@@ -832,10 +857,10 @@ function renderPredictBlock() {
           <span class="fit-stats__quality ${wPrimeQuality(currentFit.wPrimeJ).cls}">${wPrimeQuality(currentFit.wPrimeJ).label}</span>
         </div>
         ${currentEftpNow ? `
-        <div data-tooltip="Estimated FTP from your most recent 90 days: 0.95 × best 20-min MMP. Used to drift-normalize older efforts when the fit falls back to all-time data.">
+        <div data-tooltip="${eftpTooltip()}">
           <dt>eFTP</dt>
           <dd>${formatPower(currentEftpNow)}</dd>
-          <span class="fit-stats__quality is-good">last 90d</span>
+          <span class="fit-stats__quality is-good">${eftpWindowLabel()}</span>
         </div>` : ''}
         <div data-tooltip="${combinedFitTooltip(currentFit)}">
           <dt>Fit</dt>

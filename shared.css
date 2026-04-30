@@ -289,6 +289,52 @@ main {
   letter-spacing: 0.06em;
 }
 
+/* Strava connect / connected blocks. Sit between the drop zone and
+   the manual-mode disclosure on the onboarding screen. Quiet styling
+   — the affordance is the button label, not a colored bar. */
+.strava-connect, .strava-connected {
+  margin: 1rem 0 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--hair);
+  background: var(--paper-soft);
+}
+.strava-connect__lede,
+.strava-connected__status {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  margin: 0 0 0.6rem;
+}
+.strava-connect__btn,
+.strava-connected__btn {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--paper);
+  border: 0;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.strava-connect__btn:hover,
+.strava-connected__btn:hover {
+  background: var(--oxblood);
+}
+.strava-connected__actions {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+}
+#strava-athlete-id {
+  font-family: var(--mono);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--oxblood);
+}
+
 .progress {
   margin: 1.25rem 0 0;
   display: flex;
@@ -397,9 +443,13 @@ main {
 body[data-app-state="data"] .steps,
 body[data-app-state="data"] #archive-drop,
 body[data-app-state="data"] #manual-mode,
+body[data-app-state="data"] #strava-connect,
+body[data-app-state="data"] #strava-connected,
 body[data-app-state="manual"] .steps,
 body[data-app-state="manual"] #archive-drop,
-body[data-app-state="manual"] #manual-mode {
+body[data-app-state="manual"] #manual-mode,
+body[data-app-state="manual"] #strava-connect,
+body[data-app-state="manual"] #strava-connected {
   display: none;
 }
 

@@ -55,6 +55,21 @@
       <span class="drop__hint">strava_export_*.zip · or click to browse</span>
     </div>
 
+    <section id="strava-connect" class="strava-connect" hidden>
+      <p class="strava-connect__lede">Or pull the last 180 days directly from Strava — instant, no archive download.</p>
+      <button type="button" id="strava-connect-btn" class="strava-connect__btn">Connect Strava</button>
+    </section>
+
+    <section id="strava-connected" class="strava-connected" hidden>
+      <p class="strava-connected__status">
+        Strava connected · athlete <span id="strava-athlete-id">…</span>
+      </p>
+      <div class="strava-connected__actions">
+        <button type="button" id="strava-sync-btn" class="strava-connected__btn">Sync last 180 days</button>
+        <button type="button" id="strava-disconnect" class="link-button">Disconnect</button>
+      </div>
+    </section>
+
     <details id="manual-mode" class="manual-mode">
       <summary id="manual-mode-summary">Skip the upload — estimate from FTP or CP</summary>
       <form id="manual-form" class="manual-form" novalidate>

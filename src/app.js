@@ -16,11 +16,16 @@ import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints } from './cpfit.
 import { parseDuration } from './duration.js';
 import { synthesizeFit } from './manual.js';
 import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
+import {
+  parseAuthHash, clearAuthHash, loadSession, saveSession, clearSession, authorizeUrl,
+} from './strava-session.js';
 
 const dropZone = document.getElementById('archive-drop');
 const fileInput = document.getElementById('archive-input');
 const progressEl = document.getElementById('progress');
 const resultsEl = document.getElementById('results');
+const stravaConnectEl = document.getElementById('strava-connect');
+const stravaConnectedEl = document.getElementById('strava-connected');
 
 if (dropZone && fileInput) {
   dropZone.addEventListener('click', () => fileInput.click());
@@ -69,6 +74,11 @@ hydrateFromCache();
 
 async function hydrateFromCache() {
   setAppState('onboarding');
+  // Drain any OAuth callback params from the URL hash *before* the
+  // initial render — saving the session into settings here means the
+  // settings load below sees them and the Connect/Connected toggle
+  // takes the right state on first paint.
+  await consumeAuthHash();
   try {
     const [cached, settings] = await Promise.all([loadActivities(), loadSettings()]);
     currentSettings = settings || {};
@@ -79,7 +89,49 @@ async function hydrateFromCache() {
   } catch (err) {
     console.warn('cache hydrate failed', err);
   }
+  await refreshStravaUi();
 }
+
+async function consumeAuthHash() {
+  const parsed = parseAuthHash(typeof location !== 'undefined' ? location.hash : '');
+  if (!parsed) return;
+  clearAuthHash();
+  if (parsed.error) {
+    console.warn('strava auth error', parsed.error);
+    return;
+  }
+  if (parsed.session && parsed.athleteId) {
+    await saveSession({ session: parsed.session, athleteId: parsed.athleteId });
+  }
+}
+
+async function refreshStravaUi() {
+  if (!stravaConnectEl || !stravaConnectedEl) return;
+  const session = await loadSession();
+  stravaConnectEl.hidden = !!session;
+  stravaConnectedEl.hidden = !session;
+  if (session) {
+    const idEl = document.getElementById('strava-athlete-id');
+    if (idEl) idEl.textContent = session.athleteId;
+  }
+}
+
+document.getElementById('strava-connect-btn')?.addEventListener('click', () => {
+  window.location.assign(authorizeUrl('/'));
+});
+
+document.getElementById('strava-disconnect')?.addEventListener('click', async () => {
+  if (!confirm('Disconnect this browser from Strava? You can reconnect anytime.')) return;
+  await clearSession();
+  await refreshStravaUi();
+});
+
+document.getElementById('strava-sync-btn')?.addEventListener('click', () => {
+  // Wired up in the next PR — /sync/recent endpoint isn't implemented
+  // yet, so for now we just mark the intent so the user sees the
+  // button works at the click level.
+  alert('Sync endpoint coming in the next PR. The Connect step is live.');
+});
 
 async function handleArchive(file) {
   setProgressPhase('Reading', { bytesRead: 0, totalBytes: file.size });

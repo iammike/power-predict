@@ -745,21 +745,15 @@ body[data-app-state="manual"] #manual-mode {
 }
 .curve-chart .u-legend tr.u-off > * { opacity: 0.4; }
 
-/* The cursor x-line is a tick rising from the x-axis baseline rather
-   than a full-height crosshair. Reads as a typographic register
-   mark — just enough to indicate which duration is hovered, without
-   slicing the chart in half. uPlot positions .u-cursor-x with
-   top:0;bottom:0; we override to bottom-anchor it and clip to ~28%
-   of the plot height. */
-.curve-chart .u-cursor-x {
-  top: auto !important;
-  bottom: 0 !important;
-  height: 28% !important;
-  border-color: var(--ink) !important;
-  opacity: 0.55;
+/* Cursor tracer: a single small ink dot that follows the fit line.
+   Visibility is gated per-series in JS (see cursor.points.show), so
+   we only need to ensure the marker reads as a clean dot, not a
+   ringed ball. */
+.curve-chart .u-cursor-pt {
+  border: 0 !important;
+  box-shadow: none !important;
+  transition: transform 80ms ease-out;
 }
-/* Cursor point markers stay off — see cursor.points.show:false. */
-.curve-chart .u-cursor-pt { display: none !important; }
 
 /* OVERRIDE PANEL */
 

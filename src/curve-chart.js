@@ -163,13 +163,29 @@ export function renderCurveChart(container, { mmp, fit }) {
     ],
     cursor: {
       drag: { x: false, y: false },
-      // Vertical x-cursor enabled, but visually trimmed via CSS to a
-      // short tick rising from the x-axis (see .u-cursor-x styling).
-      // Horizontal cursor + per-series point markers stay off so the
-      // chart reads cleanly while still indicating the hovered duration.
-      x: true,
+      x: false,
       y: false,
-      points: { show: false },
+      // One tracer dot that follows the fitted curve as the cursor
+      // moves. We enable cursor.points only on the line series (2 =
+      // fit, 3 = extrapolation) and only when that series has a
+      // non-null value at the snapped x. The observed-MMP series (1)
+      // gets no separate marker — when the cursor is at a recorded
+      // duration, the line tracer naturally lands on top of the
+      // existing oxblood dot, giving the "lock onto a point" feel
+      // without doubling up markers.
+      points: {
+        show: (u, sidx) => {
+          if (sidx !== 2 && sidx !== 3) return false;
+          const val = u.data[sidx]?.[u.cursor.idx];
+          return val != null;
+        },
+        size: 5,
+        fill: () => {
+          const styles = getComputedStyle(document.body);
+          return styles.getPropertyValue('--ink').trim() || '#1a1612';
+        },
+        stroke: () => 'transparent',
+      },
     },
     legend: {
       show: true,

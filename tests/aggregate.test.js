@@ -35,15 +35,15 @@ describe('rollingBestWithOwners', () => {
       { startTime: 2, stravaId: 'B', mmp: { 60: 300, 300: 200 } },
     ];
     expect(rollingBestWithOwners(acts)).toEqual({
-      60: { value: 300, stravaId: 'B' },
-      300: { value: 220, stravaId: 'A' },
+      60: { value: 300, stravaId: 'B', startTime: 2 },
+      300: { value: 220, stravaId: 'A', startTime: 1 },
     });
   });
 
   it('records null stravaId when activity has none', () => {
     const acts = [{ startTime: 1, mmp: { 60: 200 } }];
     expect(rollingBestWithOwners(acts)).toEqual({
-      60: { value: 200, stravaId: null },
+      60: { value: 200, stravaId: null, startTime: 1 },
     });
   });
 });

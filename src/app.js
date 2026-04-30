@@ -385,7 +385,16 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // can't. Fall back to 2-param if the data is too sparse or no
   // tau lands in the physical envelope.
   const primaryPoints = mmpToPoints(last90Fit);
-  const primaryObserved = mmpToPoints(last90);
+  // Observed-point set for predictPower's Riegel anchor envelope.
+  // Default is the unfiltered last-90-days view so a real ride from
+  // a few weeks ago can still keep predictions honest. When the user
+  // has actively narrowed to a date range, the anchor set should
+  // match the range — otherwise an effort outside the chosen slice
+  // leaks back into the prediction and disagrees with the chart.
+  const primaryObservedRaw = (dateFromMs || dateToMs)
+    ? rollingBest(filtered)
+    : last90;
+  const primaryObserved = mmpToPoints(primaryObservedRaw);
   const primaryFit =
     fitCp3(primaryPoints, undefined, { observedPoints: primaryObserved })
     || fitCp2(primaryPoints, undefined, { observedPoints: primaryObserved });

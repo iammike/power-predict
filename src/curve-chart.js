@@ -169,7 +169,7 @@ export function renderCurveChart(container, { mmp, fit }) {
       // and highlights the snapped MMP point at the cursor's x.
       x: false,
       y: false,
-      points: { size: 7 },
+      points: { size: 6 },
     },
     legend: {
       show: true,

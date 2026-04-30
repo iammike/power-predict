@@ -313,7 +313,7 @@ function formatBytes(bytes) {
 // Held in module scope so the predict form + chart toggles can read.
 let currentFit = null;
 let currentEftpNow = null;
-let currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
+let currentMmpByWindow = { last30: {}, last90: {}, allTime: {}, range: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
   currentActivities = activityMmps;
@@ -340,7 +340,10 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const allTimeOwners = rollingBestWithOwners(activityMmps);
   const last90Owners = rollingBestWithOwners(activityMmps, { windowDays: 90 });
   const last30Owners = rollingBestWithOwners(activityMmps, { windowDays: 30 });
-  currentMmpByWindow = { last30, last90, allTime };
+  // The chart shows the active date-range slice when an override
+  // is set; otherwise it switches between the last30/last90/all-time
+  // tabs. Filled in below once we know the fit's input set.
+  currentMmpByWindow = { last30, last90, allTime, range: {} };
 
   // Effort-quality filter: drop activities whose IF (avg / FTP)
   // falls below the threshold so low-effort base rides don't anchor
@@ -358,6 +361,13 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // "tons of zone-2 base" case by excluding low-IF rides outright.
   const fitWindow = (dateFromMs || dateToMs) ? null : 90;
   const last90Fit = rollingBest(filtered, { windowDays: fitWindow, ...effortOpts });
+  // When a date range is active, the chart should show the rolling-
+  // best from the selected slice — not the raw last-90-days view.
+  // We use the fit's actual input set (sans effort filter so all
+  // observed efforts in range still appear as dots).
+  if (dateFromMs || dateToMs) {
+    currentMmpByWindow.range = rollingBest(filtered);
+  }
 
   // Drift-normalize for the all-time fallback so an old peak ridden
   // when the rider was demonstrably fitter doesn't anchor today's
@@ -704,8 +714,9 @@ function wireCurveChart() {
     tabs.forEach((t) => t.classList.toggle('is-active', t.dataset.window === key));
   };
   if (tabs.length === 0) {
-    // Date range is active — no tabs, just draw the (pre-filtered) 90d set.
-    draw('last90');
+    // Date range is active — no tabs, just draw the in-range
+    // rolling-best so the dots match what the fit actually saw.
+    draw('range');
     return;
   }
   tabs.forEach((t) => {
@@ -726,7 +737,7 @@ function renderManualMode(fit, inputs = {}) {
   const priorSettings = currentSettings;
   currentFit = fit;
   currentEftpNow = null;
-  currentMmpByWindow = { last30: {}, last90: {}, allTime: {} };
+  currentMmpByWindow = { last30: {}, last90: {}, allTime: {}, range: {} };
   const hasPriorData = priorActivities.length > 0;
 
   const unit = inputs.unit === 'cp' ? 'cp' : 'ftp';

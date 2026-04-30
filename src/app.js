@@ -12,7 +12,7 @@ import {
   loadSettings,
   saveSettings,
 } from './storage.js';
-import { fitCp2, fitCp3, predictPower, mmpToPoints } from './cpfit.js';
+import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints } from './cpfit.js';
 import { parseDuration } from './duration.js';
 import { synthesizeFit } from './manual.js';
 import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
@@ -413,6 +413,14 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     currentFit = { ...currentFit, cpW: currentSettings.cpOverrideW, overridden: true };
   }
 
+  // Personal fatigue exponent fitted from long-duration MMP. Replaces
+  // the default Riegel k = 0.10 at predict time when enough 20-min-to-
+  // 4-hr points exist. Falls back to the default otherwise.
+  if (currentFit) {
+    const fatigueSource = currentFit.fallback ? fallbackObserved : primaryObserved;
+    currentFit = { ...currentFit, fatigue: fitFatigueK(fatigueSource) };
+  }
+
   // Training-load (CTL/ATL/TSB) computed against the full archive,
   // not the date-filtered slice — TSB is about *current* fitness vs.
   // fatigue, anchored at "now," regardless of any fit override.
@@ -589,6 +597,31 @@ function formTooltip() {
   const adj = Math.round((formMultiplier(currentLoad.tsb) - 1) * 100);
   const adjStr = adj === 0 ? 'no adjustment' : `${adj > 0 ? '+' : ''}${adj}% applied to predictions`;
   return `Form (TSB) = CTL ${ctl} − ATL ${atl}. Positive = fresh; negative = fatigued. ${adjStr}. Capped at ±5%.`;
+}
+
+// Fatigue k: personal Riegel exponent fitted from 20-min-to-4-hr MMP.
+// When data is too sparse to fit, predictions fall back to k = 0.10 —
+// we show that here too so the cell isn't ever blank.
+function fatigueValue(fit) {
+  const k = fit.fatigue?.k ?? 0.10;
+  return k.toFixed(2);
+}
+function fatigueQuality(fit) {
+  if (!fit.fatigue) return { label: 'default', cls: 'is-mid' };
+  if (fit.fatigue.clamped) return { label: 'clamped', cls: 'is-mid' };
+  return { label: `${fit.fatigue.nPoints} pts`, cls: 'is-good' };
+}
+function fatigueTooltip(fit) {
+  if (!fit.fatigue) {
+    return 'Riegel fatigue exponent k governs how predicted power decays past 20 min: '
+         + 'P(t) = P_anchor × (t_anchor / t)^k. Need 3+ MMP points between 20 min and 4 h '
+         + 'to fit a personal value; falling back to the cycling default 0.10.';
+  }
+  const note = fit.fatigue.clamped
+    ? ` Raw fit was ${fit.fatigue.kRaw.toFixed(2)}, clamped into the 0.04–0.20 plausible range.`
+    : '';
+  return `Personal Riegel fatigue exponent fitted from ${fit.fatigue.nPoints} long-duration MMP points `
+       + `(20 min – 4 h). Lower k = better endurance fall-off. Cycling default is 0.10.${note}`;
 }
 
 // Combined fit-quality summary: pick whichever of RMSE / points is
@@ -976,6 +1009,11 @@ function renderPredictBlock() {
           <dd>${formatTsb(currentLoad.tsb)}</dd>
           <span class="fit-stats__quality ${formQuality().cls}">${formQuality().label}</span>
         </div>` : ''}
+        <div data-tooltip="${fatigueTooltip(currentFit)}">
+          <dt>Fatigue k</dt>
+          <dd>${fatigueValue(currentFit)}</dd>
+          <span class="fit-stats__quality ${fatigueQuality(currentFit).cls}">${fatigueQuality(currentFit).label}</span>
+        </div>
         <div data-tooltip="${combinedFitTooltip(currentFit)}">
           <dt>Fit</dt>
           <dd>${currentFit.rmse.toFixed(1)}W · ${currentFit.nPoints}pt</dd>
@@ -1025,7 +1063,8 @@ function wirePredictForm() {
       out.innerHTML = `<p class="predict-output__error">Couldn't parse that. Try "45m", "1h30m", or "90s".</p>`;
       return;
     }
-    const raw = predictPower(currentFit, seconds);
+    const decayOpt = currentFit.fatigue ? { decay: { k: currentFit.fatigue.k } } : {};
+    const raw = predictPower(currentFit, seconds, decayOpt);
     if (!raw) {
       out.hidden = false;
       out.innerHTML = `<p class="predict-output__error">Prediction failed.</p>`;

@@ -78,6 +78,7 @@ export function renderCurveChart(container, { mmp, fit }) {
   // Solid inside the fit window, dashed outside; both series share
   // d == DEFAULT_DECAY.fromS so the visual transition is seamless.
   const lineOpts = { useObservedAnchors: false };
+  if (fit.fatigue) lineOpts.decay = { k: fit.fatigue.k };
   const insideSeries = xs.map((d) => {
     if (d < fit.range.minS || d > DEFAULT_DECAY.fromS) return null;
     const out = predictPower(fit, d, lineOpts);

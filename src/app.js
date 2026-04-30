@@ -197,9 +197,15 @@ async function handleArchive(file) {
     return;
   }
 
-  setProgress(
-    `Done. ${all.length} activities cached locally (${newList.length} new this run, ${skipped} already cached, ${withPower} with power out of ${lastActivitiesSeen} activity files).`
-  );
+  // The activity count is already in the results foot note, so we
+  // skip the "Done. N activities cached…" toast and just render —
+  // leaving it up between the lede and the table read as orphaned
+  // copy.
+  if (progressEl) {
+    progressEl.textContent = '';
+    progressEl.hidden = true;
+    progressEl.innerHTML = '';
+  }
   renderCurves(all);
 }
 

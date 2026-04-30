@@ -745,11 +745,13 @@ body[data-app-state="manual"] #manual-mode {
 }
 .curve-chart .u-legend tr.u-off > * { opacity: 0.4; }
 
-/* Cursor tracer: a single small ink dot that follows the fit line.
-   Visibility is gated per-series in JS (see cursor.points.show), so
-   we only need to ensure the marker reads as a clean dot, not a
-   ringed ball. */
+/* Cursor tracer: a small filled ink dot that follows the fit line.
+   uPlot draws cursor markers as bordered, transparent-background
+   divs by default; we paint over both with explicit ink fill and
+   no border so the marker reads as a clean dot rather than a ring.
+   Visibility is gated per-series in JS (see cursor.points.show). */
 .curve-chart .u-cursor-pt {
+  background: var(--ink) !important;
   border: 0 !important;
   box-shadow: none !important;
   transition: transform 80ms ease-out;

@@ -781,40 +781,167 @@ body[data-app-state="manual"] #manual-mode {
   background: var(--paper);
 }
 
+/* Override form — refined editorial layout. Two columns
+   (Threshold | Date range) separated by a centered vertical "or"
+   rule on wide viewports; stacks below 720px. The threshold input
+   is the dominant numeric in the form, displayed in mono at a
+   size that echoes the predict-block's own readouts. */
 .override-form {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) auto minmax(0, 1.15fr);
+  grid-template-areas:
+    "threshold rule range"
+    "actions   actions actions";
+  gap: 0 2.25rem;
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+.override-form__col--threshold { grid-area: threshold; min-width: 0; }
+.override-form__col--range     { grid-area: range;     min-width: 0; }
+.override-form__rule           { grid-area: rule; }
+.override-form__actions        { grid-area: actions; }
+
+.override-form__col {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: 1rem 1rem 0.75rem;
-  max-width: 38rem;
+  gap: 0.75rem;
 }
-.override-form__group {
-  border: none;
-  padding: 0;
+
+.override-form__col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 1.6rem;
+}
+.override-form__col-head h4 {
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-.override-form__group legend {
   font-family: var(--sans);
   font-weight: 600;
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   color: var(--muted);
-  padding: 0;
-  margin-bottom: 0.2rem;
 }
+
+/* FTP / CP unit toggle — pair of pill buttons that share an
+   external border, with the active one filled in ink. */
+.override-form__unit-toggle {
+  display: inline-flex;
+  border: 1px solid var(--hair-strong);
+  background: var(--paper-soft);
+}
+.override-form__unit-toggle button {
+  font-family: var(--sans);
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  background: transparent;
+  border: none;
+  padding: 0.32rem 0.7rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.override-form__unit-toggle button + button { border-left: 1px solid var(--hair); }
+.override-form__unit-toggle button.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+.override-form__unit-toggle button:focus-visible {
+  outline: 2px solid var(--oxblood);
+  outline-offset: 2px;
+}
+
+/* Threshold input — large mono numeral with a quiet W suffix. The
+   underline is the primary chrome, in keeping with the rest of
+   the editorial form aesthetic. */
+.override-form__threshold-input {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.4rem 0;
+}
+.override-form__threshold-input:focus-within { border-bottom-color: var(--oxblood); }
+.override-form__threshold-input input {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  border: none;
+  padding: 0;
+  outline: none;
+  color: var(--ink);
+  min-width: 0;
+}
+.override-form__threshold-input input::placeholder {
+  color: var(--muted);
+  opacity: 0.45;
+}
+.override-form__threshold-unit {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+/* "Setting CP to 266 W" — italic Fraunces serif so the conversion
+   reads as editorial annotation rather than a system message. */
+.override-form__resolved {
+  margin: 0;
+  min-height: 1.4rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: var(--muted);
+  font-variation-settings: "opsz" 36;
+}
+.override-form__resolved em {
+  font-style: italic;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Vertical "or" rule between the two columns. Slim 1px lines
+   above and below a small caps label, hugging the column gutter. */
+.override-form__rule {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: stretch;
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+.override-form__rule::before,
+.override-form__rule::after {
+  content: "";
+  flex: 1;
+  width: 1px;
+  background: var(--hair-strong);
+}
+.override-form__rule span {
+  padding: 0.6rem 0;
+  white-space: nowrap;
+}
+
+/* Date inputs — kept as native <input type="date"> for the
+   browser's calendar UI but tightened typographically to match
+   the rest of the form. */
 .override-form__date-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
 }
 .override-form__date-row label {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  min-width: 0;
 }
 .override-form__date-row label span {
   font-family: var(--sans);
@@ -824,112 +951,35 @@ body[data-app-state="manual"] #manual-mode {
   letter-spacing: 0.14em;
   color: var(--muted);
 }
-
-.override-form__or {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0;
-  font-family: var(--sans);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--muted);
-  text-align: center;
-}
-.override-form__or::before,
-.override-form__or::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--hair-strong);
-}
-.override-form__or span { white-space: nowrap; }
-.override-form__field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.override-form__field span {
-  font-family: var(--sans);
-  font-weight: 600;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-}
-.override-form input {
+.override-form__date-row input {
   font-family: var(--mono);
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   background: transparent;
   color: var(--ink);
   border: none;
   border-bottom: 1px solid var(--ink);
-  padding: 0.3rem 0;
+  padding: 0.35rem 0;
   outline: none;
+  min-width: 0;
 }
-.override-form input:focus { border-bottom-color: var(--oxblood); }
+.override-form__date-row input:focus { border-bottom-color: var(--oxblood); }
 
-.override-form__combo {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  border-bottom: 1px solid var(--ink);
-  padding: 0.25rem 0;
-}
-.override-form__combo:focus-within { border-bottom-color: var(--oxblood); }
-.override-form__combo select {
-  font-family: var(--sans);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--ink-soft);
-  background: transparent;
-  border: 1px solid var(--hair-strong);
-  padding: 0.2rem 0.5rem;
-  cursor: pointer;
-}
-.override-form__combo input {
-  flex: 1;
-  border: none;
-  padding: 0;
-}
-.override-form__unit {
-  font-family: var(--mono);
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.override-form__check {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-family: var(--sans);
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-  padding: 0.4rem 0;
-  border-top: 1px solid var(--hair);
-  margin-top: 0.4rem;
-}
-.override-form__check input { margin: 0; }
-
+/* Quick-set chips — tight row beneath the date inputs. */
 .override-form__presets {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem 0.45rem;
+  margin-top: 0.25rem;
 }
 .override-form__presets-label {
   font-family: var(--sans);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: var(--muted);
-  margin-right: 0.25rem;
+  margin-right: 0.2rem;
 }
 .override-form__presets button {
   font-family: var(--mono);
@@ -937,7 +987,7 @@ body[data-app-state="manual"] #manual-mode {
   background: transparent;
   color: var(--ink-soft);
   border: 1px solid var(--hair-strong);
-  padding: 0.3rem 0.6rem;
+  padding: 0.25rem 0.55rem;
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
@@ -951,11 +1001,37 @@ body[data-app-state="manual"] #manual-mode {
 
 .override-form__actions {
   display: flex;
-  gap: 1rem;
+  gap: 1.25rem;
   align-items: center;
   justify-content: flex-end;
-  padding: 0.75rem 0 0;
+  padding-top: 0.85rem;
+  margin-top: 1rem;
   border-top: 1px solid var(--hair);
+}
+
+/* Stacked layout below 720 px — the vertical rule becomes
+   horizontal so the columns flow naturally. */
+@media (max-width: 720px) {
+  .override-form {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "threshold"
+      "rule"
+      "range"
+      "actions";
+    gap: 1.25rem 0;
+  }
+  .override-form__rule {
+    flex-direction: row;
+    align-self: auto;
+    gap: 0.75rem;
+  }
+  .override-form__rule::before,
+  .override-form__rule::after {
+    width: auto;
+    height: 1px;
+  }
+  .override-form__rule span { padding: 0; }
 }
 .override-form button[type="submit"] {
   font-family: var(--sans);

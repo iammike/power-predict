@@ -439,6 +439,16 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       </tr>`)
     .join('');
 
+  // Preserve the predict input across re-renders so changing an
+  // override (CP value, date range, preset) live-updates the existing
+  // prediction instead of clearing it.
+  const priorPredict = (() => {
+    const input = document.getElementById('predict-input');
+    const out = document.getElementById('predict-output');
+    if (!input || !input.value) return null;
+    return { value: input.value, hadOutput: out && !out.hidden };
+  })();
+
   resultsEl.innerHTML = `
     <header class="results-head">
       <h2>Mean Maximal Power</h2>
@@ -484,6 +494,18 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   wirePredictForm();
   wireCurveChart();
   wireOverrideForm();
+
+  if (priorPredict) {
+    const input = document.getElementById('predict-input');
+    if (input) {
+      input.value = priorPredict.value;
+      if (priorPredict.hadOutput) {
+        document.getElementById('predict-form')?.dispatchEvent(
+          new Event('submit', { cancelable: true })
+        );
+      }
+    }
+  }
 }
 
 // Quality bands for the fit stats. Bands are rules of thumb for the

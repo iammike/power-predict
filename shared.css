@@ -782,11 +782,57 @@ body[data-app-state="manual"] #manual-mode {
 }
 
 .override-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1rem 1rem 0.75rem;
+}
+.override-form__group {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.override-form__group legend {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  padding: 0;
+  margin-bottom: 0.2rem;
+}
+.override-form__custom-range {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  padding: 1rem 0.9rem 0.5rem;
-  align-items: end;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 0.6rem 1rem;
+  align-items: center;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--hair);
+}
+.override-form__custom-label {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--muted);
+  grid-column: 1 / -1;
+  margin-top: 0.25rem;
+}
+.override-form__custom-range label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.override-form__custom-range label span {
+  font-family: var(--sans);
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
 }
 .override-form__field {
   display: flex;
@@ -859,12 +905,10 @@ body[data-app-state="manual"] #manual-mode {
 .override-form__check input { margin: 0; }
 
 .override-form__presets {
-  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0 0;
 }
 .override-form__presets-label {
   font-family: var(--sans);
@@ -894,13 +938,12 @@ body[data-app-state="manual"] #manual-mode {
 }
 
 .override-form__actions {
-  grid-column: 1 / -1;
   display: flex;
   gap: 1rem;
   align-items: center;
-  padding: 0.5rem 0 0;
+  justify-content: flex-end;
+  padding: 0.75rem 0 0;
   border-top: 1px solid var(--hair);
-  margin-top: 0.4rem;
 }
 .override-form button[type="submit"] {
   font-family: var(--sans);

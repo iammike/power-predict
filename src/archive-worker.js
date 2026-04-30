@@ -11,9 +11,11 @@
 
 import { Unzip, UnzipInflate, gunzipSync } from 'fflate';
 import { parseFit } from './fit.js';
+import { parseTcx } from './tcx.js';
 import { extractMmp } from './mmp.js';
 
-const ACTIVITY_PATH = /^activities\/[^/]+\.fit(\.gz)?$/i;
+const FIT_PATH = /^activities\/[^/]+\.fit(\.gz)?$/i;
+const TCX_PATH = /^activities\/[^/]+\.tcx(\.gz)?$/i;
 const ACTIVITIES_CSV = /^activities\.csv$/i;
 const CHUNK_BYTES = 1 << 20; // 1 MB
 
@@ -73,7 +75,9 @@ async function parseArchive(file) {
         entry.start();
         return;
       }
-      if (!ACTIVITY_PATH.test(entry.name)) {
+      const isFit = FIT_PATH.test(entry.name);
+      const isTcx = TCX_PATH.test(entry.name);
+      if (!isFit && !isTcx) {
         entry.ondata = () => {};
         entry.start();
         return;
@@ -81,6 +85,7 @@ async function parseArchive(file) {
       activitiesSeen++;
       const chunks = [];
       let totalSize = 0;
+      const kind = isTcx ? 'tcx' : 'fit';
       entry.ondata = (err, chunk, final) => {
         if (err) { console.warn('zip entry error', entry.name, err); return; }
         if (chunk) { chunks.push(chunk); totalSize += chunk.length; }
@@ -89,7 +94,7 @@ async function parseArchive(file) {
           let offset = 0;
           for (const c of chunks) { bytes.set(c, offset); offset += c.length; }
           chunks.length = 0;
-          pendingFits.push({ name: entry.name, bytes });
+          pendingFits.push({ name: entry.name, bytes, kind });
         }
       };
       entry.start();
@@ -122,13 +127,12 @@ async function parseArchive(file) {
   // small differences in CSV path formatting don't break linking.
   const idByName = csvBytes ? buildIdMap(csvBytes) : null;
 
-  // ------- Parse FIT files -------
-  for (const { name, bytes } of pendingFits) {
-    let p = name;
+  // ------- Parse FIT and TCX files -------
+  for (const { name, bytes, kind } of pendingFits) {
     let b = bytes;
     try {
-      if (p.endsWith('.gz')) b = gunzipSync(b);
-      const activity = await parseFit(b);
+      if (name.endsWith('.gz')) b = gunzipSync(b);
+      const activity = kind === 'tcx' ? parseTcx(b) : await parseFit(b);
       if (activity?.powerStream) {
         const mmp = extractMmp(activity.powerStream);
         // Average power across the activity's full power stream

@@ -75,7 +75,7 @@ Open issues are grouped by phase: see [milestones](https://github.com/iammike/po
 
 - **Phase 3 (modeling)** — 3-parameter CP fit with P_max (#12), training-load adjustment via CTL/ATL/TSB (#42)
 - **Phase 4 (sync)** — Strava OAuth + webhook ingest (#20, #21), 180-day API backfill (#39), rate-limit budget (#22), connect UI (#26)
-- **Phase 5 (polish)** — privacy / accessibility / account deletion, robust FIT error recovery (#29), TCX/GPX support (#8)
+- **Phase 5 (polish)** — privacy / accessibility / account deletion, robust FIT error recovery (#29)
 
 ## Strava setup (for Phase 4)
 

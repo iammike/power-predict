@@ -74,18 +74,23 @@
 
     <h2>3. The Critical Power model</h2>
 
-    <p>For durations from roughly 3 minutes to 20 minutes, sustainable power is well-described by the <strong>2-parameter Critical Power model</strong>:</p>
+    <p>Power Predict tries the <strong>3-parameter Morton model</strong> first and falls back to the classic 2-parameter form when the data is too sparse for the extra parameter to behave.</p>
 
-    <p class="formula"><em>P</em>(<em>t</em>) = CP + <em>W</em>′ / <em>t</em></p>
+    <p class="formula"><em>P</em>(<em>t</em>) = CP + <em>W</em>′ / (<em>t</em> + <em>W</em>′ / (<em>P</em><sub>max</sub> &minus; CP))</p>
 
     <p>where</p>
 
     <ul>
       <li><strong>CP</strong> (watts) is the asymptote &mdash; the power you could theoretically hold indefinitely if no other systems failed first.</li>
       <li><strong>W&prime;</strong> (joules) is the finite work you can do above CP before exhausting that anaerobic reserve.</li>
+      <li><strong>P<sub>max</sub></strong> (watts) is the short-duration asymptote that tames the curve below 3 minutes &mdash; the value the model approaches as <em>t</em> → 0.</li>
     </ul>
 
-    <p>With <em>x</em> = 1 / <em>t</em>, the formula becomes a line, and we fit it by ordinary least squares. <em>W&prime;</em> falls out as the slope, CP as the intercept. Power Predict reports the fit's RMSE alongside CP and W&prime; so you can see how well your data matches the model.</p>
+    <p>With τ = <em>W</em>′ / (<em>P</em><sub>max</sub> &minus; CP), the model collapses to a linear regression for any fixed τ: <em>P</em> = CP + <em>W</em>′ / (<em>t</em> + τ). We dense-grid τ in [1, 90] s, solve CP and <em>W</em>′ in closed form for each candidate, and pick the τ with minimum residual subject to physical sanity bounds (CP ∈ [50, 600] W, <em>W</em>′ ∈ [1, 60] kJ, <em>P</em><sub>max</sub> ∈ [CP+100, 2500] W).</p>
+
+    <p>The 3-parameter form lets the fitting window extend down to 30 seconds where the 2-parameter hyperbola would predict runaway power. When fewer than three points fall in the fit range, or no τ produces a sane combination, Power Predict falls back to the 2-parameter form fitted on 180&ndash;1200 s, which only needs two anchor points but distorts below 3 minutes.</p>
+
+    <p>Either way the result reports CP, <em>W</em>′, RMSE, and the number of fit points; the 3-parameter fit also exposes <em>P</em><sub>max</sub> in the CP cell tooltip and labels the predict block "3-param CP" rather than "2-param CP".</p>
 
     <h3>Why the fit line doesn't pass through every dot</h3>
 
@@ -157,7 +162,6 @@
     <p>Today's predictions assume your last 90 days of data accurately reflect your current fitness. Issues planned for upcoming releases:</p>
 
     <ul>
-      <li><strong>3-parameter CP fit</strong> &mdash; add a P<sub>max</sub> term so the model behaves on the &lt;3 minute end. Today the regression window starts at 3 min because the 2-parameter form distorts below that.</li>
       <li><strong>Training-load adjustment</strong> &mdash; modulate predictions by recent CTL/ATL/TSB so a rider mid-taper doesn't get the same forecast as a rider mid-build.</li>
     </ul>
 

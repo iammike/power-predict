@@ -12,7 +12,7 @@ import {
   loadSettings,
   saveSettings,
 } from './storage.js';
-import { fitCp2, predictPower, mmpToPoints } from './cpfit.js';
+import { fitCp2, fitCp3, predictPower, mmpToPoints } from './cpfit.js';
 import { parseDuration } from './duration.js';
 import { synthesizeFit } from './manual.js';
 
@@ -356,8 +356,20 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const allTimeFitNorm = rollingBest(drift.activities, effortOpts);
   currentEftpNow = drift.eftpNow;
 
-  const primaryFit = fitCp2(mmpToPoints(last90Fit), undefined, { observedPoints: mmpToPoints(last90) });
-  const fallbackFit = fitCp2(mmpToPoints(allTimeFitNorm), undefined, { observedPoints: mmpToPoints(allTime) });
+  // Prefer the 3-parameter (Morton) fit when it produces a sane
+  // result — it handles short-duration data the 2-param hyperbola
+  // can't. Fall back to 2-param if the data is too sparse or no
+  // tau lands in the physical envelope.
+  const primaryPoints = mmpToPoints(last90Fit);
+  const primaryObserved = mmpToPoints(last90);
+  const primaryFit =
+    fitCp3(primaryPoints, undefined, { observedPoints: primaryObserved })
+    || fitCp2(primaryPoints, undefined, { observedPoints: primaryObserved });
+  const fallbackPoints = mmpToPoints(allTimeFitNorm);
+  const fallbackObserved = mmpToPoints(allTime);
+  const fallbackFit =
+    fitCp3(fallbackPoints, undefined, { observedPoints: fallbackObserved })
+    || fitCp2(fallbackPoints, undefined, { observedPoints: fallbackObserved });
   currentFit = primaryFit
     ? { ...primaryFit, fallback: false }
     : (fallbackFit ? { ...fallbackFit, fallback: true } : null);
@@ -453,7 +465,10 @@ function cpQuality(fit) {
 }
 function cpTooltip(fit) {
   if (fit.overridden) return 'CP is pinned to your manual override. W\' is still derived from the regression so the curve shape stays data-driven.';
-  if (fit.fallback)   return 'The 90-day window had too few MMP points in the 3-20 min range, so the fit fell back to all-time data.';
+  if (fit.fallback)   return 'The 90-day window had too few MMP points in the fit range, so the fit fell back to all-time data.';
+  if (fit.model === '3p' && Number.isFinite(fit.pMaxW)) {
+    return `Critical Power asymptote — the wattage you could theoretically hold indefinitely if no other system failed. 3-parameter Morton fit: P_max ≈ ${Math.round(fit.pMaxW)} W (the short-duration asymptote that tames the curve below 3 minutes).`;
+  }
   return 'CP came from a normal regression on the active window (last 90 days or your custom range).';
 }
 function wPrimeQuality(wPrimeJ) {
@@ -756,9 +771,10 @@ function renderPredictBlock() {
     currentSettings.dateFrom ||
     currentSettings.dateTo
   );
+  const modelLabel = currentFit.model === '3p' ? '3-param CP' : '2-param CP';
   const headerMeta = overrideActive
-    ? `CP model · custom override`
-    : `CP model · last 90 days, effort-filtered`;
+    ? `${modelLabel} · custom override`
+    : `${modelLabel} · last 90 days, effort-filtered`;
 
   return `
     <section class="predict">

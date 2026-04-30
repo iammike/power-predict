@@ -15,6 +15,7 @@ import {
 import { fitCp2, fitCp3, predictPower, mmpToPoints } from './cpfit.js';
 import { parseDuration } from './duration.js';
 import { synthesizeFit } from './manual.js';
+import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
 
 const dropZone = document.getElementById('archive-drop');
 const fileInput = document.getElementById('archive-input');
@@ -151,6 +152,7 @@ async function handleArchive(file) {
                 durationS: msg.durationS,
                 distanceM: msg.distanceM,
                 avgPower: msg.avgPower,
+                npW: msg.npW ?? msg.avgPower,
                 mmp: msg.mmp,
                 stravaId: msg.stravaId ?? null,
               });
@@ -313,6 +315,7 @@ function formatBytes(bytes) {
 // Held in module scope so the predict form + chart toggles can read.
 let currentFit = null;
 let currentEftpNow = null;
+let currentLoad = { ctl: 0, atl: 0, tsb: 0, hasFtp: false };
 let currentMmpByWindow = { last30: {}, last90: {}, allTime: {}, range: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
@@ -400,6 +403,13 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   if (currentFit && Number.isFinite(currentSettings.cpOverrideW)) {
     currentFit = { ...currentFit, cpW: currentSettings.cpOverrideW, overridden: true };
   }
+
+  // Training-load (CTL/ATL/TSB) computed against the full archive,
+  // not the date-filtered slice — TSB is about *current* fitness vs.
+  // fatigue, anchored at "now," regardless of any fit override.
+  // FTP for the IF calculation: 0.95 × CP from the fit (or null).
+  const ftpForLoad = currentFit?.cpW ? currentFit.cpW / 0.95 : null;
+  currentLoad = computeLoadSeries(activityMmps, ftpForLoad);
 
   const rows = DURATIONS_S
     .filter((d) => allTime[d] !== undefined)
@@ -531,6 +541,27 @@ function eftpTooltip() {
     ? 'within your selected date range'
     : 'from your most recent 90 days';
   return `Estimated FTP ${range}: 0.95 × best 20-min MMP. Used to drift-normalize older efforts when the fit falls back to all-time data.`;
+}
+
+// Form (TSB) display helpers. TSB is unitless; we report it with a
+// sign so a glance tells the user whether they're fresh or fatigued.
+function formatTsb(tsb) {
+  const v = Math.round(tsb);
+  return v > 0 ? `+${v}` : String(v);
+}
+function formQuality() {
+  const band = tsbBand(currentLoad.tsb);
+  if (band === 'fresh')      return { label: 'fresh', cls: 'is-good' };
+  if (band === 'building')   return { label: 'building', cls: 'is-mid' };
+  if (band === 'overloaded') return { label: 'overloaded', cls: 'is-bad' };
+  return { label: 'stable', cls: 'is-good' };
+}
+function formTooltip() {
+  const ctl = Math.round(currentLoad.ctl);
+  const atl = Math.round(currentLoad.atl);
+  const adj = Math.round((formMultiplier(currentLoad.tsb) - 1) * 100);
+  const adjStr = adj === 0 ? 'no adjustment' : `${adj > 0 ? '+' : ''}${adj}% applied to predictions`;
+  return `Form (TSB) = CTL ${ctl} − ATL ${atl}. Positive = fresh; negative = fatigued. ${adjStr}. Capped at ±5%.`;
 }
 
 // Combined fit-quality summary: pick whichever of RMSE / points is
@@ -737,6 +768,7 @@ function renderManualMode(fit, inputs = {}) {
   const priorSettings = currentSettings;
   currentFit = fit;
   currentEftpNow = null;
+  currentLoad = { ctl: 0, atl: 0, tsb: 0, hasFtp: false };
   currentMmpByWindow = { last30: {}, last90: {}, allTime: {}, range: {} };
   const hasPriorData = priorActivities.length > 0;
 
@@ -911,6 +943,12 @@ function renderPredictBlock() {
           <dd>${formatPower(currentEftpNow)}</dd>
           <span class="fit-stats__quality is-good">${eftpWindowLabel()}</span>
         </div>` : ''}
+        ${currentLoad.hasFtp ? `
+        <div data-tooltip="${formTooltip()}">
+          <dt>Form</dt>
+          <dd>${formatTsb(currentLoad.tsb)}</dd>
+          <span class="fit-stats__quality ${formQuality().cls}">${formQuality().label}</span>
+        </div>` : ''}
         <div data-tooltip="${combinedFitTooltip(currentFit)}">
           <dt>Fit</dt>
           <dd>${currentFit.rmse.toFixed(1)}W · ${currentFit.nPoints}pt</dd>
@@ -960,12 +998,23 @@ function wirePredictForm() {
       out.innerHTML = `<p class="predict-output__error">Couldn't parse that. Try "45m", "1h30m", or "90s".</p>`;
       return;
     }
-    const result = predictPower(currentFit, seconds);
-    if (!result) {
+    const raw = predictPower(currentFit, seconds);
+    if (!raw) {
       out.hidden = false;
       out.innerHTML = `<p class="predict-output__error">Prediction failed.</p>`;
       return;
     }
+    // Apply the form-based multiplier to the predicted wattage and
+    // its confidence band. Capped at ±5% inside formMultiplier so
+    // it's a nudge, not a rewrite.
+    const mult = currentLoad.hasFtp ? formMultiplier(currentLoad.tsb) : 1;
+    const adjPct = Math.round((mult - 1) * 100);
+    const result = mult === 1 ? raw : {
+      ...raw,
+      powerW: raw.powerW * mult,
+      low: raw.low * mult,
+      high: raw.high * mult,
+    };
     out.hidden = false;
     out.innerHTML = `
       <p class="predict-output__label">Predicted for ${formatDuration(seconds)}</p>
@@ -973,6 +1022,7 @@ function wirePredictForm() {
       <p class="predict-output__band">
         Range ${Math.round(result.low)}–${Math.round(result.high)} W
         ${result.extrapolated ? '<span class="predict-output__flag">extrapolated</span>' : ''}
+        ${adjPct !== 0 ? `<span class="predict-output__flag">${adjPct > 0 ? '+' : ''}${adjPct}% form</span>` : ''}
       </p>
     `;
   });

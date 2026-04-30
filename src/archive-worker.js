@@ -13,6 +13,7 @@ import { Unzip, UnzipInflate, gunzipSync } from 'fflate';
 import { parseFit } from './fit.js';
 import { parseTcx } from './tcx.js';
 import { extractMmp } from './mmp.js';
+import { normalizedPower } from './aggregate.js';
 
 const FIT_PATH = /^activities\/[^/]+\.fit(\.gz)?$/i;
 const TCX_PATH = /^activities\/[^/]+\.tcx(\.gz)?$/i;
@@ -146,6 +147,11 @@ async function parseArchive(file) {
         const avgPower = activity.powerStream.length
           ? totalPower / activity.powerStream.length
           : 0;
+        // Normalized Power for TSS / training-load math. Coggan's
+        // 4th-root-of-mean-of-30s-rolling-avg^4 form. Falls back
+        // to avgPower for activities too short for a 30s window.
+        const npRaw = normalizedPower(activity.powerStream);
+        const npW = Number.isFinite(npRaw) && npRaw > 0 ? npRaw : avgPower;
         // Resolve the public Strava activity ID via activities.csv.
         // The number in the FIT filename is the upload ID — globally
         // unique but distinct from the activity ID a user URL uses,
@@ -158,6 +164,7 @@ async function parseArchive(file) {
           durationS: activity.durationS,
           distanceM: activity.distanceM,
           avgPower,
+          npW,
           mmp,
           stravaId,
         });

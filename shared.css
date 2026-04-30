@@ -673,7 +673,7 @@ body[data-app-state="manual"] #manual-mode {
 /* CURVE CHART */
 
 .curve-chart-section {
-  margin: 1.5rem 0 0;
+  margin: 1.5rem 0 2rem;
 }
 .curve-chart-head {
   display: flex;

@@ -574,20 +574,11 @@ function renderOverrideForm() {
           </div>
         </fieldset>
 
+        <p class="override-form__or" aria-hidden="true"><span>or</span></p>
+
         <fieldset class="override-form__group">
           <legend>Date range</legend>
-          <div class="override-form__presets" role="group" aria-label="Date range presets">
-            <span class="override-form__presets-label">Last</span>
-            <button type="button" data-preset-days="15">15d</button>
-            <button type="button" data-preset-days="30">30d</button>
-            <button type="button" data-preset-days="45">45d</button>
-            <button type="button" data-preset-days="60">60d</button>
-            <button type="button" data-preset-days="90">90d</button>
-            <button type="button" data-preset-days="180">6mo</button>
-            <button type="button" data-preset-days="365">1y</button>
-          </div>
-          <div class="override-form__custom-range">
-            <span class="override-form__custom-label">or pick exact dates</span>
+          <div class="override-form__date-row">
             <label>
               <span>From</span>
               <input type="date" id="date-from" value="${from}">
@@ -596,6 +587,16 @@ function renderOverrideForm() {
               <span>To</span>
               <input type="date" id="date-to" value="${to}">
             </label>
+          </div>
+          <div class="override-form__presets" role="group" aria-label="Date range presets">
+            <span class="override-form__presets-label">Quick set</span>
+            <button type="button" data-preset-days="15">15d</button>
+            <button type="button" data-preset-days="30">30d</button>
+            <button type="button" data-preset-days="45">45d</button>
+            <button type="button" data-preset-days="60">60d</button>
+            <button type="button" data-preset-days="90">90d</button>
+            <button type="button" data-preset-days="180">6mo</button>
+            <button type="button" data-preset-days="365">1y</button>
           </div>
         </fieldset>
 

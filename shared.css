@@ -805,28 +805,17 @@ body[data-app-state="manual"] #manual-mode {
   padding: 0;
   margin-bottom: 0.2rem;
 }
-.override-form__custom-range {
+.override-form__date-row {
   display: grid;
-  grid-template-columns: auto 1fr 1fr;
-  gap: 0.6rem 1rem;
-  align-items: center;
-  padding-top: 0.4rem;
-  border-top: 1px dashed var(--hair);
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }
-.override-form__custom-label {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 0.85rem;
-  color: var(--muted);
-  grid-column: 1 / -1;
-  margin-top: 0.25rem;
-}
-.override-form__custom-range label {
+.override-form__date-row label {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
-.override-form__custom-range label span {
+.override-form__date-row label span {
   font-family: var(--sans);
   font-size: 0.66rem;
   font-weight: 600;
@@ -834,6 +823,28 @@ body[data-app-state="manual"] #manual-mode {
   letter-spacing: 0.14em;
   color: var(--muted);
 }
+
+.override-form__or {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  text-align: center;
+}
+.override-form__or::before,
+.override-form__or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hair-strong);
+}
+.override-form__or span { white-space: nowrap; }
 .override-form__field {
   display: flex;
   flex-direction: column;

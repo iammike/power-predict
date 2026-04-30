@@ -117,7 +117,9 @@
 
     <p>The anchor is whichever is later: your longest observed MMP point, or the 20-minute model prediction. Anchoring at real data when available means a 12-hour forecast is grounded in your actual 4-hour or 6-hour ride, not extrapolated all the way from the CP fit.</p>
 
-    <p>The fatigue exponent <em>k</em> = 0.10. Skiba publishes 0.07, which fits the 1&ndash;4 hour range; observed pro and amateur ultra-endurance data falls off faster than that, more like 0.10 in the 8&ndash;24 hour range. Defaulting higher avoids the trap of ultra predictions reading too close to CP.</p>
+    <p>The fatigue exponent <em>k</em> defaults to 0.10. Skiba publishes 0.07, which fits the 1&ndash;4 hour range; observed pro and amateur ultra-endurance data falls off faster than that, more like 0.10 in the 8&ndash;24 hour range. Defaulting higher avoids the trap of ultra predictions reading too close to CP.</p>
+
+    <p>When your archive contains at least three MMP points between 20 minutes and 4 hours, Power Predict fits a <strong>personal</strong> <em>k</em> by linear regression on log&minus;log MMP data: log <em>P</em> = <em>a</em> &minus; <em>k</em> &middot; log <em>t</em>. The fitted value replaces the default at predict time, both in the chart's fatigue line and in the predict form. The result is clamped to the 0.04&ndash;0.20 envelope to ignore degenerate fits driven by a single low-effort long ride. The Fatigue&nbsp;k stat in the predict block reports which value is in use and how many points it was fitted on.</p>
 
     <table>
       <thead><tr><th>Duration</th><th>Typical fraction of CP</th><th>Power Predict default</th></tr></thead>

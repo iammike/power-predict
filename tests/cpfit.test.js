@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fitCp2, fitCp3, predictPower, mmpToPoints } from '../src/cpfit.js';
+import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints } from '../src/cpfit.js';
 
 // Generate synthetic MMP points from a known CP/W' so we can verify
 // the fit recovers them.
@@ -205,5 +205,59 @@ describe('fitCp3', () => {
     const at60 = predictPower(fit, 60, { decay: false });
     const expected = fit.cpW + fit.wPrimeJ / (60 + fit.tauS);
     expect(at60.powerW).toBeCloseTo(expected, 4);
+  });
+});
+
+describe('fitFatigueK', () => {
+  // Build a synthetic Riegel-decayed dataset: P(t) = P0 × (t0 / t)^k
+  function riegel(p0, t0, k, durationsS) {
+    return durationsS.map((t) => ({ durationS: t, powerW: p0 * (t0 / t) ** k }));
+  }
+
+  it('recovers k on a noiseless synthetic decay', () => {
+    const pts = riegel(280, 1200, 0.08, [1200, 1800, 2700, 3600, 5400, 7200]);
+    const out = fitFatigueK(pts);
+    expect(out.k).toBeCloseTo(0.08, 4);
+    expect(out.clamped).toBe(false);
+    expect(out.nPoints).toBe(6);
+  });
+
+  it('returns null when fewer than 3 points fall in range', () => {
+    const pts = [
+      { durationS: 1200, powerW: 280 },
+      { durationS: 3600, powerW: 250 },
+    ];
+    expect(fitFatigueK(pts)).toBeNull();
+  });
+
+  it('ignores points outside the long-duration range', () => {
+    const pts = [
+      ...riegel(280, 1200, 0.08, [1200, 1800, 3600]),
+      { durationS: 60, powerW: 600 },   // sprint, ignored
+      { durationS: 300, powerW: 380 },  // 5 min, ignored
+    ];
+    const out = fitFatigueK(pts);
+    expect(out.nPoints).toBe(3);
+    expect(out.k).toBeCloseTo(0.08, 3);
+  });
+
+  it('clamps absurdly steep decays into the plausible envelope', () => {
+    const pts = riegel(280, 1200, 0.40, [1200, 1800, 3600, 7200]);
+    const out = fitFatigueK(pts);
+    expect(out.clamped).toBe(true);
+    expect(out.k).toBe(0.20);
+    expect(out.kRaw).toBeGreaterThan(0.30);
+  });
+
+  it('clamps near-zero decays into the plausible envelope', () => {
+    const pts = riegel(280, 1200, 0.005, [1200, 1800, 3600, 7200]);
+    const out = fitFatigueK(pts);
+    expect(out.clamped).toBe(true);
+    expect(out.k).toBe(0.04);
+  });
+
+  it('returns null for non-array input', () => {
+    expect(fitFatigueK(null)).toBeNull();
+    expect(fitFatigueK(undefined)).toBeNull();
   });
 });

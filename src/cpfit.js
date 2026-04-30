@@ -201,6 +201,45 @@ export const DEFAULT_DECAY = {
   k: 0.10,
 };
 
+// Fit a personal Riegel exponent from MMP points in the long-duration
+// range (default 20 min – 4 h). The relation
+//   P(t) = P_anchor × (t_anchor / t)^k
+// linearizes under log/log to log P = a − k · log t, so a least-squares
+// regression on (log t, log P) gives slope = −k.
+//
+// We require at least three points and clamp k to a physically plausible
+// envelope: below ~0.04 implies near-zero fatigue (unrealistic over hours);
+// above ~0.20 implies catastrophic decay seen only in untrained or sick
+// riders. Outside that window we still report the clamped value with a
+// `clamped` flag so callers can distinguish "fitted" from "rail-pinned."
+export const DEFAULT_FATIGUE_RANGE = { minS: 1200, maxS: 14400 };
+const FATIGUE_K_MIN = 0.04;
+const FATIGUE_K_MAX = 0.20;
+const FATIGUE_MIN_POINTS = 3;
+
+export function fitFatigueK(points, range = DEFAULT_FATIGUE_RANGE) {
+  if (!Array.isArray(points)) return null;
+  const filtered = points.filter(
+    (p) => p && p.durationS >= range.minS && p.durationS <= range.maxS && p.powerW > 0
+  );
+  if (filtered.length < FATIGUE_MIN_POINTS) return null;
+  const n = filtered.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (const p of filtered) {
+    const x = Math.log(p.durationS);
+    const y = Math.log(p.powerW);
+    sumX += x; sumY += y; sumXY += x * y; sumXX += x * x;
+  }
+  const denom = n * sumXX - sumX * sumX;
+  if (denom <= 0) return null;
+  const slope = (n * sumXY - sumX * sumY) / denom;
+  const kRaw = -slope;
+  if (!Number.isFinite(kRaw)) return null;
+  const clamped = kRaw < FATIGUE_K_MIN || kRaw > FATIGUE_K_MAX;
+  const k = Math.max(FATIGUE_K_MIN, Math.min(FATIGUE_K_MAX, kRaw));
+  return { k, kRaw, nPoints: n, clamped };
+}
+
 // Baseline P(t) for the fit. 3-param fits include a tauS term;
 // 2-param fits don't, and the baseline collapses to CP + W'/t.
 function baselinePower(fit, t) {

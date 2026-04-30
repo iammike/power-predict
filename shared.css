@@ -786,6 +786,7 @@ body[data-app-state="manual"] #manual-mode {
   flex-direction: column;
   gap: 1.25rem;
   padding: 1rem 1rem 0.75rem;
+  max-width: 38rem;
 }
 .override-form__group {
   border: none;

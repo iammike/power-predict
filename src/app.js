@@ -489,7 +489,9 @@ function rmseQuality(rmse) {
 function rmseTooltip(rmse) {
   return 'Root-mean-squared error of the regression. Lower = tighter fit. '
        + 'Typical bands: <5W excellent (clean test data), 5-15W good (real-world riding), '
-       + '15-30W noisy, >30W means the model isn\'t fitting your data well.';
+       + '15-30W noisy, >30W means the model isn\'t fitting your data well. '
+       + 'Note: the fit line is a least-squares smoother, so individual MMP dots can sit '
+       + 'slightly above or below it — RMSE is the size of that gap.';
 }
 function pointsQuality(n) {
   // 9 durations available in our DURATIONS_S between 3 and 20 min.

@@ -191,7 +191,7 @@ main {
 .steps {
   list-style: none;
   padding: 0;
-  margin: clamp(3rem, 6vw, 5rem) 0 2rem;
+  margin: clamp(2rem, 4vw, 3rem) 0 2rem;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border-top: var(--rule-strong);

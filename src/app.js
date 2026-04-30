@@ -561,23 +561,28 @@ function renderOverrideForm() {
         ? 'open' : ''
     }>
       <summary>Manual override</summary>
-      <form class="override-form" id="override-form">
-        <fieldset class="override-form__group">
-          <legend>Threshold</legend>
-          <div class="override-form__combo">
-            <select id="override-unit" aria-label="Override unit">
-              <option value="ftp" ${unit === 'ftp' ? 'selected' : ''}>FTP</option>
-              <option value="cp" ${unit === 'cp' ? 'selected' : ''}>CP</option>
-            </select>
-            <input type="number" id="cp-override" min="50" max="600" step="1" value="${displayValue}" placeholder="e.g. 280">
-            <span class="override-form__unit">W</span>
+      <form class="override-form" id="override-form" data-unit="${unit}">
+        <section class="override-form__col override-form__col--threshold">
+          <header class="override-form__col-head">
+            <h4>Threshold</h4>
+            <div class="override-form__unit-toggle" role="tablist" aria-label="Threshold unit">
+              <button type="button" role="tab" data-unit="ftp" class="${unit === 'ftp' ? 'is-active' : ''}" aria-selected="${unit === 'ftp'}">FTP</button>
+              <button type="button" role="tab" data-unit="cp"  class="${unit === 'cp'  ? 'is-active' : ''}" aria-selected="${unit === 'cp'}">CP</button>
+            </div>
+          </header>
+          <div class="override-form__threshold-input">
+            <input type="number" id="cp-override" min="50" max="600" step="1" value="${displayValue}" placeholder="280" inputmode="numeric">
+            <span class="override-form__threshold-unit">W</span>
           </div>
-        </fieldset>
+          <p class="override-form__resolved" id="threshold-resolved" aria-live="polite"></p>
+        </section>
 
-        <p class="override-form__or" aria-hidden="true"><span>or</span></p>
+        <div class="override-form__rule" aria-hidden="true"><span>or</span></div>
 
-        <fieldset class="override-form__group">
-          <legend>Date range</legend>
+        <section class="override-form__col override-form__col--range">
+          <header class="override-form__col-head">
+            <h4>Date range</h4>
+          </header>
           <div class="override-form__date-row">
             <label>
               <span>From</span>
@@ -598,12 +603,12 @@ function renderOverrideForm() {
             <button type="button" data-preset-days="180">6mo</button>
             <button type="button" data-preset-days="365">1y</button>
           </div>
-        </fieldset>
+        </section>
 
-        <div class="override-form__actions">
+        <footer class="override-form__actions">
           <button type="submit">Apply</button>
           <button type="button" class="link-button" id="reset-override">Reset</button>
-        </div>
+        </footer>
       </form>
     </details>
   `;
@@ -612,10 +617,42 @@ function renderOverrideForm() {
 function wireOverrideForm() {
   const form = document.getElementById('override-form');
   if (!form) return;
+  const valueInput = document.getElementById('cp-override');
+  const resolvedEl = document.getElementById('threshold-resolved');
+  const toggleButtons = form.querySelectorAll('.override-form__unit-toggle button');
+
+  const refreshResolved = () => {
+    const unit = form.dataset.unit === 'cp' ? 'cp' : 'ftp';
+    const value = Number(valueInput.value);
+    if (!Number.isFinite(value) || value <= 0) {
+      resolvedEl.textContent = '';
+      return;
+    }
+    const cpW = unit === 'ftp' ? Math.round(value * 0.95) : Math.round(value);
+    resolvedEl.innerHTML = unit === 'ftp'
+      ? `Setting CP to <em>${cpW} W</em>`
+      : `CP set <em>directly</em>`;
+  };
+
+  toggleButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.unit === 'cp' ? 'cp' : 'ftp';
+      form.dataset.unit = next;
+      toggleButtons.forEach((b) => {
+        const active = b.dataset.unit === next;
+        b.classList.toggle('is-active', active);
+        b.setAttribute('aria-selected', String(active));
+      });
+      refreshResolved();
+    });
+  });
+  valueInput.addEventListener('input', refreshResolved);
+  refreshResolved();
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const valueStr = document.getElementById('cp-override').value.trim();
-    const unit = document.getElementById('override-unit').value === 'cp' ? 'cp' : 'ftp';
+    const valueStr = valueInput.value.trim();
+    const unit = form.dataset.unit === 'cp' ? 'cp' : 'ftp';
     const from = document.getElementById('date-from').value;
     const to = document.getElementById('date-to').value;
     const value = valueStr ? Number(valueStr) : null;

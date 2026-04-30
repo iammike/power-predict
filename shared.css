@@ -858,6 +858,41 @@ body[data-app-state="manual"] #manual-mode {
 }
 .override-form__check input { margin: 0; }
 
+.override-form__presets {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0 0;
+}
+.override-form__presets-label {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  margin-right: 0.25rem;
+}
+.override-form__presets button {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid var(--hair-strong);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.override-form__presets button:hover,
+.override-form__presets button:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  outline: none;
+}
+
 .override-form__actions {
   grid-column: 1 / -1;
   display: flex;

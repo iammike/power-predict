@@ -564,6 +564,16 @@ function renderOverrideForm() {
           <span>To</span>
           <input type="date" id="date-to" value="${to}">
         </label>
+        <div class="override-form__presets" role="group" aria-label="Date range presets">
+          <span class="override-form__presets-label">Last</span>
+          <button type="button" data-preset-days="15">15d</button>
+          <button type="button" data-preset-days="30">30d</button>
+          <button type="button" data-preset-days="45">45d</button>
+          <button type="button" data-preset-days="60">60d</button>
+          <button type="button" data-preset-days="90">90d</button>
+          <button type="button" data-preset-days="180">6mo</button>
+          <button type="button" data-preset-days="365">1y</button>
+        </div>
         <div class="override-form__actions">
           <button type="submit">Apply</button>
           <button type="button" class="link-button" id="reset-override">Reset</button>
@@ -600,6 +610,22 @@ function wireOverrideForm() {
     currentSettings = {};
     await saveSettings({});
     renderCurves(currentActivities, { fromCache: true });
+  });
+  document.querySelectorAll('.override-form__presets [data-preset-days]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const days = Number(btn.dataset.presetDays);
+      const today = new Date();
+      const from = new Date(today);
+      from.setDate(today.getDate() - days);
+      const fmt = (d) => d.toISOString().slice(0, 10);
+      currentSettings = {
+        ...currentSettings,
+        dateFrom: fmt(from),
+        dateTo: fmt(today),
+      };
+      await saveSettings(currentSettings);
+      renderCurves(currentActivities, { fromCache: true });
+    });
   });
 }
 

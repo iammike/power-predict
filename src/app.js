@@ -1109,8 +1109,9 @@ function wirePredictForm() {
     }
     // Apply the form-based multiplier to the predicted wattage and
     // its confidence band. Capped at ±5% inside formMultiplier so
-    // it's a nudge, not a rewrite. The Form cell's tooltip carries
-    // the adjustment %; we don't repeat it on the prediction output.
+    // it's a nudge, not a rewrite. We surface the applied delta on the
+    // output so the user can reconcile the predicted watts against the
+    // chart curve (which doesn't bake form in).
     const mult = currentLoad.hasFtp ? formMultiplier(currentLoad.tsb) : 1;
     const result = mult === 1 ? raw : {
       ...raw,
@@ -1118,6 +1119,10 @@ function wirePredictForm() {
       low: raw.low * mult,
       high: raw.high * mult,
     };
+    const adjPct = Math.round((mult - 1) * 100);
+    const formChip = adjPct === 0
+      ? ''
+      : `<span class="predict-output__flag predict-output__flag--form" title="${formTooltip()}">${adjPct > 0 ? '+' : ''}${adjPct}% form</span>`;
     out.hidden = false;
     out.innerHTML = `
       <p class="predict-output__label">Predicted for ${formatDuration(seconds)}</p>
@@ -1125,6 +1130,7 @@ function wirePredictForm() {
       <p class="predict-output__band">
         Range ${Math.round(result.low)}–${Math.round(result.high)} W
         ${result.extrapolated ? '<span class="predict-output__flag">extrapolated</span>' : ''}
+        ${formChip}
       </p>
     `;
   });

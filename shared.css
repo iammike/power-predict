@@ -783,28 +783,32 @@ body[data-app-state="manual"] #manual-mode {
 
 /* Override form — refined editorial layout. Two columns
    (Threshold | Date range) separated by a centered vertical "or"
-   rule on wide viewports; stacks below 720px. The threshold input
-   is the dominant numeric in the form, displayed in mono at a
-   size that echoes the predict-block's own readouts. */
+   rule on wide viewports; stacks below 720px. Children use a
+   shared 4-row grid (heads / inputs / after-input / actions) via
+   display:contents on the column wrappers, so the threshold
+   underline and the date underlines land on the same horizontal
+   line regardless of the inputs' intrinsic heights. */
 .override-form {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) auto minmax(0, 1.15fr);
+  grid-template-rows: auto auto auto auto;
   grid-template-areas:
-    "threshold rule range"
-    "actions   actions actions";
-  gap: 0 2.25rem;
+    "th-head  rule rg-head"
+    "th-input rule rg-input"
+    "th-after rule rg-after"
+    "actions  actions actions";
+  gap: 0.5rem 2.25rem;
   padding: 1.25rem 1.25rem 0.75rem;
 }
-.override-form__col--threshold { grid-area: threshold; min-width: 0; }
-.override-form__col--range     { grid-area: range;     min-width: 0; }
-.override-form__rule           { grid-area: rule; }
-.override-form__actions        { grid-area: actions; }
-
-.override-form__col {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
+.override-form__col { display: contents; }
+.override-form__col--threshold .override-form__col-head        { grid-area: th-head; }
+.override-form__col--threshold .override-form__threshold-input { grid-area: th-input; align-self: end; }
+.override-form__col--threshold .override-form__resolved        { grid-area: th-after; }
+.override-form__col--range     .override-form__col-head        { grid-area: rg-head; }
+.override-form__col--range     .override-form__date-row        { grid-area: rg-input; align-self: end; }
+.override-form__col--range     .override-form__presets         { grid-area: rg-after; }
+.override-form__rule    { grid-area: rule; }
+.override-form__actions { grid-area: actions; }
 
 .override-form__col-head {
   display: flex;
@@ -1014,17 +1018,25 @@ body[data-app-state="manual"] #manual-mode {
 @media (max-width: 720px) {
   .override-form {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto auto auto auto;
     grid-template-areas:
-      "threshold"
+      "th-head"
+      "th-input"
+      "th-after"
       "rule"
-      "range"
+      "rg-head"
+      "rg-input"
+      "rg-after"
       "actions";
-    gap: 1.25rem 0;
+    gap: 0.5rem 0;
   }
+  .override-form__col--threshold .override-form__threshold-input,
+  .override-form__col--range .override-form__date-row { align-self: stretch; }
   .override-form__rule {
     flex-direction: row;
     align-self: auto;
     gap: 0.75rem;
+    margin: 1rem 0 0.5rem;
   }
   .override-form__rule::before,
   .override-form__rule::after {

@@ -329,12 +329,17 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
         (!dateToMs   || a.startTime <= dateToMs))
     : activityMmps;
 
-  const allTime = rollingBest(filtered);
-  const last90 = rollingBest(filtered, { windowDays: 90 });
-  const last30 = rollingBest(filtered, { windowDays: 30 });
-  const allTimeOwners = rollingBestWithOwners(filtered);
-  const last90Owners = rollingBestWithOwners(filtered, { windowDays: 90 });
-  const last30Owners = rollingBestWithOwners(filtered, { windowDays: 30 });
+  // The MMP table reports the rider's actual rolling-best across
+  // their full archive — Last 30d, Last 90d, All-time are static
+  // facts about their history. Date-range overrides only steer the
+  // fit pipeline below; they don't recompute what the user has
+  // demonstrably ridden.
+  const allTime = rollingBest(activityMmps);
+  const last90 = rollingBest(activityMmps, { windowDays: 90 });
+  const last30 = rollingBest(activityMmps, { windowDays: 30 });
+  const allTimeOwners = rollingBestWithOwners(activityMmps);
+  const last90Owners = rollingBestWithOwners(activityMmps, { windowDays: 90 });
+  const last30Owners = rollingBestWithOwners(activityMmps, { windowDays: 30 });
   currentMmpByWindow = { last30, last90, allTime };
 
   // Effort-quality filter: drop activities whose IF (avg / FTP)

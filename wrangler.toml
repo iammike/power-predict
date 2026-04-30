@@ -12,6 +12,7 @@ compatibility_date = "2024-12-01"
 [vars]
 STRAVA_CLIENT_ID = ""           # filled in once Strava app is registered
 ALLOWED_ORIGIN = "https://power.iammike.org"
+FRONTEND_URL    = "https://power.iammike.org"
 
 # D1 database for users, activities, MMP records, CP fits
 [[d1_databases]]

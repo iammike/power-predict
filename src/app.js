@@ -136,40 +136,56 @@ document.getElementById('strava-sync-btn')?.addEventListener('click', triggerStr
 async function triggerStravaSync() {
   const session = await loadSession();
   if (!session) return;
-  setProgressPhase('Reading', { bytesRead: 0, totalBytes: 1 });
-  setProgress('Pulling activity list from Strava…');
+  // When the user has data on screen the global progress slot lives
+  // way up by the header, easy to miss. Prefer the inline status
+  // line we render next to the Sync button; fall back to the global
+  // slot only when there's no inline target (i.e. onboarding state).
+  const inline = document.getElementById('sync-status');
+  const setSync = (text) => {
+    if (inline) {
+      inline.hidden = false;
+      inline.textContent = text;
+    } else {
+      setProgress(text);
+    }
+  };
+  const clearSync = () => {
+    if (inline) {
+      inline.textContent = '';
+      inline.hidden = true;
+    } else if (progressEl) {
+      progressEl.textContent = '';
+      progressEl.hidden = true;
+      progressEl.innerHTML = '';
+    }
+  };
+  setSync('Pulling activity list from Strava…');
   try {
     await syncRecent({
       session: session.session,
       days: 180,
       onProgress: ({ processed, totalWithPower, remaining }) => {
         const total = Number.isFinite(totalWithPower) ? totalWithPower : '?';
-        setProgress(`Syncing from Strava… ${processed} / ${total} activities (${remaining} remaining).`);
+        setSync(`Syncing from Strava… ${processed} / ${total} activities (${remaining} remaining).`);
       },
     });
-    setProgress('Loading synced data…');
+    setSync('Loading synced data…');
     const remoteActivities = await fetchSyncedActivities(session.session);
     if (remoteActivities.length === 0) {
-      setProgress('No power-equipped rides in the synced window.');
+      setSync('No power-equipped rides in the synced window.');
       return;
     }
-    // Merge into IDB by startTime (the primary key). New rides land,
-    // existing ones get refreshed with whatever the worker computed.
     const fresh = [];
     for (const a of remoteActivities) {
       if (!(await hasActivity(a.startTime))) fresh.push(a);
     }
     if (fresh.length) await saveActivities(fresh);
     const all = await loadActivities();
-    if (progressEl) {
-      progressEl.textContent = '';
-      progressEl.hidden = true;
-      progressEl.innerHTML = '';
-    }
+    clearSync();
     renderCurves(all);
   } catch (err) {
     console.error('strava sync failed', err);
-    setProgress(`Strava sync failed: ${err.message || err}`);
+    setSync(`Strava sync failed: ${err.message || err}`);
   }
 }
 
@@ -582,6 +598,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
         <button type="button" class="link-button" id="manual-from-data">Synthesize from FTP instead</button>
         <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
       </div>
+      ${currentSettings.stravaSession ? `<p class="sync-status" id="sync-status" hidden></p>` : ''}
     </div>
     ${renderPredictBlock()}
   `;
@@ -1035,6 +1052,7 @@ function renderManualMode(fit, inputs = {}) {
           <button type="button" class="link-button" id="manual-upload">Upload an archive</button>
           ${currentSettings.stravaSession ? `<button type="button" class="link-button" id="manual-strava-sync">Sync from Strava</button>` : ''}
         </div>
+        ${currentSettings.stravaSession ? `<p class="sync-status" id="sync-status" hidden></p>` : ''}
       </div>
     </section>
   `;

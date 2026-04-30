@@ -78,10 +78,14 @@ export async function runSyncSlice({
     const powered = all.filter(hasRealPower);
     totalWithPower = powered.length;
     // Skip the ones we've already ingested. Strava activity ids are
-    // stable, so we trust the rows already in D1.
+    // stable, so we trust the rows already in D1. We pull every id
+    // for this user (typically a few thousand at most) and filter in
+    // memory — D1 caps bind parameters per query around 100, so an
+    // IN-list with the full powered set blows past it on large
+    // archives.
     const existing = await env.DB
-      .prepare(`SELECT id FROM activities WHERE user_id = ? AND id IN (${powered.map(() => '?').join(',') || 'NULL'})`)
-      .bind(athleteId, ...powered.map((a) => a.id))
+      .prepare('SELECT id FROM activities WHERE user_id = ?')
+      .bind(athleteId)
       .all();
     const existingIds = new Set((existing.results || []).map((r) => r.id));
     pending = powered
@@ -171,12 +175,15 @@ export async function loadActivities(env, athleteId) {
     .all();
   const rows = acts.results || [];
   if (rows.length === 0) return [];
-  const ids = rows.map((r) => r.id);
+  // Pull every mmp_record joined to one of this user's activities;
+  // SQLite handles the join fine at this size and we avoid an
+  // IN-list with thousands of bind params.
   const mmps = await env.DB
-    .prepare(`SELECT activity_id, duration_s, power_w
-              FROM mmp_records
-              WHERE activity_id IN (${ids.map(() => '?').join(',')})`)
-    .bind(...ids)
+    .prepare(`SELECT m.activity_id, m.duration_s, m.power_w
+              FROM mmp_records m
+              JOIN activities a ON a.id = m.activity_id
+              WHERE a.user_id = ?`)
+    .bind(athleteId)
     .all();
   const mmpByActivity = new Map();
   for (const m of mmps.results || []) {

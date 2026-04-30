@@ -79,6 +79,10 @@ Open issues are grouped by phase: see [milestones](https://github.com/iammike/po
 
 ## Strava setup (for Phase 4)
 
-1. Register an app at https://www.strava.com/settings/api
-2. Authorization callback domain: `power.iammike.org`
-3. Copy `client_id` into `wrangler.toml` (public), `client_secret` via `wrangler secret put`
+1. Register an app at https://www.strava.com/settings/api.
+2. Authorization callback domain: the worker host (e.g. `api.power.iammike.org` or `power-predict-api.<account>.workers.dev`). The frontend domain is not the callback — the worker is.
+3. Copy `client_id` into `wrangler.toml` under `[vars]`, then push the secret:
+   ```bash
+   wrangler secret put STRAVA_CLIENT_SECRET
+   ```
+4. The OAuth flow is rooted at `/auth/strava/authorize` on the worker host. On success the worker redirects back to `FRONTEND_URL` with `#session=...&athlete_id=...` in the URL hash.

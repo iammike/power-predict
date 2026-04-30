@@ -2,6 +2,12 @@
 // Handles Strava OAuth, webhook ingest, archive-upload coordination,
 // and rate-limit-budgeted Strava API proxying.
 
+import {
+  buildAuthorizeUrl,
+  exchangeCodeForTokens,
+  generateRandomToken,
+} from './worker/strava-oauth.js';
+
 const ALLOWED_ORIGINS = [
   'https://power.iammike.org',
   'https://iammike.github.io',
@@ -109,14 +115,103 @@ async function processWebhookEvent(_event, _env) {
   // TODO Phase 4: fetch single activity stream, compute MMP, upsert to D1.
 }
 
-function handleAuthorize(_request, _env, _url) {
-  // TODO Phase 4: build Strava authorize URL with state, redirect.
-  return new Response('not implemented', { status: 501 });
+async function handleAuthorize(request, env, url) {
+  const clientId = env.STRAVA_CLIENT_ID;
+  if (!clientId) return new Response('strava client not configured', { status: 503 });
+  // The frontend may pass an explicit return path (e.g. '/?after-auth=sync'),
+  // so the redirect lands the user back where they started.
+  const returnTo = url.searchParams.get('return_to') || '/';
+  const state = generateRandomToken();
+  // KV holds the state token + intended return path for ten minutes.
+  // Strava round-trips the state param back via the callback; we
+  // verify there before exchanging the auth code.
+  await env.RATE_LIMIT.put(`oauth-state:${state}`, returnTo, { expirationTtl: 600 });
+  const callbackUrl = `${url.origin}/auth/strava/callback`;
+  const authorize = buildAuthorizeUrl({
+    clientId,
+    redirectUri: callbackUrl,
+    state,
+    scope: 'read,activity:read_all',
+  });
+  return Response.redirect(authorize, 302);
 }
 
-function handleCallback(_request, _env, _origin) {
-  // TODO Phase 4: exchange code for tokens via Strava /oauth/token, persist user.
-  return new Response('not implemented', { status: 501 });
+async function handleCallback(request, env, origin) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get('code');
+  const state = url.searchParams.get('state');
+  const err = url.searchParams.get('error');
+  if (err) return redirectToFrontend(env, { error: err });
+  if (!code || !state) return new Response('missing code or state', { status: 400 });
+
+  // State must round-trip exactly; consume it (delete) so a leaked
+  // state can't be re-used by an attacker.
+  const storedReturn = await env.RATE_LIMIT.get(`oauth-state:${state}`);
+  if (storedReturn === null) return new Response('invalid or expired state', { status: 400 });
+  await env.RATE_LIMIT.delete(`oauth-state:${state}`);
+
+  let tokens;
+  try {
+    tokens = await exchangeCodeForTokens({
+      clientId: env.STRAVA_CLIENT_ID,
+      clientSecret: env.STRAVA_CLIENT_SECRET,
+      code,
+    });
+  } catch (e) {
+    return redirectToFrontend(env, { error: 'token_exchange_failed', return_to: storedReturn });
+  }
+
+  const athleteId = tokens.athlete?.id;
+  if (!athleteId) return new Response('strava response missing athlete id', { status: 502 });
+
+  // Upsert the user row. We persist the access + refresh tokens so a
+  // later /sync run can talk to Strava on the user's behalf.
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB.prepare(
+    `INSERT INTO users (id, display_name, access_token, refresh_token, token_expires_at, created_at, last_sync_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL)
+     ON CONFLICT(id) DO UPDATE SET
+       display_name = excluded.display_name,
+       access_token = excluded.access_token,
+       refresh_token = excluded.refresh_token,
+       token_expires_at = excluded.token_expires_at`
+  )
+    .bind(
+      athleteId,
+      `${tokens.athlete?.firstname ?? ''} ${tokens.athlete?.lastname ?? ''}`.trim() || null,
+      tokens.access_token,
+      tokens.refresh_token,
+      tokens.expires_at,
+      now,
+    )
+    .run();
+
+  // Issue our own opaque session token. Front-end stores it and uses
+  // it on subsequent /sync requests so we don't expose Strava's tokens
+  // to the browser. Thirty-day TTL — the user re-auths if they go
+  // longer than a month between visits.
+  const session = generateRandomToken();
+  await env.RATE_LIMIT.put(`session:${session}`, String(athleteId), {
+    expirationTtl: 60 * 60 * 24 * 30,
+  });
+
+  return redirectToFrontend(env, {
+    session,
+    athlete_id: String(athleteId),
+    return_to: storedReturn,
+  });
+}
+
+// Redirect back to the frontend with auth result encoded in the URL
+// hash (so it doesn't hit access logs). Frontend reads the hash on
+// load and stores the session token in IndexedDB.
+function redirectToFrontend(env, params) {
+  const base = env.FRONTEND_URL || 'https://power.iammike.org';
+  const returnTo = params.return_to || '/';
+  const cleanParams = { ...params };
+  delete cleanParams.return_to;
+  const hash = new URLSearchParams(cleanParams).toString();
+  return Response.redirect(`${base}${returnTo}#${hash}`, 302);
 }
 
 function handleArchiveUpload(_request, _env, _origin) {

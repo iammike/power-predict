@@ -601,11 +601,13 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       </p>
       <div class="results-foot__actions">
         <button type="button" class="link-button" id="upload-another">Upload another archive</button>
-        ${currentSettings.stravaSession ? `<button type="button" class="link-button" id="results-foot-sync">Sync from Strava</button>` : ''}
+        ${currentSettings.stravaSession
+          ? `<button type="button" class="link-button" id="results-foot-sync">Sync from Strava</button>`
+          : `<button type="button" class="link-button" id="results-foot-connect">Connect Strava</button>`}
         <button type="button" class="link-button" id="manual-from-data">Synthesize from FTP instead</button>
         <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
       </div>
-      ${currentSettings.stravaSession ? `<p class="sync-status" id="sync-status" hidden></p>` : ''}
+      <p class="sync-status" id="sync-status" hidden></p>
     </div>
     ${renderPredictBlock()}
   `;
@@ -616,6 +618,9 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     fileInput?.click();
   });
   document.getElementById('results-foot-sync')?.addEventListener('click', triggerStravaSync);
+  document.getElementById('results-foot-connect')?.addEventListener('click', () => {
+    window.location.assign(authorizeUrl('/'));
+  });
   document.getElementById('manual-from-data').addEventListener('click', () => {
     // Pre-seed from the current fit — CP is the natural unit here
     // since we have a fitted CP from data, not an FTP guess.
@@ -932,8 +937,17 @@ function wireOverrideForm() {
     renderCurves(currentActivities, { fromCache: true });
   });
   document.getElementById('reset-override').addEventListener('click', async () => {
-    currentSettings = {};
-    await saveSettings({});
+    // Reset clears the override-form fields (CP override + date range)
+    // but must preserve the Strava session — those keys belong to a
+    // different feature, not the user's fit overrides.
+    const preserved = {
+      stravaSession: currentSettings.stravaSession,
+      stravaAthleteId: currentSettings.stravaAthleteId,
+    };
+    currentSettings = Object.fromEntries(
+      Object.entries(preserved).filter(([, v]) => v != null)
+    );
+    await saveSettings(currentSettings);
     renderCurves(currentActivities, { fromCache: true });
   });
   document.querySelectorAll('.override-form__presets [data-preset-days]').forEach((btn) => {

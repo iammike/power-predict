@@ -163,14 +163,9 @@ export function renderCurveChart(container, { mmp, fit }) {
     ],
     cursor: {
       drag: { x: false, y: false },
-      x: true,
-      y: true,
-      points: { size: 6 },
-      // Snap the crosshair x to whatever data column is closest in
-      // pixel space, then read y values off each series for the live
-      // legend. (uPlot does this by default; declared here so future
-      // changes don't accidentally lose the hover readout.)
-      focus: { prox: 24 },
+      x: false,
+      y: false,
+      points: { show: false },
     },
     legend: {
       show: true,

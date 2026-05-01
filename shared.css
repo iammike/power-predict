@@ -348,29 +348,9 @@ main {
   padding: 0.05rem 0.4rem;
   margin: 0 0.2rem;
 }
-.status-banner--success { background: var(--ink); }
-.status-banner--error   { background: var(--oxblood); }
-.status-banner--progress {
-  background: var(--ink);
-  /* Subtle left-side mark that pulses while progress is live. */
-  padding-left: 2.1rem;
-}
-.status-banner--progress::before {
-  content: '';
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--oxblood);
-  transform: translateY(-50%);
-  animation: status-pulse 1400ms ease-in-out infinite;
-}
-@keyframes status-pulse {
-  0%, 100% { opacity: 0.45; transform: translate(0, -50%) scale(0.85); }
-  50%      { opacity: 1;    transform: translate(0, -50%) scale(1.15); }
-}
+.status-banner--success  { background: var(--ink); }
+.status-banner--error    { background: var(--oxblood); }
+.status-banner--progress { background: var(--ink); }
 .progress {
   margin: 1.25rem 0 0;
   display: flex;

@@ -57,7 +57,7 @@ if (manualForm) {
     const sprint1minW = sprintRaw ? Number(sprintRaw) : null;
     const fit = synthesizeFit({ ftpW, sprint1minW });
     if (!fit) {
-      setProgress('Enter a positive FTP or CP value (typical range 100-450 W).');
+      showStatus('Enter a positive FTP or CP (typical range 100–450 W)', { kind: 'error', dwellMs: 4500 });
       return;
     }
     renderManualMode(fit, { ftpW, sprint1minW, unit });
@@ -353,7 +353,8 @@ async function handleArchive(file) {
     });
   } catch (err) {
     console.error('archive worker failed', err);
-    setProgress(`Archive read failed: ${err.message || err}`);
+    showStatus(`Archive read failed: ${err.message || err}`, { kind: 'error', dwellMs: 6000 });
+    if (progressEl) { progressEl.hidden = true; progressEl.innerHTML = ''; }
     worker.terminate();
     document.removeEventListener('visibilitychange', onVisibility);
     if (wakeLock) try { await wakeLock.release(); } catch {}
@@ -369,37 +370,35 @@ async function handleArchive(file) {
 
   const newList = Array.from(newActivities.values());
   if (newList.length > 0) {
-    setProgress(`Saving ${newList.length} new activities to local cache…`);
+    showStatus(`Saving ${newList.length} new activities to local cache`, { kind: 'progress', persistent: true });
     await saveActivities(newList);
   }
 
   const all = await loadActivities();
   if (all.length === 0) {
-    setProgress(
-      `No power-equipped activities found in the archive (${lastActivitiesSeen} activity files seen).`
+    showStatus(
+      `No power-equipped activities found (${lastActivitiesSeen} activity files seen)`,
+      { kind: 'success', dwellMs: 5000 },
     );
+    if (progressEl) { progressEl.hidden = true; progressEl.innerHTML = ''; }
     return;
   }
 
-  // The activity count is already in the results foot note, so we
-  // skip the "Done. N activities cached…" toast and just render —
-  // leaving it up between the lede and the table read as orphaned
-  // copy. The exception is when files failed to parse: that's
-  // information the user needs, so we keep the progress slot for a
-  // brief notice listing how many files were skipped.
-  if (progressEl) {
-    if (parseFailed > 0) {
-      const sampleStr = parseFailedSamples.length
-        ? ` (${parseFailedSamples.slice(0, 3).join(', ')}${parseFailed > 3 ? ', …' : ''})`
-        : '';
-      const noun = parseFailed === 1 ? 'file' : 'files';
-      progressEl.hidden = false;
-      progressEl.innerHTML = `<p class="progress__note">Skipped ${parseFailed} ${noun} that couldn’t be parsed${sampleStr}. See console for details.</p>`;
-    } else {
-      progressEl.textContent = '';
-      progressEl.hidden = true;
-      progressEl.innerHTML = '';
-    }
+  // Clear the inline parse-bar element regardless; any post-parse
+  // commentary (success / files-skipped) flows through the toast.
+  if (progressEl) { progressEl.hidden = true; progressEl.innerHTML = ''; }
+
+  if (parseFailed > 0) {
+    const sampleStr = parseFailedSamples.length
+      ? ` (${parseFailedSamples.slice(0, 3).join(', ')}${parseFailed > 3 ? ', …' : ''})`
+      : '';
+    const noun = parseFailed === 1 ? 'file' : 'files';
+    showStatus(
+      `Skipped ${parseFailed} ${noun} that couldn’t be parsed${sampleStr}. See console for details.`,
+      { kind: 'error', dwellMs: 8000 },
+    );
+  } else {
+    showStatus(`Parsed ${newList.length} new activities`, { kind: 'success', dwellMs: 3000 });
   }
   renderCurves(all);
 }
@@ -1378,11 +1377,6 @@ async function handleClearCache() {
   showStatus('Cache cleared', { kind: 'success', dwellMs: 2200 });
 }
 
-function setProgress(msg) {
-  if (!progressEl) return;
-  progressEl.textContent = msg;
-  progressEl.hidden = false;
-}
 
 // Build/version tag in the footer so we can confirm a deploy landed.
 // version.json is written by the deploy workflow at build time.

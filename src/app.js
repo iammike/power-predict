@@ -637,7 +637,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       <section class="data-sources__row">
         <span class="data-sources__label">Archive</span>
         <p class="data-sources__line">
-          <span class="data-sources__status">${activityMmps.length.toLocaleString()} activities cached${fromCache ? ', from your last visit' : ''}.</span>
+          <span class="data-sources__status">${activityMmps.length.toLocaleString()} activities cached.</span>
           <span class="data-sources__actions">
             <button type="button" class="link-button" id="upload-another">Upload another</button>
             <button type="button" class="link-button" id="clear-cache">Clear cache</button>
@@ -648,7 +648,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
         <span class="data-sources__label">Strava</span>
         <p class="data-sources__line">
           ${currentSettings.stravaSession
-            ? `<span class="data-sources__status">Connected as athlete <em>#${currentSettings.stravaAthleteId}</em>.</span>
+            ? `<span class="data-sources__status">Connected.</span>
                <span class="data-sources__actions">
                  <button type="button" class="link-button" id="results-foot-sync">Sync 180 days</button>
                  <button type="button" class="link-button" id="results-foot-disconnect">Disconnect</button>

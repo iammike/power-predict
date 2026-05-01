@@ -828,16 +828,9 @@ body[data-app-state="manual"] #strava-connected {
   color: var(--oxblood);
 }
 .data-sources__actions {
-  display: inline;
-}
-.data-sources__actions .link-button {
-  margin-right: 0.65rem;
-}
-.data-sources__actions .link-button + .link-button::before {
-  content: '·';
-  color: var(--hair-strong);
-  margin-right: 0.65rem;
-  font-style: normal;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1.1rem;
 }
 .data-sources .sync-status {
   margin-top: 0.4rem;

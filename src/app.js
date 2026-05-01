@@ -1322,14 +1322,13 @@ function renderPredictBlock() {
           <span class="curve-chart-title">Power-duration curve</span>
           ${(currentSettings.dateFrom || currentSettings.dateTo)
             ? `<span class="curve-range-label">Range: ${currentSettings.dateFrom || '…'} → ${currentSettings.dateTo || '…'}</span>`
-            : `<div class="curve-window-tabs" role="tablist">
+            : `<div class="curve-window-tabs" role="tablist" data-tooltip="Display window only — switching tabs only re-windows the plotted MMP dots. The prediction always uses the fit shown above.">
                 <button type="button" data-window="last30" role="tab">Last 30d</button>
                 <button type="button" data-window="last90" role="tab" class="is-active">Last 90d</button>
                 <button type="button" data-window="allTime" role="tab">${allTimeLabel(currentActivities)}</button>
               </div>`
           }
         </header>
-        <p class="curve-chart-note">Display window only · prediction uses the fit above</p>
         <div id="curve-chart" class="curve-chart"></div>
       </div>
 

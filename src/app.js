@@ -218,7 +218,7 @@ async function triggerStravaSync() {
   // banner — visible regardless of scroll position and consistent
   // with auth toasts / errors.
   const setSync = (html) => showStatus(html, { kind: 'progress', persistent: true });
-  showStatus('Pulling activity list from Strava…', { kind: 'progress', persistent: true });
+  showStatus('Pulling activity list from Strava', { kind: 'progress', persistent: true });
   try {
     // Tell the worker which Strava ids the IDB cache already has so it
     // skips them in the worklist — no point re-fetching streams the
@@ -235,7 +235,7 @@ async function triggerStravaSync() {
         setSync(`Syncing from Strava · <em>${processed}</em> / <em>${total}</em> activities · <em>${remaining}</em> remaining`);
       },
     });
-    setSync('Loading synced data…');
+    setSync('Loading synced data');
     const remoteActivities = await fetchSyncedActivities(session.session);
     if (remoteActivities.length === 0) {
       showStatus('No power-equipped rides in the synced window.', { kind: 'success', dwellMs: 3500 });

@@ -451,12 +451,24 @@ main {
 
 .mmp-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-family: var(--mono);
   font-size: 0.92rem;
   font-variant-numeric: tabular-nums;
   margin-top: 0.5rem;
 }
+/* Fixed layout + nth-child widths so the three data columns stay
+   evenly distributed regardless of header label length (e.g. the
+   dynamic 'Since Mon YYYY' wider than 'All-time'). */
+.mmp-table th:nth-child(1),
+.mmp-table td:nth-child(1) { width: 8rem; }
+.mmp-table th:nth-child(2),
+.mmp-table td:nth-child(2),
+.mmp-table th:nth-child(3),
+.mmp-table td:nth-child(3),
+.mmp-table th:nth-child(4),
+.mmp-table td:nth-child(4) { width: calc((100% - 8rem) / 3); }
 .mmp-table th,
 .mmp-table td {
   padding: 0.6rem 1rem;
@@ -745,9 +757,10 @@ body[data-app-state="manual"] #manual-mode {
    no animations, no department marks — utility row, not magazine
    spread. */
 .data-sources {
-  margin-top: 1.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--hair);
+  /* The table already ends in its own hairline border-bottom, so we
+     skip the border-top here to avoid two parallel rules. */
+  margin-top: 1.5rem;
+  padding-top: 0;
   display: grid;
   row-gap: 0.55rem;
 }

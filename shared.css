@@ -47,12 +47,17 @@ html {
   position: relative;
   cursor: help;
 }
+a[data-tooltip],
+button[data-tooltip] {
+  cursor: pointer;
+}
 [data-tooltip]:hover::after,
 [data-tooltip]:focus-within::after {
   content: attr(data-tooltip);
   position: absolute;
   bottom: calc(100% + 6px);
   left: 0;
+  width: max-content;
   max-width: 22rem;
   z-index: 10;
   background: var(--ink);

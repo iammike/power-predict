@@ -656,7 +656,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
           <th>Duration</th>
           <th>Last 30d</th>
           <th class="featured">Last 90d</th>
-          <th title="Best across the entire local cache. Earlier rides may not be present if you only synced a recent window.">${allTimeLabel(activityMmps)}</th>
+          <th data-tooltip="Best across the entire local cache. Earlier rides may not be present if you only synced a recent window.">${allTimeLabel(activityMmps)}</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -777,10 +777,10 @@ function renderMmpCell(owner) {
     ? new Date(owner.startTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     : null;
   if (!owner.stravaId) {
-    return date ? `<span title="${date}">${watts}</span>` : watts;
+    return date ? `<span data-tooltip="${date}">${watts}</span>` : watts;
   }
-  const title = date ? `${date} · open on Strava` : 'Open this activity on Strava';
-  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" title="${title}">${watts}</a>`;
+  const tip = date ? `${date} · open on Strava` : 'Open this activity on Strava';
+  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" data-tooltip="${tip}">${watts}</a>`;
 }
 
 // eFTP is computed from a 90-day window ending at the most recent

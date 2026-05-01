@@ -1008,35 +1008,6 @@ body[data-app-state="manual"] #manual-mode {
   box-shadow: none !important;
   transition: transform 80ms ease-out;
 }
-.curve-hover-tip {
-  position: absolute;
-  top: 8px;
-  z-index: 5;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--sans);
-  font-weight: 400;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  letter-spacing: 0;
-  text-transform: none;
-  padding: 0.55rem 0.7rem;
-  box-shadow: 0 6px 16px rgba(26, 22, 18, 0.18);
-  pointer-events: none;
-  white-space: nowrap;
-}
-.curve-hover-tip strong {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--paper);
-}
-.curve-hover-tip__date {
-  color: rgba(244, 238, 226, 0.65);
-  font-size: 0.72rem;
-}
 
 /* OVERRIDE PANEL */
 

@@ -36,7 +36,7 @@ const STANDARD_TICKS = [
   86400,                   // 24h
 ];
 
-export function renderCurveChart(container, { mmp, mmpOwners = {}, fit, fitWindowLabel = 'last 90 days' }) {
+export function renderCurveChart(container, { mmp, fit, fitWindowLabel = 'last 90 days' }) {
   if (!container) return;
   container.innerHTML = '';
   if (!fit) {
@@ -170,59 +170,6 @@ export function renderCurveChart(container, { mmp, mmpOwners = {}, fit, fitWindo
     legend: {
       show: true,
       live: true,
-    },
-    hooks: {
-      ready: [
-        (u) => {
-          const tip = document.createElement('div');
-          tip.className = 'curve-hover-tip';
-          tip.hidden = true;
-          u.over.appendChild(tip);
-        },
-      ],
-      setCursor: [
-        (u) => {
-          const tip = u.over.querySelector('.curve-hover-tip');
-          if (!tip) return;
-          const idx = u.cursor.idx;
-          const left = u.cursor.left;
-          if (idx == null || left == null || left < 0) {
-            tip.hidden = true;
-            return;
-          }
-          const xVal = u.data[0][idx];
-          const obs = u.data[1][idx];
-          const insideY = u.data[2][idx];
-          const outsideY = u.data[3][idx];
-          const fitY = insideY ?? outsideY;
-          if (fitY == null && obs == null) {
-            tip.hidden = true;
-            return;
-          }
-          const lines = [`<strong>${formatDurationTick(xVal)}</strong>`];
-          if (obs != null) {
-            const owner = mmpOwners[xVal];
-            const date = owner && Number.isFinite(owner.startTime)
-              ? new Date(owner.startTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-              : null;
-            lines.push(date
-              ? `Observed: ${Math.round(obs)} W <span class="curve-hover-tip__date">· ${date}</span>`
-              : `Observed: ${Math.round(obs)} W`);
-          }
-          if (fitY != null) {
-            const label = outsideY != null ? 'Extrapolation' : 'Fit';
-            lines.push(`${label}: ${Math.round(fitY)} W`);
-          }
-          tip.innerHTML = lines.join('<br>');
-          tip.hidden = false;
-          // Anchor at cursor x; let CSS flip across the midline so the
-          // tooltip never spills past the right edge of the plot area.
-          const plotW = u.bbox.width / window.devicePixelRatio;
-          const flip = left > plotW * 0.6;
-          tip.style.left = flip ? 'auto' : `${left + 12}px`;
-          tip.style.right = flip ? `${plotW - left + 12}px` : 'auto';
-        },
-      ],
     },
   };
 

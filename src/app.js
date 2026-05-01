@@ -98,12 +98,32 @@ async function consumeAuthHash() {
   if (!parsed) return;
   clearAuthHash();
   if (parsed.error) {
+    showAuthToast(`Connection failed: ${parsed.error}`, { error: true });
     console.warn('strava auth error', parsed.error);
     return;
   }
   if (parsed.session && parsed.athleteId) {
     await saveSession({ session: parsed.session, athleteId: parsed.athleteId });
+    showAuthToast(`Connected to Strava · athlete ${parsed.athleteId}`);
   }
+}
+
+// Brief overlay shown after a successful auth round-trip. Fades in,
+// dwells, fades out — gives the post-callback page rebuild a sense
+// of arrival instead of feeling like a stale reload.
+function showAuthToast(message, { error = false } = {}) {
+  const el = document.createElement('div');
+  el.className = `auth-toast${error ? ' auth-toast--error' : ''}`;
+  el.textContent = message;
+  document.body.appendChild(el);
+  // Force reflow so the .is-visible animation actually transitions.
+  // eslint-disable-next-line no-unused-expressions
+  el.offsetHeight;
+  el.classList.add('is-visible');
+  setTimeout(() => {
+    el.classList.remove('is-visible');
+    setTimeout(() => el.remove(), 400);
+  }, 2200);
 }
 
 async function refreshStravaUi() {
@@ -117,9 +137,25 @@ async function refreshStravaUi() {
   }
 }
 
-document.getElementById('strava-connect-btn')?.addEventListener('click', () => {
-  window.location.assign(authorizeUrl('/'));
+document.getElementById('strava-connect-btn')?.addEventListener('click', (e) => {
+  beginStravaConnect(e.currentTarget);
 });
+
+// Click feedback for any Connect Strava button (onboarding card or
+// the data-state results-foot variant). The redirect itself is fast,
+// but Strava's authorize screen takes a beat to load — without the
+// flash of in-progress state it just feels like a stuck click.
+function beginStravaConnect(btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    btn.dataset.originalText = btn.textContent;
+    btn.textContent = 'Opening Strava…';
+  }
+  // Tiny defer so the disabled + label change actually paints before
+  // the navigation tears the page down.
+  setTimeout(() => window.location.assign(authorizeUrl('/')), 60);
+}
 
 document.getElementById('strava-disconnect')?.addEventListener('click', async () => {
   if (!confirm('Disconnect this browser from Strava? You can reconnect anytime.')) return;
@@ -141,12 +177,14 @@ async function triggerStravaSync() {
   // line we render next to the Sync button; fall back to the global
   // slot only when there's no inline target (i.e. onboarding state).
   const inline = document.getElementById('sync-status');
-  const setSync = (text) => {
+  const setSync = (html) => {
     if (inline) {
       inline.hidden = false;
-      inline.textContent = text;
+      inline.innerHTML = html;
     } else {
-      setProgress(text);
+      // Strip tags for the global progress slot — its CSS doesn't
+      // know about our <em> oxblood numerals and they'd render flat.
+      setProgress(html.replace(/<[^>]+>/g, ''));
     }
   };
   const clearSync = () => {
@@ -173,7 +211,7 @@ async function triggerStravaSync() {
       knownIds,
       onProgress: ({ processed, totalWithPower, remaining }) => {
         const total = Number.isFinite(totalWithPower) ? totalWithPower : '?';
-        setSync(`Syncing from Strava… ${processed} / ${total} activities (${remaining} remaining).`);
+        setSync(`Syncing from Strava · <em>${processed}</em> / <em>${total}</em> activities · <em>${remaining}</em> remaining`);
       },
     });
     setSync('Loading synced data…');
@@ -602,7 +640,8 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       <div class="results-foot__actions">
         <button type="button" class="link-button" id="upload-another">Upload another archive</button>
         ${currentSettings.stravaSession
-          ? `<button type="button" class="link-button" id="results-foot-sync">Sync from Strava</button>`
+          ? `<button type="button" class="link-button" id="results-foot-sync">Sync from Strava</button>
+             <button type="button" class="link-button" id="results-foot-disconnect">Disconnect Strava</button>`
           : `<button type="button" class="link-button" id="results-foot-connect">Connect Strava</button>`}
         <button type="button" class="link-button" id="manual-from-data">Synthesize from FTP instead</button>
         <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
@@ -618,8 +657,14 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     fileInput?.click();
   });
   document.getElementById('results-foot-sync')?.addEventListener('click', triggerStravaSync);
-  document.getElementById('results-foot-connect')?.addEventListener('click', () => {
-    window.location.assign(authorizeUrl('/'));
+  document.getElementById('results-foot-connect')?.addEventListener('click', (e) => {
+    beginStravaConnect(e.currentTarget);
+  });
+  document.getElementById('results-foot-disconnect')?.addEventListener('click', async () => {
+    if (!confirm('Disconnect this browser from Strava? You can reconnect anytime.')) return;
+    await clearSession();
+    showAuthToast('Disconnected from Strava');
+    renderCurves(currentActivities, { fromCache: true });
   });
   document.getElementById('manual-from-data').addEventListener('click', () => {
     // Pre-seed from the current fit — CP is the natural unit here

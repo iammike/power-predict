@@ -634,39 +634,30 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       <tbody>${rows}</tbody>
     </table>
     <aside class="data-sources" aria-label="Data sources">
-      <section class="data-sources__col data-sources__col--archive">
-        <p class="data-sources__stat">${activityMmps.length.toLocaleString()}</p>
-        <p class="data-sources__lede">
-          activities cached locally${fromCache ? ', loaded from your last visit' : ''}.
+      <section class="data-sources__row">
+        <span class="data-sources__label">Archive</span>
+        <p class="data-sources__line">
+          <span class="data-sources__status">${activityMmps.length.toLocaleString()} activities cached${fromCache ? ', from your last visit' : ''}.</span>
+          <span class="data-sources__actions">
+            <button type="button" class="link-button" id="upload-another">Upload another</button>
+            <button type="button" class="link-button" id="clear-cache">Clear cache</button>
+          </span>
         </p>
-        <p class="data-sources__label">Archive</p>
-        <ul class="data-sources__actions">
-          <li><button type="button" class="data-sources__link" id="upload-another">Upload another</button></li>
-          <li><button type="button" class="data-sources__link" id="manual-from-data">Synthesize from FTP</button></li>
-          <li><button type="button" class="data-sources__link data-sources__link--quiet" id="clear-cache">Clear cache</button></li>
-        </ul>
       </section>
-      <section class="data-sources__col data-sources__col--strava">
-        ${currentSettings.stravaSession
-          ? `
-            <p class="data-sources__pill"><span class="data-sources__dot" aria-hidden="true"></span>Connected</p>
-            <p class="data-sources__lede">
-              athlete <em>#${currentSettings.stravaAthleteId}</em> · pull the last 180 days from Strava on demand.
-            </p>
-            <p class="data-sources__label">Strava</p>
-            <ul class="data-sources__actions">
-              <li><button type="button" class="data-sources__link" id="results-foot-sync">Sync 180 days</button></li>
-              <li><button type="button" class="data-sources__link data-sources__link--quiet" id="results-foot-disconnect">Disconnect</button></li>
-            </ul>`
-          : `
-            <p class="data-sources__pill data-sources__pill--off">Not connected</p>
-            <p class="data-sources__lede">
-              skip the archive download — sync the last 180 days straight from your Strava account.
-            </p>
-            <p class="data-sources__label">Strava</p>
-            <ul class="data-sources__actions">
-              <li><button type="button" class="data-sources__link" id="results-foot-connect">Connect</button></li>
-            </ul>`}
+      <section class="data-sources__row">
+        <span class="data-sources__label">Strava</span>
+        <p class="data-sources__line">
+          ${currentSettings.stravaSession
+            ? `<span class="data-sources__status">Connected as athlete <em>#${currentSettings.stravaAthleteId}</em>.</span>
+               <span class="data-sources__actions">
+                 <button type="button" class="link-button" id="results-foot-sync">Sync 180 days</button>
+                 <button type="button" class="link-button" id="results-foot-disconnect">Disconnect</button>
+               </span>`
+            : `<span class="data-sources__status">Sync the last 180 days from your Strava account — no archive download required.</span>
+               <span class="data-sources__actions">
+                 <button type="button" class="link-button" id="results-foot-connect">Connect</button>
+               </span>`}
+        </p>
       </section>
       <p class="sync-status" id="sync-status" hidden></p>
     </aside>
@@ -687,14 +678,6 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     await clearSession();
     showAuthToast('Disconnected from Strava');
     renderCurves(currentActivities, { fromCache: true });
-  });
-  document.getElementById('manual-from-data').addEventListener('click', () => {
-    // Pre-seed from the current fit — CP is the natural unit here
-    // since we have a fitted CP from data, not an FTP guess.
-    const seedCp = Number.isFinite(currentFit?.cpW) ? currentFit.cpW : 266;
-    const ftpW = seedCp / 0.95;
-    const fit = synthesizeFit({ ftpW });
-    if (fit) renderManualMode(fit, { ftpW, unit: 'cp' });
   });
   wirePredictForm();
   wireCurveChart();

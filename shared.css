@@ -551,16 +551,18 @@ main {
    (it's the page header). State controls the secondary sections:
    onboarding shows the steps + drop zone + synth disclosure;
    data and manual hide all of those in favor of the results. */
+/* Data state owns the screen — every onboarding entry hides. Manual
+   state keeps the data-source entries visible at the top so the user
+   has natural access to upload / connect / sync without rebuilding
+   them inside the manual block. The manual disclosure itself does
+   hide (its inline editor lives inside the manual result block now). */
 body[data-app-state="data"] .steps,
 body[data-app-state="data"] #archive-drop,
 body[data-app-state="data"] #manual-mode,
 body[data-app-state="data"] #strava-connect,
 body[data-app-state="data"] #strava-connected,
 body[data-app-state="manual"] .steps,
-body[data-app-state="manual"] #archive-drop,
-body[data-app-state="manual"] #manual-mode,
-body[data-app-state="manual"] #strava-connect,
-body[data-app-state="manual"] #strava-connected {
+body[data-app-state="manual"] #manual-mode {
   display: none;
 }
 

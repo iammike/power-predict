@@ -193,14 +193,16 @@ async function handleDisconnect() {
 // cookie auto-approves the flow, the user never actually sees
 // Strava's UI — the redirect bounces back almost instantly. So the
 // label says 'Connecting' rather than 'Opening Strava' to be honest
-// in both cases.
+// in both cases. Also surface the same message in the floating top
+// banner so the status reads consistently with sync / disconnect.
 function beginStravaConnect(btn) {
   if (btn) {
     btn.disabled = true;
     btn.classList.add('is-loading');
     btn.dataset.originalText = btn.textContent;
-    btn.textContent = 'Connecting to Strava…';
+    btn.textContent = 'Connecting to Strava ';
   }
+  showStatus('Connecting to Strava', { kind: 'progress', persistent: true });
   setTimeout(() => window.location.assign(authorizeUrl('/')), 60);
 }
 

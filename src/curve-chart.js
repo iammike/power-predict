@@ -36,7 +36,7 @@ const STANDARD_TICKS = [
   86400,                   // 24h
 ];
 
-export function renderCurveChart(container, { mmp, fit }) {
+export function renderCurveChart(container, { mmp, fit, fitWindowLabel = 'last 90 days' }) {
   if (!container) return;
   container.innerHTML = '';
   if (!fit) {
@@ -146,7 +146,7 @@ export function renderCurveChart(container, { mmp, fit }) {
         value: (_u, v) => (v == null ? '—' : `${Math.round(v)} W`),
       },
       {
-        label: 'CP fit (3-20 min)',
+        label: `CP fit · ${fitWindowLabel}`,
         stroke: ink,
         width: 1.5,
         points: { show: false },

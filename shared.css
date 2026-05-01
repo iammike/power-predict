@@ -743,29 +743,39 @@ body[data-app-state="manual"] #manual-mode {
   row-gap: 0.55rem;
 }
 .data-sources__row {
+  /* Three columns now: the numbered label, the journalistic status,
+     and the action-verb apparatus pushed to the right edge so the
+     eye gets a clean status | actions split instead of one mixed
+     line. */
   display: grid;
-  grid-template-columns: 5.5rem 1fr;
+  grid-template-columns: 7rem 1fr auto;
   align-items: baseline;
-  column-gap: 1rem;
+  column-gap: 1.4rem;
 }
 .data-sources__label {
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.data-sources__label-num {
+  color: var(--ink-soft);
+  margin-right: 0.45rem;
+}
+.data-sources__label-sep {
+  color: var(--hair-strong);
+  margin-right: 0.45rem;
 }
 .data-sources__line {
   margin: 0;
   font-family: var(--serif);
   font-style: italic;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   line-height: 1.5;
   color: var(--ink-soft);
   font-variation-settings: "opsz" 24;
-}
-.data-sources__status {
-  margin-right: 0.8rem;
 }
 .data-sources__status em {
   font-style: normal;
@@ -777,12 +787,23 @@ body[data-app-state="manual"] #manual-mode {
 .data-sources__actions {
   display: inline-flex;
   align-items: baseline;
-  gap: 1.1rem;
+  gap: 1rem;
+  /* Quieter than the status by default; oxblood on hover (handled
+     by the .link-button base style). */
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
-@media (max-width: 600px) {
+.data-sources__actions .link-button {
+  color: var(--ink-soft);
+}
+@media (max-width: 720px) {
   .data-sources__row {
     grid-template-columns: 1fr;
-    row-gap: 0.25rem;
+    row-gap: 0.4rem;
+  }
+  .data-sources__actions {
+    justify-content: flex-start;
   }
 }
 .results-foot--manual {

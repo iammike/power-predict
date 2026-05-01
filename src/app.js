@@ -1159,13 +1159,11 @@ function renderManualMode(fit, inputs = {}) {
       <dl class="fit-stats" id="manual-fit-stats">
         <div data-tooltip="Critical Power synthesized from the FTP you entered. CP ≈ 0.95 × FTP.">
           <dt>CP</dt>
-          <dd id="manual-cp">${formatPower(fit.cpW)}</dd>
-          <span class="fit-stats__quality is-mid">manual</span>
+          <dd id="manual-cp">${formatPower(fit.cpW)}<span class="fit-stats__quality is-mid">manual</span></dd>
         </div>
         <div data-tooltip="Anaerobic work capacity. Derived from your 1-minute sprint number when given, otherwise defaulted to 18 kJ.">
           <dt>W'</dt>
-          <dd id="manual-wprime">${(fit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
-          <span class="fit-stats__quality is-mid">manual</span>
+          <dd id="manual-wprime">${(fit.wPrimeJ / 1000).toFixed(1)} kJ<span class="fit-stats__quality is-mid">manual</span></dd>
         </div>
       </dl>
 
@@ -1283,35 +1281,29 @@ function renderPredictBlock() {
       <dl class="fit-stats">
         <div data-tooltip="${cpTooltip(currentFit)}">
           <dt>CP${currentFit.overridden ? ' *' : ''}</dt>
-          <dd>${formatPower(currentFit.cpW)}</dd>
-          <span class="fit-stats__quality ${cpQuality(currentFit).cls}">${cpQuality(currentFit).label}</span>
+          <dd>${formatPower(currentFit.cpW)}<span class="fit-stats__quality ${cpQuality(currentFit).cls}">${cpQuality(currentFit).label}</span></dd>
         </div>
         <div data-tooltip="${wPrimeTooltip(currentFit.wPrimeJ)}">
           <dt>W'</dt>
-          <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ</dd>
-          <span class="fit-stats__quality ${wPrimeQuality(currentFit.wPrimeJ).cls}">${wPrimeQuality(currentFit.wPrimeJ).label}</span>
+          <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ<span class="fit-stats__quality ${wPrimeQuality(currentFit.wPrimeJ).cls}">${wPrimeQuality(currentFit.wPrimeJ).label}</span></dd>
         </div>
         ${currentEftpNow ? `
         <div data-tooltip="${eftpTooltip()}">
           <dt>eFTP</dt>
-          <dd>${formatPower(currentEftpNow)}</dd>
-          <span class="fit-stats__quality is-good">${eftpWindowLabel()}</span>
+          <dd>${formatPower(currentEftpNow)}<span class="fit-stats__quality is-good">${eftpWindowLabel()}</span></dd>
         </div>` : ''}
         ${currentLoad.hasFtp ? `
         <div data-tooltip="${formTooltip()}">
           <dt>Form</dt>
-          <dd>${formatTsb(currentLoad.tsb)}</dd>
-          <span class="fit-stats__quality ${formQuality().cls}">${formQuality().label}</span>
+          <dd>${formatTsb(currentLoad.tsb)}<span class="fit-stats__quality ${formQuality().cls}">${formQuality().label}</span></dd>
         </div>` : ''}
         <div data-tooltip="${fatigueTooltip(currentFit)}">
           <dt>Fatigue k</dt>
-          <dd>${fatigueValue(currentFit)}</dd>
-          <span class="fit-stats__quality ${fatigueQuality(currentFit).cls}">${fatigueQuality(currentFit).label}</span>
+          <dd>${fatigueValue(currentFit)}<span class="fit-stats__quality ${fatigueQuality(currentFit).cls}">${fatigueQuality(currentFit).label}</span></dd>
         </div>
         <div data-tooltip="${combinedFitTooltip(currentFit)}">
           <dt>Fit</dt>
-          <dd>${currentFit.rmse.toFixed(1)}W · ${currentFit.nPoints}pt</dd>
-          <span class="fit-stats__quality ${combinedFitQuality(currentFit).cls}">${combinedFitQuality(currentFit).label}</span>
+          <dd>${currentFit.rmse.toFixed(1)}W · ${currentFit.nPoints}pt<span class="fit-stats__quality ${combinedFitQuality(currentFit).cls}">${combinedFitQuality(currentFit).label}</span></dd>
         </div>
       </dl>
 

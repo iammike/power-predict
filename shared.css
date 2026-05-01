@@ -1497,9 +1497,13 @@ body[data-app-state="manual"] #manual-mode {
 }
 
 @media (max-width: 720px) {
-  .fit-stats { grid-template-columns: repeat(2, 1fr); }
+  .fit-stats {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fit-stats > div { border-right: var(--rule-soft); }
   .fit-stats > div:nth-child(2n) { border-right: none; }
-  .fit-stats > div:nth-child(-n+2) { border-bottom: var(--rule-soft); }
+  .fit-stats > div:nth-child(n+3) { border-top: var(--rule-soft); }
 }
 
 /* ARTICLE PAGES */

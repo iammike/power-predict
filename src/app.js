@@ -23,7 +23,6 @@ import {
 
 const dropZone = document.getElementById('archive-drop');
 const fileInput = document.getElementById('archive-input');
-const progressEl = document.getElementById('progress');
 const resultsEl = document.getElementById('results');
 const stravaDataSourceEl = document.getElementById('strava-data-source');
 
@@ -119,15 +118,31 @@ async function consumeAuthHash() {
 // callers can wrap numerals in <em> for the oxblood numeric accent.
 let statusEl = null;
 let statusDismissTimer = null;
-function showStatus(html, { kind = 'info', persistent = false, dwellMs = 2200 } = {}) {
+function showStatus(html, { kind = 'info', persistent = false, dwellMs = 2200, progress = null } = {}) {
   if (!statusEl) {
     statusEl = document.createElement('div');
     statusEl.className = 'status-banner';
     document.body.appendChild(statusEl);
   }
   clearTimeout(statusDismissTimer);
+  // Track whether we already had a progress bar — repeated calls
+  // (parse-phase ticking) need to update its width without rebuilding
+  // the inner DOM, otherwise the bar visibly jumps on each redraw.
+  const hadBar = statusEl.querySelector('.status-banner__bar');
   statusEl.className = `status-banner status-banner--${kind}`;
-  statusEl.innerHTML = html;
+  if (progress != null && Number.isFinite(progress)) {
+    const pct = Math.max(0, Math.min(100, progress * 100));
+    if (hadBar) {
+      statusEl.querySelector('.status-banner__text').innerHTML = html;
+      hadBar.firstElementChild.style.width = `${pct}%`;
+    } else {
+      statusEl.innerHTML =
+        `<span class="status-banner__text">${html}</span>` +
+        `<span class="status-banner__bar"><span class="status-banner__bar-fill" style="width:${pct}%"></span></span>`;
+    }
+  } else {
+    statusEl.innerHTML = html;
+  }
   // Force reflow so .is-visible always animates in cleanly even when
   // we're re-using the element across rapid updates.
   // eslint-disable-next-line no-unused-expressions
@@ -354,7 +369,7 @@ async function handleArchive(file) {
   } catch (err) {
     console.error('archive worker failed', err);
     showStatus(`Archive read failed: ${err.message || err}`, { kind: 'error', dwellMs: 6000 });
-    if (progressEl) { progressEl.hidden = true; progressEl.innerHTML = ''; }
+    clearStatus();
     worker.terminate();
     document.removeEventListener('visibilitychange', onVisibility);
     if (wakeLock) try { await wakeLock.release(); } catch {}
@@ -380,13 +395,14 @@ async function handleArchive(file) {
       `No power-equipped activities found (${lastActivitiesSeen} activity files seen)`,
       { kind: 'success', dwellMs: 5000 },
     );
-    if (progressEl) { progressEl.hidden = true; progressEl.innerHTML = ''; }
+    clearStatus();
     return;
   }
 
-  // Clear the inline parse-bar element regardless; any post-parse
-  // commentary (success / files-skipped) flows through the toast.
-  if (progressEl) { progressEl.hidden = true; progressEl.innerHTML = ''; }
+  // Any post-parse commentary (success / files-skipped) flows
+  // through the toast — clear the in-flight progress first so the
+  // success bar doesn't linger underneath the next message.
+  clearStatus();
 
   if (parseFailed > 0) {
     const sampleStr = parseFailedSamples.length
@@ -445,41 +461,25 @@ function startSilentAudio() {
 }
 
 function setProgressPhase(phase, payload) {
-  if (!progressEl) return;
   const now = performance.now ? performance.now() : Date.now();
   lastPhase = phase;
   const readFrac = payload.totalBytes ? Math.min(1, payload.bytesRead / payload.totalBytes) : 0;
   const parseFrac = payload.activitiesSeen ? Math.min(1, payload.parsedCount / payload.activitiesSeen) : 0;
   const isParsing = phase === 'Parsing';
   const isComplete = isParsing ? parseFrac >= 1 : false;
-  const isFirst = !progressEl.querySelector('.progress__bar');
-  if (!isComplete && !isFirst && now - lastProgressUpdate < PROGRESS_THROTTLE_MS) return;
+  if (!isComplete && now - lastProgressUpdate < PROGRESS_THROTTLE_MS) return;
   lastProgressUpdate = now;
 
-  if (isFirst) {
-    progressEl.innerHTML =
-      '<span class="progress__text"></span>' +
-      '<span class="progress__bar"><span class="progress__bar-fill"></span></span>';
-  }
-  progressEl.hidden = false;
-
-  // Combined 0-100 progress: read fills 0..50%, parse fills 50..100%.
+  // Combined 0..1 progress: read fills 0..0.5, parse fills 0.5..1.
   const overall = isParsing
-    ? READ_WEIGHT * 100 + (1 - READ_WEIGHT) * parseFrac * 100
-    : READ_WEIGHT * readFrac * 100;
+    ? READ_WEIGHT + (1 - READ_WEIGHT) * parseFrac
+    : READ_WEIGHT * readFrac;
 
   const phaseDetail = isParsing
-    ? `Parsing: ${payload.parsedCount} / ${payload.activitiesSeen} activities (${(parseFrac * 100).toFixed(0)}%)${payload.withPower ? ` · ${payload.withPower} with power` : ''}${payload.skipped ? `, ${payload.skipped} cached` : ''}`
-    : `Reading: ${formatBytes(payload.bytesRead)} / ${formatBytes(payload.totalBytes)} (${(readFrac * 100).toFixed(0)}%)${payload.activitiesSeen ? ` · ${payload.activitiesSeen} entries seen` : ''}`;
+    ? `Parsing ${payload.parsedCount} / ${payload.activitiesSeen} (${(parseFrac * 100).toFixed(0)}%)${payload.withPower ? ` · ${payload.withPower} with power` : ''}${payload.skipped ? `, ${payload.skipped} cached` : ''}`
+    : `Reading ${formatBytes(payload.bytesRead)} / ${formatBytes(payload.totalBytes)} (${(readFrac * 100).toFixed(0)}%)${payload.activitiesSeen ? ` · ${payload.activitiesSeen} entries` : ''}`;
 
-  // ETA removed — read and parse take very different amounts of time
-  // per archive, so any single weighting produced misleading numbers.
-  // The phase counters + bar position are honest enough on their own.
-
-  const textEl = progressEl.querySelector('.progress__text');
-  const fillEl = progressEl.querySelector('.progress__bar-fill');
-  if (textEl) textEl.textContent = phaseDetail;
-  if (fillEl) fillEl.style.width = `${overall}%`;
+  showStatus(phaseDetail, { kind: 'progress', persistent: true, progress: overall });
 
   // Mirror progress into document.title so the tab strip shows
   // movement even when the tab is hidden — browsers don't paint
@@ -487,7 +487,7 @@ function setProgressPhase(phase, payload) {
   // away user even though the worker keeps running.
   document.title = isComplete
     ? 'Power Predict'
-    : `${overall.toFixed(0)}% · ${phase} — Power Predict`;
+    : `${(overall * 100).toFixed(0)}% · ${phase} — Power Predict`;
 }
 
 const ORIGINAL_TITLE = typeof document !== 'undefined' ? document.title : 'Power Predict';

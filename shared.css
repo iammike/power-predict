@@ -368,39 +368,32 @@ main {
   75%  { content: '...'; }
   100% { content: ''; }
 }
-.progress {
-  margin: 1.25rem 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.progress__text {
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  color: var(--ink-soft);
+/* Progress bar variant of the floating status banner. The text sits
+   above a thin oxblood-on-cream-deep bar that fills as the parse
+   advances. Reuses the banner's .is-visible fade-in so the bar
+   doesn't pop. */
+.status-banner__text {
+  display: block;
   font-variant-numeric: tabular-nums;
 }
-.progress__bar {
+.status-banner__bar {
   display: block;
-  height: 3px;
-  background: var(--paper-deep);
+  height: 2px;
+  margin-top: 0.55rem;
+  background: rgba(244, 238, 226, 0.18);
   position: relative;
   overflow: hidden;
 }
-.progress__bar-fill {
+.status-banner__bar-fill {
   position: absolute;
   inset: 0 auto 0 0;
   background: var(--oxblood);
   transition: width 120ms linear;
 }
-/* Plain-text progress used for save / done states */
-.progress:not(:has(.progress__bar)) {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 1rem;
-  color: var(--ink-soft);
-  font-variation-settings: "opsz" 24;
+/* When a bar is present, drop the trailing animated ellipsis — the
+   bar itself carries the 'still working' signal more honestly. */
+.status-banner--progress:has(.status-banner__bar)::after {
+  display: none;
 }
 
 /* RESULTS */

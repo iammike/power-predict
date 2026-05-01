@@ -336,6 +336,23 @@ main {
   z-index: 1000;
   pointer-events: none;
   white-space: nowrap;
+  max-width: calc(100vw - 2rem);
+}
+@media (max-width: 480px) {
+  .status-banner {
+    top: 0;
+    left: 0;
+    right: 0;
+    max-width: none;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.4;
+    transform: translate(0, -0.4rem);
+    box-shadow: 0 6px 18px rgba(26, 22, 18, 0.25);
+  }
+  .status-banner.is-visible {
+    transform: translate(0, 0);
+  }
 }
 .status-banner.is-visible {
   opacity: 1;

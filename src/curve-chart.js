@@ -178,7 +178,6 @@ export function renderCurveChart(container, { mmp, mmpOwners = {}, fit, fitWindo
           tip.className = 'curve-hover-tip';
           tip.hidden = true;
           u.over.appendChild(tip);
-          u.over.style.position = u.over.style.position || 'relative';
         },
       ],
       setCursor: [

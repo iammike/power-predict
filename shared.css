@@ -991,6 +991,14 @@ body[data-app-state="manual"] #manual-mode {
   border-radius: 50%;
   margin-right: 0.4em;
 }
+/* Reserve a stable width for each value cell so the legend stops
+   reflowing as the cursor moves between observed dots and gaps. */
+.curve-chart .u-legend .u-value {
+  display: inline-block;
+  min-width: 4.5em;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
 .curve-chart .u-legend tr.u-off > * { opacity: 0.4; }
 
 /* Cursor tracer dots — one per series at the snapped x. Rendered

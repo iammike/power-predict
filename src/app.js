@@ -663,7 +663,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
         <p class="data-sources__line">
           <span class="data-sources__status">${activityMmps.length.toLocaleString()} activities cached.</span>
           <span class="data-sources__actions">
-            <button type="button" class="link-button" id="upload-another">Upload another</button>
+            <button type="button" class="link-button" id="upload-another">Upload archive</button>
             <button type="button" class="link-button" id="clear-cache">Clear cache</button>
           </span>
         </p>

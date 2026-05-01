@@ -369,9 +369,24 @@ main {
   transform: translate(0, -50%);
   animation: status-pulse 1400ms ease-in-out infinite;
 }
+.status-banner--progress::after {
+  content: '';
+  display: inline-block;
+  width: 1.4em;
+  text-align: left;
+  letter-spacing: 0.1em;
+  animation: status-dots 1200ms steps(4, end) infinite;
+}
 @keyframes status-pulse {
   0%, 100% { opacity: 0.45; transform: translate(0, -50%) scale(0.85); }
   50%      { opacity: 1;    transform: translate(0, -50%) scale(1.15); }
+}
+@keyframes status-dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
 }
 .progress {
   margin: 1.25rem 0 0;

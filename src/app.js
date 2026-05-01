@@ -659,7 +659,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     </table>
     <aside class="data-sources" aria-label="Data sources">
       <section class="data-sources__row">
-        <span class="data-sources__label">Archive</span>
+        <span class="data-sources__label">Local</span>
         <p class="data-sources__line">
           <span class="data-sources__status">${activityMmps.length.toLocaleString()} activities cached · ${latestActivityLabel(activityMmps)}</span>
           <span class="data-sources__actions">

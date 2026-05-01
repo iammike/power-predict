@@ -3,14 +3,22 @@
 // archive but know their FTP — a coarse-but-real prediction beats
 // a no-data dead end.
 //
-// CP ≈ 0.95 × FTP (Coggan: FTP ≈ 60-min power ≈ ~1.05 × CP).
-// W' from 1-min sprint: solve the 2-param hyperbola P(60) = CP + W'/60
-//   → W' = (P_1min - CP) × 60.
-// Default W' = 18 kJ when no sprint number is given (middle of the
-// trained-cyclist range, ~15-25 kJ).
+// FTP is defined as the 60-minute sustainable power, so the
+// synthesis anchors there: the 2-parameter hyperbola P(t) = CP + W'/t
+// must return FTP at t = 3600 s. Solving:
+//   CP = FTP − W'/3600
+// W' from 1-min sprint: solve P(60) = CP + W'/60 = sprint, giving
+//   W' = (sprint − CP_seed) × 60 with CP_seed = 0.95 × FTP for a
+// stable starting point. Default W' = 18 kJ when no sprint is
+// given (middle of the trained-cyclist range, ~15-25 kJ).
 //
 // Clamps: keep W' in [5 kJ, 40 kJ] so a wildly out-of-range sprint
 // number can't produce an absurd hyperbola.
+//
+// `manual: true` flags downstream code (predictPower, chart) to
+// skip Riegel fatigue decay — the synthesized fit has no observed
+// data behind it, so layering decay on top double-counts fatigue
+// and pulls 60-min predictions below the user's stated FTP.
 
 const W_PRIME_DEFAULT_J = 18_000;
 const W_PRIME_MIN_J = 5_000;
@@ -18,13 +26,18 @@ const W_PRIME_MAX_J = 40_000;
 
 export function synthesizeFit({ ftpW, sprint1minW }) {
   if (!Number.isFinite(ftpW) || ftpW <= 0) return null;
-  const cpW = ftpW * 0.95;
 
   let wPrimeJ = W_PRIME_DEFAULT_J;
-  if (Number.isFinite(sprint1minW) && sprint1minW > cpW) {
-    const fromSprint = (sprint1minW - cpW) * 60;
-    wPrimeJ = Math.max(W_PRIME_MIN_J, Math.min(W_PRIME_MAX_J, fromSprint));
+  if (Number.isFinite(sprint1minW) && sprint1minW > 0) {
+    const cpSeed = 0.95 * ftpW;
+    if (sprint1minW > cpSeed) {
+      const fromSprint = (sprint1minW - cpSeed) * 60;
+      wPrimeJ = Math.max(W_PRIME_MIN_J, Math.min(W_PRIME_MAX_J, fromSprint));
+    }
   }
+  // Calibrate CP so the model returns the user's stated FTP at
+  // exactly 60 min: CP + W'/3600 = FTP.
+  const cpW = ftpW - wPrimeJ / 3600;
 
   return {
     cpW,

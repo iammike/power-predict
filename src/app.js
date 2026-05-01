@@ -107,22 +107,54 @@ async function consumeAuthHash() {
   }
 }
 
-// Brief overlay shown after a successful auth round-trip. Fades in,
-// dwells, fades out — gives the post-callback page rebuild a sense
-// of arrival instead of feeling like a stale reload.
-function showAuthToast(message, { error = false } = {}) {
-  const el = document.createElement('div');
-  el.className = `auth-toast${error ? ' auth-toast--error' : ''}`;
-  el.textContent = message;
-  document.body.appendChild(el);
-  // Force reflow so the .is-visible animation actually transitions.
+// Floating status banner anchored to the top of the page. One DOM
+// element, shared across:
+//   - auth toasts (transient, dismiss after 2.2 s)
+//   - sync progress (live-updating, persists until cleared)
+//   - sync completion (persists until next render)
+//   - errors (oxblood styling, persists until cleared)
+//
+// `kind` controls styling. `persistent: true` skips the auto-dismiss
+// timer so progress + completion stay visible. innerHTML accepted so
+// callers can wrap numerals in <em> for the oxblood numeric accent.
+let statusEl = null;
+let statusDismissTimer = null;
+function showStatus(html, { kind = 'info', persistent = false, dwellMs = 2200 } = {}) {
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.className = 'status-banner';
+    document.body.appendChild(statusEl);
+  }
+  clearTimeout(statusDismissTimer);
+  statusEl.className = `status-banner status-banner--${kind}`;
+  statusEl.innerHTML = html;
+  // Force reflow so .is-visible always animates in cleanly even when
+  // we're re-using the element across rapid updates.
   // eslint-disable-next-line no-unused-expressions
-  el.offsetHeight;
-  el.classList.add('is-visible');
+  statusEl.offsetHeight;
+  statusEl.classList.add('is-visible');
+  if (!persistent) {
+    statusDismissTimer = setTimeout(() => clearStatus(), dwellMs);
+  }
+}
+function clearStatus() {
+  if (!statusEl) return;
+  clearTimeout(statusDismissTimer);
+  statusEl.classList.remove('is-visible');
+  // Match the CSS transition duration before pulling the element so
+  // the fade-out actually completes.
   setTimeout(() => {
-    el.classList.remove('is-visible');
-    setTimeout(() => el.remove(), 400);
-  }, 2200);
+    if (statusEl && !statusEl.classList.contains('is-visible')) {
+      statusEl.remove();
+      statusEl = null;
+    }
+  }, 320);
+}
+
+// Back-compat shim: showAuthToast still works, just routed through
+// the unified banner.
+function showAuthToast(message, { error = false } = {}) {
+  showStatus(message, { kind: error ? 'error' : 'success' });
 }
 
 async function refreshStravaUi() {
@@ -157,16 +189,17 @@ async function handleDisconnect() {
   await refreshStravaUi();
 }
 
-// Click feedback for any Connect Strava button. The redirect itself
-// is fast, but Strava's authorize screen takes a beat to load —
-// without the flash of in-progress state it just feels like a stuck
-// click.
+// Click feedback for any Connect Strava button. If Strava's session
+// cookie auto-approves the flow, the user never actually sees
+// Strava's UI — the redirect bounces back almost instantly. So the
+// label says 'Connecting' rather than 'Opening Strava' to be honest
+// in both cases.
 function beginStravaConnect(btn) {
   if (btn) {
     btn.disabled = true;
     btn.classList.add('is-loading');
     btn.dataset.originalText = btn.textContent;
-    btn.textContent = 'Opening Strava…';
+    btn.textContent = 'Connecting to Strava…';
   }
   setTimeout(() => window.location.assign(authorizeUrl('/')), 60);
 }
@@ -178,32 +211,11 @@ function beginStravaConnect(btn) {
 async function triggerStravaSync() {
   const session = await loadSession();
   if (!session) return;
-  // When the user has data on screen the global progress slot lives
-  // way up by the header, easy to miss. Prefer the inline status
-  // line we render next to the Sync button; fall back to the global
-  // slot only when there's no inline target (i.e. onboarding state).
-  const inline = document.getElementById('sync-status');
-  const setSync = (html) => {
-    if (inline) {
-      inline.hidden = false;
-      inline.innerHTML = html;
-    } else {
-      // Strip tags for the global progress slot — its CSS doesn't
-      // know about our <em> oxblood numerals and they'd render flat.
-      setProgress(html.replace(/<[^>]+>/g, ''));
-    }
-  };
-  const clearSync = () => {
-    if (inline) {
-      inline.textContent = '';
-      inline.hidden = true;
-    } else if (progressEl) {
-      progressEl.textContent = '';
-      progressEl.hidden = true;
-      progressEl.innerHTML = '';
-    }
-  };
-  setSync('Pulling activity list from Strava…');
+  // All sync messaging flows through the floating top-of-page status
+  // banner — visible regardless of scroll position and consistent
+  // with auth toasts / errors.
+  const setSync = (html) => showStatus(html, { kind: 'progress', persistent: true });
+  showStatus('Pulling activity list from Strava…', { kind: 'progress', persistent: true });
   try {
     // Tell the worker which Strava ids the IDB cache already has so it
     // skips them in the worklist — no point re-fetching streams the
@@ -223,7 +235,7 @@ async function triggerStravaSync() {
     setSync('Loading synced data…');
     const remoteActivities = await fetchSyncedActivities(session.session);
     if (remoteActivities.length === 0) {
-      setSync('No power-equipped rides in the synced window.');
+      showStatus('No power-equipped rides in the synced window.', { kind: 'success', dwellMs: 3500 });
       return;
     }
     const fresh = [];
@@ -233,23 +245,14 @@ async function triggerStravaSync() {
     if (fresh.length) await saveActivities(fresh);
     const all = await loadActivities();
     renderCurves(all);
-    // Persist a completion message in the freshly-rendered sync-status
-    // element. Stays put until the next render (override change,
-    // re-sync, etc.) or a page reload, so the user sees that the sync
-    // actually finished rather than the progress text just vanishing.
     const noun = fresh.length === 1 ? 'ride' : 'rides';
     const completion = fresh.length === 0
-      ? `Sync complete. No new rides — local cache already had everything in the synced window.`
-      : `Sync complete. <em>${fresh.length}</em> new ${noun} added to local cache.`;
-    const after = document.getElementById('sync-status');
-    if (after) {
-      after.hidden = false;
-      after.classList.add('sync-status--done');
-      after.innerHTML = completion;
-    }
+      ? `Sync complete · already had everything in the window`
+      : `Sync complete · <em>${fresh.length}</em> new ${noun} added`;
+    showStatus(completion, { kind: 'success', dwellMs: 3500 });
   } catch (err) {
     console.error('strava sync failed', err);
-    setSync(`Strava sync failed: ${err.message || err}`);
+    showStatus(`Strava sync failed: ${err.message || err}`, { kind: 'error', dwellMs: 5000 });
   }
 }
 
@@ -678,7 +681,6 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
                </span>`}
         </p>
       </section>
-      <p class="sync-status" id="sync-status" hidden></p>
     </aside>
     ${renderPredictBlock()}
   `;

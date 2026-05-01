@@ -1375,7 +1375,7 @@ async function handleClearCache() {
   resultsEl.innerHTML = '';
   currentActivities = [];
   setAppState('onboarding');
-  setProgress(`Cache cleared. ${await activityCount()} activities remaining.`);
+  showStatus('Cache cleared', { kind: 'success', dwellMs: 2200 });
 }
 
 function setProgress(msg) {

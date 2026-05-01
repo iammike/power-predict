@@ -652,7 +652,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
           <th>Duration</th>
           <th>Last 30d</th>
           <th class="featured">Last 90d</th>
-          <th>All-time</th>
+          <th title="Best across the entire local cache. Earlier rides may not be present if you only synced a recent window.">${allTimeLabel(activityMmps)}</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -791,6 +791,23 @@ function renderMmpCell(owner) {
 // range: a preset (dateTo = today) collapses to "last Nd"; an explicit
 // span renders as "Mar 31 → Apr 30"; a one-sided bound renders as
 // "since X" or "through X".
+// Header label for the all-time MMP column / chart tab. Falls back
+// to literal 'All-time' when the cache reaches well into the past
+// (≥ 3 years), otherwise reads as 'Since Mar 2024' so a 180-day
+// sync user isn't told their three-month window is 'all-time'.
+function allTimeLabel(activities) {
+  if (!Array.isArray(activities) || activities.length === 0) return 'All-time';
+  let minMs = Infinity;
+  for (const a of activities) {
+    if (Number.isFinite(a.startTime) && a.startTime < minMs) minMs = a.startTime;
+  }
+  if (!Number.isFinite(minMs)) return 'All-time';
+  const ageDays = (Date.now() - minMs) / 86_400_000;
+  if (ageDays > 365 * 3) return 'All-time';
+  const d = new Date(minMs);
+  return `Since ${d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`;
+}
+
 function eftpWindowLabel() {
   const { dateFrom, dateTo } = currentSettings;
   if (!dateFrom && !dateTo) return 'last 90d';
@@ -1282,7 +1299,7 @@ function renderPredictBlock() {
             : `<div class="curve-window-tabs" role="tablist">
                 <button type="button" data-window="last30" role="tab">Last 30d</button>
                 <button type="button" data-window="last90" role="tab" class="is-active">Last 90d</button>
-                <button type="button" data-window="allTime" role="tab">All-time</button>
+                <button type="button" data-window="allTime" role="tab">${allTimeLabel(activityMmps)}</button>
               </div>`
           }
         </header>

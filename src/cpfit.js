@@ -260,7 +260,15 @@ function baselinePower(fit, t) {
 //                          duration predictions never undercut a real ride.
 export function predictPower(fit, durationS, opts = {}) {
   if (!fit || !Number.isFinite(durationS) || durationS <= 0) return null;
-  const decay = opts.decay === false ? null : { ...DEFAULT_DECAY, ...(opts.decay || {}) };
+  // Manual-mode fits are synthesized from a single number (FTP / CP)
+  // and have no observed efforts behind them. Riegel decay only makes
+  // physical sense when calibrated against real long-duration rides;
+  // applying it on top of a synthesized hyperbola pulls predictions
+  // below the user's stated FTP at 60 min, which contradicts the
+  // input. Always skip decay for manual fits unless the caller forces
+  // an explicit decay opts in.
+  const decayDisabled = opts.decay === false || (fit.manual && opts.decay === undefined);
+  const decay = decayDisabled ? null : { ...DEFAULT_DECAY, ...(opts.decay || {}) };
   const useObservedAnchors = opts.useObservedAnchors !== false;
 
   let powerW = baselinePower(fit, durationS);

@@ -637,14 +637,24 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       <p class="results-foot__note">
         ${activityMmps.length} activities cached locally${fromCache ? ', loaded from your last visit.' : '.'}
       </p>
-      <div class="results-foot__actions">
-        <button type="button" class="link-button" id="upload-another">Upload another archive</button>
-        ${currentSettings.stravaSession
-          ? `<button type="button" class="link-button" id="results-foot-sync">Sync from Strava</button>
-             <button type="button" class="link-button" id="results-foot-disconnect">Disconnect Strava</button>`
-          : `<button type="button" class="link-button" id="results-foot-connect">Connect Strava</button>`}
-        <button type="button" class="link-button" id="manual-from-data">Synthesize from FTP instead</button>
-        <button type="button" class="link-button" id="clear-cache">Clear cached data</button>
+      <div class="results-foot__groups">
+        <div class="results-foot__group">
+          <span class="results-foot__group-label">Archive</span>
+          <div class="results-foot__group-actions">
+            <button type="button" class="link-button" id="upload-another">Upload another</button>
+            <button type="button" class="link-button" id="manual-from-data">Synthesize from FTP</button>
+            <button type="button" class="link-button" id="clear-cache">Clear cache</button>
+          </div>
+        </div>
+        <div class="results-foot__group">
+          <span class="results-foot__group-label">Strava</span>
+          <div class="results-foot__group-actions">
+            ${currentSettings.stravaSession
+              ? `<button type="button" class="link-button" id="results-foot-sync">Sync 180 days</button>
+                 <button type="button" class="link-button" id="results-foot-disconnect">Disconnect</button>`
+              : `<button type="button" class="link-button" id="results-foot-connect">Connect</button>`}
+          </div>
+        </div>
       </div>
       <p class="sync-status" id="sync-status" hidden></p>
     </div>

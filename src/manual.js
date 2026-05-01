@@ -16,9 +16,11 @@
 // number can't produce an absurd hyperbola.
 //
 // `manual: true` flags downstream code (predictPower, chart) to
-// skip Riegel fatigue decay — the synthesized fit has no observed
-// data behind it, so layering decay on top double-counts fatigue
-// and pulls 60-min predictions below the user's stated FTP.
+// shift the Riegel fatigue anchor from the default 20 min to 60 min.
+// Decay still applies for ultra-endurance durations (2 h+), but
+// kicks in from the user's stated FTP rather than from a model
+// value at 20 min — otherwise the decay would pull 60-min
+// predictions below the user's FTP, contradicting the input.
 
 const W_PRIME_DEFAULT_J = 18_000;
 const W_PRIME_MIN_J = 5_000;

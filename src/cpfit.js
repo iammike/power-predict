@@ -260,15 +260,21 @@ function baselinePower(fit, t) {
 //                          duration predictions never undercut a real ride.
 export function predictPower(fit, durationS, opts = {}) {
   if (!fit || !Number.isFinite(durationS) || durationS <= 0) return null;
-  // Manual-mode fits are synthesized from a single number (FTP / CP)
-  // and have no observed efforts behind them. Riegel decay only makes
-  // physical sense when calibrated against real long-duration rides;
-  // applying it on top of a synthesized hyperbola pulls predictions
-  // below the user's stated FTP at 60 min, which contradicts the
-  // input. Always skip decay for manual fits unless the caller forces
-  // an explicit decay opts in.
-  const decayDisabled = opts.decay === false || (fit.manual && opts.decay === undefined);
-  const decay = decayDisabled ? null : { ...DEFAULT_DECAY, ...(opts.decay || {}) };
+  // Manual-mode fits are synthesized from FTP, calibrated so the
+  // 2-param model returns FTP at 60 min. We still want Riegel decay
+  // for ultra-endurance, just anchored at 60 min instead of the
+  // default 20 min — otherwise decay starting at 20 min drags the
+  // 60-min prediction below the user's stated FTP. Inside 60 min
+  // the calibrated hyperbola handles things on its own.
+  const manualDecayDefault = { fromS: 3600, k: 0.10 };
+  let decay;
+  if (opts.decay === false) {
+    decay = null;
+  } else if (fit.manual && opts.decay === undefined) {
+    decay = manualDecayDefault;
+  } else {
+    decay = { ...DEFAULT_DECAY, ...(opts.decay || {}) };
+  }
   const useObservedAnchors = opts.useObservedAnchors !== false;
 
   let powerW = baselinePower(fit, durationS);

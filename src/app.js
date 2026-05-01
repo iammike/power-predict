@@ -196,11 +196,12 @@ async function handleDisconnect() {
 // in both cases. Also surface the same message in the floating top
 // banner so the status reads consistently with sync / disconnect.
 function beginStravaConnect(btn) {
+  // The status banner carries the 'Connecting to Strava' message;
+  // the button just dims + adds an animated ellipsis via .is-loading.
+  // Avoids saying the same thing in two places.
   if (btn) {
     btn.disabled = true;
     btn.classList.add('is-loading');
-    btn.dataset.originalText = btn.textContent;
-    btn.textContent = 'Connecting to Strava ';
   }
   showStatus('Connecting to Strava', { kind: 'progress', persistent: true });
   setTimeout(() => window.location.assign(authorizeUrl('/')), 60);

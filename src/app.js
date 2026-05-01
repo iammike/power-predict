@@ -25,8 +25,7 @@ const dropZone = document.getElementById('archive-drop');
 const fileInput = document.getElementById('archive-input');
 const progressEl = document.getElementById('progress');
 const resultsEl = document.getElementById('results');
-const stravaConnectEl = document.getElementById('strava-connect');
-const stravaConnectedEl = document.getElementById('strava-connected');
+const stravaDataSourceEl = document.getElementById('strava-data-source');
 
 if (dropZone && fileInput) {
   dropZone.addEventListener('click', () => fileInput.click());
@@ -127,24 +126,41 @@ function showAuthToast(message, { error = false } = {}) {
 }
 
 async function refreshStravaUi() {
-  if (!stravaConnectEl || !stravaConnectedEl) return;
+  if (!stravaDataSourceEl) return;
   const session = await loadSession();
-  stravaConnectEl.hidden = !!session;
-  stravaConnectedEl.hidden = !session;
+  const statusEl = document.getElementById('strava-status-text');
+  const actionsEl = document.getElementById('strava-status-actions');
+  if (!statusEl || !actionsEl) return;
+  stravaDataSourceEl.hidden = false;
   if (session) {
-    const idEl = document.getElementById('strava-athlete-id');
-    if (idEl) idEl.textContent = session.athleteId;
+    statusEl.textContent = 'Connected.';
+    actionsEl.innerHTML = `
+      <button type="button" class="link-button" id="strava-sync-btn">Sync 180 days</button>
+      <button type="button" class="link-button" id="strava-disconnect">Disconnect</button>
+    `;
+    document.getElementById('strava-sync-btn').addEventListener('click', triggerStravaSync);
+    document.getElementById('strava-disconnect').addEventListener('click', handleDisconnect);
+  } else {
+    statusEl.textContent = 'Sync the last 180 days from your Strava account — no archive download required.';
+    actionsEl.innerHTML = `<button type="button" class="link-button" id="strava-connect-btn">Connect</button>`;
+    document.getElementById('strava-connect-btn').addEventListener('click', (e) => {
+      beginStravaConnect(e.currentTarget);
+    });
   }
 }
 
-document.getElementById('strava-connect-btn')?.addEventListener('click', (e) => {
-  beginStravaConnect(e.currentTarget);
-});
+async function handleDisconnect() {
+  if (!confirm('Disconnect this browser from Strava? You can reconnect anytime.')) return;
+  await clearSession();
+  currentSettings = (await loadSettings()) || {};
+  showAuthToast('Disconnected from Strava');
+  await refreshStravaUi();
+}
 
-// Click feedback for any Connect Strava button (onboarding card or
-// the data-state results-foot variant). The redirect itself is fast,
-// but Strava's authorize screen takes a beat to load — without the
-// flash of in-progress state it just feels like a stuck click.
+// Click feedback for any Connect Strava button. The redirect itself
+// is fast, but Strava's authorize screen takes a beat to load —
+// without the flash of in-progress state it just feels like a stuck
+// click.
 function beginStravaConnect(btn) {
   if (btn) {
     btn.disabled = true;
@@ -152,22 +168,8 @@ function beginStravaConnect(btn) {
     btn.dataset.originalText = btn.textContent;
     btn.textContent = 'Opening Strava…';
   }
-  // Tiny defer so the disabled + label change actually paints before
-  // the navigation tears the page down.
   setTimeout(() => window.location.assign(authorizeUrl('/')), 60);
 }
-
-document.getElementById('strava-disconnect')?.addEventListener('click', async () => {
-  if (!confirm('Disconnect this browser from Strava? You can reconnect anytime.')) return;
-  await clearSession();
-  // Re-hydrate currentSettings so the next render sees the cleared
-  // session keys; clearSession updates IDB but doesn't reach into the
-  // in-memory copy.
-  currentSettings = (await loadSettings()) || {};
-  await refreshStravaUi();
-});
-
-document.getElementById('strava-sync-btn')?.addEventListener('click', triggerStravaSync);
 
 // Single source of truth for the sync action. Drives the
 // /sync/recent loop, then pulls the resulting MMP records back out

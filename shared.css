@@ -11,12 +11,12 @@
   --paper-deep:   #e3d9c1;
   --ink:          #1a1612;
   --ink-soft:     #34291f;
-  --muted:        #7a6f60;
+  --muted:        #6b6052;
   --hair:         rgba(26, 22, 18, 0.16);
   --hair-strong:  rgba(26, 22, 18, 0.32);
   --oxblood:      #7a1f24;
   --oxblood-deep: #5e161a;
-  --burnt:        #c14a1a;
+  --burnt:        #a83c14;
 
   /* Type system */
   --serif: 'Fraunces', 'Iowan Old Style', Georgia, serif;
@@ -213,7 +213,7 @@ main {
   display: block;
   margin-bottom: 0.65rem;
 }
-.steps h3 {
+.steps h2 {
   font-family: var(--serif);
   font-weight: 500;
   font-size: 1.18rem;

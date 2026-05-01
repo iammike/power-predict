@@ -327,87 +327,61 @@ main {
 /* Sync progress line. Editorial mono with oxblood numerals and a
    small pulsing leading mark so it reads as live, not stale. The
    marker runs only while the line is visible. */
-.sync-status {
-  margin: 0.75rem 0 0;
-  padding-left: 1.1rem;
-  position: relative;
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-}
-.sync-status::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: var(--oxblood);
-  transform: translateY(-50%);
-  animation: sync-pulse 1400ms ease-in-out infinite;
-}
-@keyframes sync-pulse {
-  0%, 100% { opacity: 0.35; transform: translateY(-50%) scale(0.85); }
-  50%      { opacity: 1;    transform: translateY(-50%) scale(1.1); }
-}
-.sync-status[hidden] { display: none; }
-/* Persistent post-sync confirmation. Drops the pulse marker (sync is
-   over, not ongoing) and switches the bullet to a static check. */
-.sync-status.sync-status--done::before {
-  animation: none;
-  background: transparent;
-  width: 0.7rem;
-  height: 0.7rem;
-  top: 50%;
-  border: 0;
-  border-radius: 0;
-  content: '✓';
-  color: var(--oxblood);
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  line-height: 1;
-  display: inline-block;
-  text-align: center;
-}
-/* Numeric counts inside the line lean oxblood for emphasis. We tag
-   them at write time with a span; falling back to plain ink if no
-   span is provided. */
-.sync-status em {
-  font-style: normal;
-  color: var(--oxblood);
-  font-weight: 500;
-}
-
-/* Auth toast: brief editorial banner that fades in after the OAuth
-   round-trip lands. Keeps the user oriented so the page rebuild
-   doesn't read as a generic reload. */
-.auth-toast {
+/* Floating status banner — single element shared by auth toasts,
+   sync progress, sync completion, errors. Fixed at top-center so the
+   message is visible regardless of page scroll. */
+.status-banner {
   position: fixed;
   top: 1.5rem;
   left: 50%;
-  transform: translate(-50%, -0.5rem);
+  transform: translate(-50%, -0.6rem);
+  padding: 0.7rem 1.2rem;
   background: var(--ink);
   color: var(--paper);
-  padding: 0.65rem 1.1rem;
   font-family: var(--mono);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  box-shadow: 0 12px 32px rgba(26, 22, 18, 0.28);
+  box-shadow: 0 14px 36px rgba(26, 22, 18, 0.3);
   opacity: 0;
   transition: opacity 280ms ease, transform 280ms ease;
   z-index: 1000;
   pointer-events: none;
+  white-space: nowrap;
 }
-.auth-toast.is-visible {
+.status-banner.is-visible {
   opacity: 1;
   transform: translate(-50%, 0);
 }
-.auth-toast--error {
+.status-banner em {
+  font-style: normal;
+  color: var(--paper);
   background: var(--oxblood);
+  padding: 0.05rem 0.4rem;
+  margin: 0 0.2rem;
+}
+.status-banner--success { background: var(--ink); }
+.status-banner--error   { background: var(--oxblood); }
+.status-banner--progress {
+  background: var(--ink);
+  /* Subtle left-side mark that pulses while progress is live. */
+  padding-left: 2.1rem;
+}
+.status-banner--progress::before {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--oxblood);
+  transform: translateY(-50%);
+  animation: status-pulse 1400ms ease-in-out infinite;
+}
+@keyframes status-pulse {
+  0%, 100% { opacity: 0.45; transform: translate(0, -50%) scale(0.85); }
+  50%      { opacity: 1;    transform: translate(0, -50%) scale(1.15); }
 }
 .progress {
   margin: 1.25rem 0 0;
@@ -814,17 +788,10 @@ body[data-app-state="manual"] #manual-mode {
   align-items: baseline;
   gap: 1.1rem;
 }
-.data-sources .sync-status {
-  margin-top: 0.4rem;
-  margin-left: 6.5rem;
-}
 @media (max-width: 600px) {
   .data-sources__row {
     grid-template-columns: 1fr;
     row-gap: 0.25rem;
-  }
-  .data-sources .sync-status {
-    margin-left: 0;
   }
 }
 .results-foot--manual {

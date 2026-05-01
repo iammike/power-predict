@@ -12,7 +12,14 @@ import { refreshTokens } from './strava-oauth.js';
 // 30 s ceiling and keeps progress feedback responsive. The first
 // call (no cursor) does the activity listing only and processes 0
 // streams, so the streams-only call rate is a clean N per slice.
-const ACTIVITIES_PER_CALL = 10;
+//
+// In addition to the per-slice cap, a wall-time guard inside the
+// loop breaks out early if the slice has been running long enough
+// that one more stream fetch could push past the worker's 30 s
+// budget. This way we adapt to slow Strava responses instead of
+// counting on the static cap alone.
+const ACTIVITIES_PER_CALL = 15;
+const SLICE_WALL_BUDGET_MS = 22_000;
 
 // Resolve a session token to an athlete id, or return null when the
 // session is missing / expired.
@@ -108,16 +115,27 @@ export async function runSyncSlice({
     };
   }
 
-  // Subsequent slice: process up to ACTIVITIES_PER_CALL streams.
+  // Subsequent slice: process up to ACTIVITIES_PER_CALL streams or
+  // until the wall-time guard fires, whichever comes first.
+  const sliceStartedAt = Date.now();
   const pending = cursor.pending;
   const totalSeen = cursor.totalSeen;
   const totalWithPower = cursor.totalWithPower;
   const slice = pending.slice(0, ACTIVITIES_PER_CALL);
-  const remaining = pending.slice(slice.length);
+  let remaining = pending.slice(slice.length);
   const errors = [];
   let processed = 0;
 
-  for (const a of slice) {
+  for (let i = 0; i < slice.length; i++) {
+    // Wall-time guard: if we're already past the budget, push what's
+    // left back onto the worklist and bail. Better to return early
+    // with a smaller chunk than risk the worker hitting its hard
+    // 30 s limit and dropping the response entirely.
+    if (Date.now() - sliceStartedAt >= SLICE_WALL_BUDGET_MS) {
+      remaining = slice.slice(i).concat(remaining);
+      break;
+    }
+    const a = slice[i];
     try {
       const stream = await fetchPowerStream({ accessToken, activityId: a.id }, fetchImpl);
       if (!stream || stream.length === 0) continue;
@@ -163,8 +181,10 @@ export async function runSyncSlice({
     .bind(Math.floor(Date.now() / 1000), athleteId)
     .run();
 
+  const elapsedMs = Date.now() - sliceStartedAt;
   const done = remaining.length === 0;
   return {
+    elapsedMs,
     done,
     processed,
     totalSeen,

@@ -91,6 +91,12 @@ export async function syncRecent({ session, days = 180, knownIds = [], onProgres
     }
     const slice = await res.json();
     cumulativeProcessed += slice.processed || 0;
+    if (typeof slice.elapsedMs === 'number') {
+      // Visibility into per-slice wall time. Logged but not shown to
+      // the user — useful when tuning ACTIVITIES_PER_CALL or chasing
+      // a Strava-side slowdown.
+      console.debug(`[sync] slice ${slice.processed}/${slice.processed + slice.remaining} done in ${slice.elapsedMs}ms`);
+    }
     onProgress?.({
       processed: cumulativeProcessed,
       totalWithPower: slice.totalWithPower,

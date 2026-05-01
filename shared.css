@@ -743,41 +743,40 @@ body[data-app-state="manual"] #manual-mode {
   row-gap: 0.55rem;
 }
 .data-sources__row {
-  /* Three columns now: the numbered label, the journalistic status,
-     and the action-verb apparatus pushed to the right edge so the
-     eye gets a clean status | actions split instead of one mixed
-     line. */
+  /* Two-column grid: the journalistic status sentence on the left
+     (with an oxblood em-dash leader as a small editorial flourish)
+     and the action-verb apparatus pushed to the right edge. */
   display: grid;
-  grid-template-columns: 7rem 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: baseline;
-  column-gap: 1.4rem;
-}
-.data-sources__label {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.data-sources__label-num {
-  color: var(--ink-soft);
-  margin-right: 0.45rem;
-}
-.data-sources__label-sep {
-  color: var(--hair-strong);
-  margin-right: 0.45rem;
+  column-gap: 1.6rem;
 }
 .data-sources__line {
   margin: 0;
   font-family: var(--serif);
   font-style: italic;
-  font-size: 0.98rem;
+  font-size: 1rem;
   line-height: 1.5;
   color: var(--ink-soft);
   font-variation-settings: "opsz" 24;
+  position: relative;
+  padding-left: 1.4rem;
 }
-.data-sources__status em {
+/* Editorial dateline em-dash. Earns its keep as a single typographic
+   mark anchoring each row — the kind of leading flourish you'd see
+   at the top of a magazine column or under a pull quote. */
+.data-sources__line::before {
+  content: '\2014';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--oxblood);
+  font-style: normal;
+  font-weight: 500;
+  font-family: var(--serif);
+  font-variation-settings: "opsz" 24;
+}
+.data-sources__line em {
   font-style: normal;
   font-family: var(--mono);
   font-size: 0.88em;
@@ -788,8 +787,6 @@ body[data-app-state="manual"] #manual-mode {
   display: inline-flex;
   align-items: baseline;
   gap: 1rem;
-  /* Quieter than the status by default; oxblood on hover (handled
-     by the .link-button base style). */
   font-size: 0.72rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -800,10 +797,11 @@ body[data-app-state="manual"] #manual-mode {
 @media (max-width: 720px) {
   .data-sources__row {
     grid-template-columns: 1fr;
-    row-gap: 0.4rem;
+    row-gap: 0.45rem;
   }
   .data-sources__actions {
     justify-content: flex-start;
+    padding-left: 1.4rem; /* align with the post-em-dash text above */
   }
 }
 .results-foot--manual {

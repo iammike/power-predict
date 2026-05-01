@@ -659,26 +659,20 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     </table>
     <aside class="data-sources" aria-label="Data sources">
       <section class="data-sources__row">
-        <span class="data-sources__label">
-          <span class="data-sources__label-num">01</span><span class="data-sources__label-sep">/</span>Local
-        </span>
-        <p class="data-sources__line data-sources__status">${activityMmps.length.toLocaleString()} activities cached · ${latestActivityLabel(activityMmps)}</p>
+        <p class="data-sources__line">${activityMmps.length.toLocaleString()} activities cached locally · ${latestActivityLabel(activityMmps)}</p>
         <span class="data-sources__actions">
           <button type="button" class="link-button" id="upload-another">Upload archive</button>
           <button type="button" class="link-button" id="clear-cache">Clear cache</button>
         </span>
       </section>
       <section class="data-sources__row">
-        <span class="data-sources__label">
-          <span class="data-sources__label-num">02</span><span class="data-sources__label-sep">/</span>Strava
-        </span>
         ${currentSettings.stravaSession
-          ? `<p class="data-sources__line data-sources__status">Connected.</p>
+          ? `<p class="data-sources__line">Connected to Strava.</p>
              <span class="data-sources__actions">
                <button type="button" class="link-button" id="results-foot-sync">Sync 180 days</button>
                <button type="button" class="link-button" id="results-foot-disconnect">Disconnect</button>
              </span>`
-          : `<p class="data-sources__line data-sources__status">Sync the last 180 days from your Strava account — no archive download required.</p>
+          : `<p class="data-sources__line">Sync the last 180 days from Strava — no archive download required.</p>
              <span class="data-sources__actions">
                <button type="button" class="link-button" id="results-foot-connect">Connect</button>
              </span>`}

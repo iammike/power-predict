@@ -1135,14 +1135,34 @@ function renderManualMode(fit, inputs = {}) {
       </form>
       <output class="predict-output" id="predict-output" hidden></output>
 
-      <div class="results-foot results-foot--manual">
-        <div class="results-foot__actions">
-          ${hasPriorData ? `<button type="button" class="link-button" id="manual-back">← Back to my data (${priorActivities.length})</button>` : ''}
-          <button type="button" class="link-button" id="manual-upload">Upload an archive</button>
-          ${currentSettings.stravaSession ? `<button type="button" class="link-button" id="manual-strava-sync">Sync from Strava</button>` : ''}
-        </div>
-        ${currentSettings.stravaSession ? `<p class="sync-status" id="sync-status" hidden></p>` : ''}
-      </div>
+      <aside class="data-sources data-sources--manual" aria-label="Data sources">
+        <section class="data-sources__row">
+          <span class="data-sources__label">Archive</span>
+          <p class="data-sources__line">
+            <span class="data-sources__status">Upload a Strava archive zip for the full power-duration curve from your real rides.</span>
+            <span class="data-sources__actions">
+              <button type="button" class="link-button" id="manual-upload">Upload archive</button>
+              ${hasPriorData ? `<button type="button" class="link-button" id="manual-back">Back to my data (${priorActivities.length})</button>` : ''}
+            </span>
+          </p>
+        </section>
+        <section class="data-sources__row">
+          <span class="data-sources__label">Strava</span>
+          <p class="data-sources__line">
+            ${currentSettings.stravaSession
+              ? `<span class="data-sources__status">Connected.</span>
+                 <span class="data-sources__actions">
+                   <button type="button" class="link-button" id="manual-strava-sync">Sync 180 days</button>
+                   <button type="button" class="link-button" id="manual-strava-disconnect">Disconnect</button>
+                 </span>`
+              : `<span class="data-sources__status">Sync the last 180 days from your Strava account — no archive download required.</span>
+                 <span class="data-sources__actions">
+                   <button type="button" class="link-button" id="manual-strava-connect">Connect</button>
+                 </span>`}
+          </p>
+        </section>
+        <p class="sync-status" id="sync-status" hidden></p>
+      </aside>
     </section>
   `;
   resultsEl.hidden = false;
@@ -1151,6 +1171,23 @@ function renderManualMode(fit, inputs = {}) {
   wireManualInline();
   setAppState('manual');
   document.getElementById('manual-strava-sync')?.addEventListener('click', triggerStravaSync);
+  document.getElementById('manual-strava-connect')?.addEventListener('click', (e) => {
+    beginStravaConnect(e.currentTarget);
+  });
+  document.getElementById('manual-strava-disconnect')?.addEventListener('click', async () => {
+    if (!confirm('Disconnect this browser from Strava? You can reconnect anytime.')) return;
+    await clearSession();
+    currentSettings = (await loadSettings()) || {};
+    showAuthToast('Disconnected from Strava');
+    // Reconstruct the FTP from the current calibrated fit:
+    // CP = FTP − W'/3600, so FTP = CP + W'/3600. Re-render manual
+    // mode so the data-sources block flips to the disconnected
+    // variant in place.
+    const ftpW = currentFit ? currentFit.cpW + currentFit.wPrimeJ / 3600 : null;
+    if (ftpW) {
+      renderManualMode(synthesizeFit({ ftpW }), { ftpW, unit: inputs.unit || 'ftp' });
+    }
+  });
   if (hasPriorData) {
     document.getElementById('manual-back').addEventListener('click', () => {
       currentSettings = priorSettings;

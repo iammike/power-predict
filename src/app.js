@@ -122,6 +122,8 @@ function showStatus(html, { kind = 'info', persistent = false, dwellMs = 2200, p
   if (!statusEl) {
     statusEl = document.createElement('div');
     statusEl.className = 'status-banner';
+    statusEl.setAttribute('role', 'status');
+    statusEl.setAttribute('aria-atomic', 'true');
     document.body.appendChild(statusEl);
   }
   clearTimeout(statusDismissTimer);
@@ -130,6 +132,8 @@ function showStatus(html, { kind = 'info', persistent = false, dwellMs = 2200, p
   // the inner DOM, otherwise the bar visibly jumps on each redraw.
   const hadBar = statusEl.querySelector('.status-banner__bar');
   statusEl.className = `status-banner status-banner--${kind}`;
+  // Errors should preempt SR announcements; everything else is polite.
+  statusEl.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
   if (progress != null && Number.isFinite(progress)) {
     const pct = Math.max(0, Math.min(100, progress * 100));
     if (hadBar) {

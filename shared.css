@@ -633,6 +633,10 @@ body[data-app-state="manual"] #manual-mode {
   transition: background 160ms ease;
 }
 .manual-form button:hover { background: var(--oxblood-deep); }
+.manual-form button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
 .manual-mode .results-foot__note {
   padding: 0 1rem 1rem;
   margin: 0;
@@ -850,6 +854,10 @@ body[data-app-state="manual"] #manual-mode {
 .link-button:hover {
   color: var(--oxblood-deep);
   border-bottom-color: var(--oxblood-deep);
+}
+.link-button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 /* CURVE CHART */
@@ -1257,6 +1265,10 @@ body[data-app-state="manual"] #manual-mode {
   transition: background 160ms ease;
 }
 .override-form button[type="submit"]:hover { background: var(--oxblood-deep); }
+.override-form button[type="submit"]:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
 .override-panel .results-foot__note {
   padding: 0 0.9rem 0.9rem;
   margin: 0;
@@ -1417,6 +1429,10 @@ body[data-app-state="manual"] #manual-mode {
 }
 .predict-form button:hover { background: var(--oxblood-deep); }
 .predict-form button:active { transform: translateY(1px); }
+.predict-form button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
 
 .predict-output {
   display: none;

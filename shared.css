@@ -292,48 +292,23 @@ main {
 /* Strava connect / connected blocks. Sit between the drop zone and
    the manual-mode disclosure on the onboarding screen. Quiet styling
    — the affordance is the button label, not a colored bar. */
-.strava-connect, .strava-connected {
+/* Inline data-sources block (top-of-page strava entry on the
+   onboarding/manual screens). Same row layout as the data-screen
+   colophon, but no top border / extra margin since it sits inline
+   between the drop zone and the manual disclosure rather than at
+   the foot of a results section. */
+.data-sources--inline {
   margin: 1rem 0 0;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--hair);
-  background: var(--paper-soft);
-}
-.strava-connect__lede,
-.strava-connected__status {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 0.95rem;
-  color: var(--ink-soft);
-  margin: 0 0 0.6rem;
-}
-.strava-connect__btn,
-.strava-connected__btn {
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  background: var(--ink);
-  color: var(--paper);
-  border: 0;
-  padding: 0.55rem 1rem;
-  cursor: pointer;
-  transition: background 160ms ease;
-}
-.strava-connect__btn:hover,
-.strava-connected__btn:hover {
-  background: var(--oxblood);
+  padding: 0.6rem 0;
+  border-top: 0;
 }
 /* Connect button loading state: subtle ellipsis dots that animate
-   while the Strava redirect kicks in. Disabled state dims the bg. */
-.strava-connect__btn.is-loading,
-.strava-connected__btn.is-loading,
+   while the Strava redirect kicks in. */
 .link-button.is-loading {
   opacity: 0.7;
   cursor: progress;
   pointer-events: none;
 }
-.strava-connect__btn.is-loading::after,
-.strava-connected__btn.is-loading::after,
 .link-button.is-loading::after {
   content: '';
   display: inline-block;
@@ -434,18 +409,6 @@ main {
 .auth-toast--error {
   background: var(--oxblood);
 }
-.strava-connected__actions {
-  display: flex;
-  gap: 0.9rem;
-  align-items: center;
-}
-#strava-athlete-id {
-  font-family: var(--mono);
-  font-style: normal;
-  font-variant-numeric: tabular-nums;
-  color: var(--oxblood);
-}
-
 .progress {
   margin: 1.25rem 0 0;
   display: flex;
@@ -559,8 +522,7 @@ main {
 body[data-app-state="data"] .steps,
 body[data-app-state="data"] #archive-drop,
 body[data-app-state="data"] #manual-mode,
-body[data-app-state="data"] #strava-connect,
-body[data-app-state="data"] #strava-connected,
+body[data-app-state="data"] #strava-data-source,
 body[data-app-state="manual"] .steps,
 body[data-app-state="manual"] #manual-mode {
   display: none;
@@ -1684,8 +1646,7 @@ body[data-app-state="manual"] #manual-mode {
 .lede > *,
 .steps > li,
 .drop,
-#strava-connect,
-#strava-connected,
+#strava-data-source,
 .manual-mode {
   opacity: 0;
   animation: rise 720ms cubic-bezier(.2, .8, .2, 1) forwards;
@@ -1696,10 +1657,9 @@ body[data-app-state="manual"] #manual-mode {
 .steps > li:nth-child(1) { animation-delay: 540ms; }
 .steps > li:nth-child(2) { animation-delay: 640ms; }
 .steps > li:nth-child(3) { animation-delay: 740ms; }
-.drop             { animation-delay: 880ms; }
-#strava-connect,
-#strava-connected { animation-delay: 940ms; }
-.manual-mode      { animation-delay: 1000ms; }
+.drop              { animation-delay: 880ms; }
+#strava-data-source { animation-delay: 940ms; }
+.manual-mode       { animation-delay: 1000ms; }
 
 #results[data-revealed] {
   animation: rise 600ms cubic-bezier(.2, .8, .2, 1);
@@ -1711,7 +1671,7 @@ body[data-app-state="manual"] #manual-mode {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-  .lede > *, .steps > li, .drop, #strava-connect, #strava-connected, .manual-mode { opacity: 1; }
+  .lede > *, .steps > li, .drop, #strava-data-source, .manual-mode { opacity: 1; }
 }
 
 /* RESPONSIVE */

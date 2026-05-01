@@ -513,7 +513,6 @@ let currentFit = null;
 let currentEftpNow = null;
 let currentLoad = { ctl: 0, atl: 0, tsb: 0, hasFtp: false };
 let currentMmpByWindow = { last30: {}, last90: {}, allTime: {}, range: {} };
-let currentMmpOwnersByWindow = { last30: {}, last90: {}, allTime: {}, range: {} };
 
 function renderCurves(activityMmps, { fromCache = false } = {}) {
   currentActivities = activityMmps;
@@ -544,7 +543,6 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // is set; otherwise it switches between the last30/last90/all-time
   // tabs. Filled in below once we know the fit's input set.
   currentMmpByWindow = { last30, last90, allTime, range: {} };
-  currentMmpOwnersByWindow = { last30: last30Owners, last90: last90Owners, allTime: allTimeOwners, range: {} };
 
   // Effort-quality filter: drop activities whose IF (avg / FTP)
   // falls below the threshold so low-effort base rides don't anchor
@@ -568,7 +566,6 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // observed efforts in range still appear as dots).
   if (dateFromMs || dateToMs) {
     currentMmpByWindow.range = rollingBest(filtered);
-    currentMmpOwnersByWindow.range = rollingBestWithOwners(filtered);
   }
 
   // Drift-normalize for the all-time fallback so an old peak ridden
@@ -1102,7 +1099,6 @@ function wireCurveChart() {
   const draw = (key) => {
     renderCurveChart(container, {
       mmp: currentMmpByWindow[key] || {},
-      mmpOwners: currentMmpOwnersByWindow[key] || {},
       fit: currentFit,
       fitWindowLabel,
     });

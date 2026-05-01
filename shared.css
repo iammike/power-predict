@@ -38,6 +38,60 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* SHARED TOOLTIP
+   Any element with [data-tooltip] gets a hover/focus tooltip in the
+   ink-on-cream callout style. Default position is above; add
+   [data-tooltip-pos="below"] to flip.
+*/
+[data-tooltip] {
+  position: relative;
+  cursor: help;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-within::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  max-width: 22rem;
+  z-index: 10;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-style: normal;
+  font-weight: 400;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 0.55rem 0.7rem;
+  box-shadow: 0 6px 16px rgba(26, 22, 18, 0.18);
+  white-space: normal;
+  pointer-events: none;
+}
+[data-tooltip]:hover::before,
+[data-tooltip]:focus-within::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 1.1rem;
+  border: 5px solid transparent;
+  border-top-color: var(--ink);
+  z-index: 11;
+}
+[data-tooltip-pos="below"]:hover::after,
+[data-tooltip-pos="below"]:focus-within::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+[data-tooltip-pos="below"]:hover::before,
+[data-tooltip-pos="below"]:focus-within::before {
+  bottom: auto;
+  top: 100%;
+  border-top-color: transparent;
+  border-bottom-color: var(--ink);
+}
+
 body {
   margin: 0;
   font-family: var(--sans);
@@ -887,42 +941,6 @@ body[data-app-state="manual"] #manual-mode {
   color: var(--oxblood);
   letter-spacing: 0.04em;
 }
-.curve-window-tabs[data-tooltip] {
-  position: relative;
-  cursor: help;
-}
-.curve-window-tabs[data-tooltip]:hover::after,
-.curve-window-tabs[data-tooltip]:focus-within::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  max-width: 22rem;
-  z-index: 10;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--sans);
-  font-weight: 400;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  letter-spacing: 0;
-  text-transform: none;
-  padding: 0.55rem 0.7rem;
-  box-shadow: 0 6px 16px rgba(26, 22, 18, 0.18);
-  white-space: normal;
-  pointer-events: none;
-}
-.curve-window-tabs[data-tooltip]:hover::before,
-.curve-window-tabs[data-tooltip]:focus-within::before {
-  content: "";
-  position: absolute;
-  top: 100%;
-  right: 1.2rem;
-  border: 5px solid transparent;
-  border-bottom-color: var(--ink);
-  z-index: 11;
-}
-
 .curve-window-tabs {
   display: inline-flex;
   border: 1px solid var(--hair-strong);
@@ -1348,40 +1366,6 @@ body[data-app-state="manual"] #manual-mode {
   border-right: var(--rule-soft);
   position: relative;
   min-width: 0;
-}
-.fit-stats > div[data-tooltip] { cursor: help; }
-.fit-stats > div[data-tooltip]:hover::after,
-.fit-stats > div[data-tooltip]:focus-within::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0.75rem;
-  right: 0.75rem;
-  z-index: 10;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: var(--sans);
-  font-style: normal;
-  font-weight: 400;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  letter-spacing: 0;
-  text-transform: none;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--ink);
-  box-shadow: 0 6px 16px rgba(26, 22, 18, 0.18);
-  white-space: normal;
-  pointer-events: none;
-}
-.fit-stats > div[data-tooltip]:hover::before,
-.fit-stats > div[data-tooltip]:focus-within::before {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  left: 1.1rem;
-  border: 5px solid transparent;
-  border-top-color: var(--ink);
-  z-index: 11;
 }
 .fit-stats > div:last-child { border-right: none; }
 .fit-stats dt {

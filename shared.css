@@ -350,25 +350,9 @@ main {
 }
 .status-banner--success  { background: var(--ink); }
 .status-banner--error    { background: var(--oxblood); }
-.status-banner--progress {
-  background: var(--ink);
-  /* Pulsing oxblood dot reads as 'still working' so the user knows
-     the toast isn't a final state. Only progress kind gets the
-     decoration; success / error are terminal and stay plain. */
-  padding-left: 2.1rem;
-}
-.status-banner--progress::before {
-  content: '';
-  position: absolute;
-  left: 1rem;
-  top: 50%;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--oxblood);
-  transform: translate(0, -50%);
-  animation: status-pulse 1400ms ease-in-out infinite;
-}
+.status-banner--progress { background: var(--ink); }
+/* Animated trailing ellipsis on progress toasts — reads as 'still
+   working' on its own, so we don't also need the leading pulse dot. */
 .status-banner--progress::after {
   content: '';
   display: inline-block;
@@ -376,10 +360,6 @@ main {
   text-align: left;
   letter-spacing: 0.1em;
   animation: status-dots 1200ms steps(4, end) infinite;
-}
-@keyframes status-pulse {
-  0%, 100% { opacity: 0.45; transform: translate(0, -50%) scale(0.85); }
-  50%      { opacity: 1;    transform: translate(0, -50%) scale(1.15); }
 }
 @keyframes status-dots {
   0%   { content: ''; }

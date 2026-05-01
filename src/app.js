@@ -160,6 +160,10 @@ function beginStravaConnect(btn) {
 document.getElementById('strava-disconnect')?.addEventListener('click', async () => {
   if (!confirm('Disconnect this browser from Strava? You can reconnect anytime.')) return;
   await clearSession();
+  // Re-hydrate currentSettings so the next render sees the cleared
+  // session keys; clearSession updates IDB but doesn't reach into the
+  // in-memory copy.
+  currentSettings = (await loadSettings()) || {};
   await refreshStravaUi();
 });
 
@@ -226,8 +230,21 @@ async function triggerStravaSync() {
     }
     if (fresh.length) await saveActivities(fresh);
     const all = await loadActivities();
-    clearSync();
     renderCurves(all);
+    // Persist a completion message in the freshly-rendered sync-status
+    // element. Stays put until the next render (override change,
+    // re-sync, etc.) or a page reload, so the user sees that the sync
+    // actually finished rather than the progress text just vanishing.
+    const noun = fresh.length === 1 ? 'ride' : 'rides';
+    const completion = fresh.length === 0
+      ? `Sync complete. No new rides — local cache already had everything in the synced window.`
+      : `Sync complete. <em>${fresh.length}</em> new ${noun} added to local cache.`;
+    const after = document.getElementById('sync-status');
+    if (after) {
+      after.hidden = false;
+      after.classList.add('sync-status--done');
+      after.innerHTML = completion;
+    }
   } catch (err) {
     console.error('strava sync failed', err);
     setSync(`Strava sync failed: ${err.message || err}`);
@@ -676,6 +693,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   document.getElementById('results-foot-disconnect')?.addEventListener('click', async () => {
     if (!confirm('Disconnect this browser from Strava? You can reconnect anytime.')) return;
     await clearSession();
+    currentSettings = (await loadSettings()) || {};
     showAuthToast('Disconnected from Strava');
     renderCurves(currentActivities, { fromCache: true });
   });

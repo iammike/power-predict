@@ -302,26 +302,14 @@ main {
   padding: 0.6rem 0;
   border-top: 0;
 }
-/* Connect button loading state: subtle ellipsis dots that animate
-   while the Strava redirect kicks in. */
+/* Loading state on link buttons: the floating status banner
+   carries the message + pulsing marker, so the button just dims
+   and disables to read as 'in progress' without competing for
+   attention. */
 .link-button.is-loading {
-  opacity: 0.7;
+  opacity: 0.55;
   cursor: progress;
   pointer-events: none;
-}
-.link-button.is-loading::after {
-  content: '';
-  display: inline-block;
-  width: 0.5em;
-  text-align: left;
-  animation: connect-dots 1200ms steps(4, end) infinite;
-}
-@keyframes connect-dots {
-  0%   { content: ''; }
-  25%  { content: '·'; }
-  50%  { content: '··'; }
-  75%  { content: '···'; }
-  100% { content: ''; }
 }
 
 /* Sync progress line. Editorial mono with oxblood numerals and a

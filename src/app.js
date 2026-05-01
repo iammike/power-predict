@@ -803,7 +803,15 @@ function latestActivityLabel(activities) {
     if (Number.isFinite(a.startTime) && a.startTime > maxMs) maxMs = a.startTime;
   }
   if (!Number.isFinite(maxMs)) return 'no rides';
-  const diffDays = Math.floor((Date.now() - maxMs) / 86_400_000);
+  // Calendar-day diff in local time: a ride at 8 PM yesterday is
+  // 'yesterday' even though only 13 elapsed hours have passed. Use
+  // midnight-aligned local dates so the day count never undercounts.
+  const startOfDay = (ms) => {
+    const d = new Date(ms);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+  const diffDays = Math.round((startOfDay(Date.now()) - startOfDay(maxMs)) / 86_400_000);
   if (diffDays <= 0) return 'last ride today';
   if (diffDays === 1) return 'last ride yesterday';
   if (diffDays < 7) return `last ride ${diffDays} days ago`;

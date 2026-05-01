@@ -982,8 +982,8 @@ body[data-app-state="manual"] #manual-mode {
   font-family: var(--mono);
   font-size: 0.78rem;
   color: var(--ink-soft);
-  text-align: left;
-  padding-top: 0.4rem;
+  text-align: center;
+  padding-top: 0.7rem;
 }
 .curve-chart .u-legend .u-marker {
   width: 10px;
@@ -995,8 +995,8 @@ body[data-app-state="manual"] #manual-mode {
    reflowing as the cursor moves between observed dots and gaps. */
 .curve-chart .u-legend .u-value {
   display: inline-block;
-  min-width: 4.5em;
-  text-align: left;
+  min-width: 4.2em;
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .curve-chart .u-legend tr.u-off > * { opacity: 0.4; }

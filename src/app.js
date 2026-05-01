@@ -103,7 +103,7 @@ async function consumeAuthHash() {
   }
   if (parsed.session && parsed.athleteId) {
     await saveSession({ session: parsed.session, athleteId: parsed.athleteId });
-    showAuthToast(`Connected to Strava · athlete ${parsed.athleteId}`);
+    showAuthToast('Connected to Strava');
   }
 }
 

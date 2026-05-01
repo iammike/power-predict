@@ -661,7 +661,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       <section class="data-sources__row">
         <span class="data-sources__label">Archive</span>
         <p class="data-sources__line">
-          <span class="data-sources__status">${activityMmps.length.toLocaleString()} activities cached.</span>
+          <span class="data-sources__status">${activityMmps.length.toLocaleString()} activities cached · ${latestActivityLabel(activityMmps)}</span>
           <span class="data-sources__actions">
             <button type="button" class="link-button" id="upload-another">Upload archive</button>
             <button type="button" class="link-button" id="clear-cache">Clear cache</button>
@@ -791,6 +791,30 @@ function renderMmpCell(owner) {
 // range: a preset (dateTo = today) collapses to "last Nd"; an explicit
 // span renders as "Mar 31 → Apr 30"; a one-sided bound renders as
 // "since X" or "through X".
+// 'last [date]' helper for the Archive status. Reads as relative
+// for recent rides ('today', 'yesterday', '3 days ago') and as a
+// month-day for anything older. Surfaces cache staleness at a
+// glance so a user with sync connected has a natural prompt to
+// hit Sync if the most recent ride is days behind today.
+function latestActivityLabel(activities) {
+  if (!Array.isArray(activities) || activities.length === 0) return 'no rides';
+  let maxMs = -Infinity;
+  for (const a of activities) {
+    if (Number.isFinite(a.startTime) && a.startTime > maxMs) maxMs = a.startTime;
+  }
+  if (!Number.isFinite(maxMs)) return 'no rides';
+  const diffDays = Math.floor((Date.now() - maxMs) / 86_400_000);
+  if (diffDays <= 0) return 'last ride today';
+  if (diffDays === 1) return 'last ride yesterday';
+  if (diffDays < 7) return `last ride ${diffDays} days ago`;
+  const d = new Date(maxMs);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const fmt = sameYear
+    ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    : d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  return `last ride ${fmt}`;
+}
+
 // Header label for the all-time MMP column / chart tab. Falls back
 // to literal 'All-time' when the cache reaches well into the past
 // (≥ 3 years), otherwise reads as 'Since Mar 2024' so a 180-day

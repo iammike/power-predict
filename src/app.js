@@ -1299,7 +1299,7 @@ function renderPredictBlock() {
             : `<div class="curve-window-tabs" role="tablist">
                 <button type="button" data-window="last30" role="tab">Last 30d</button>
                 <button type="button" data-window="last90" role="tab" class="is-active">Last 90d</button>
-                <button type="button" data-window="allTime" role="tab">${allTimeLabel(activityMmps)}</button>
+                <button type="button" data-window="allTime" role="tab">${allTimeLabel(currentActivities)}</button>
               </div>`
           }
         </header>

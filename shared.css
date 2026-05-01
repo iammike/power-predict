@@ -887,6 +887,14 @@ body[data-app-state="manual"] #manual-mode {
   color: var(--oxblood);
   letter-spacing: 0.04em;
 }
+.curve-chart-note {
+  margin: 0 0 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
 
 .curve-window-tabs {
   display: inline-flex;

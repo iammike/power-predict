@@ -1093,10 +1093,14 @@ function wireCurveChart() {
   const container = document.getElementById('curve-chart');
   if (!container || !currentFit) return;
   const tabs = document.querySelectorAll('[data-window]');
+  const fitWindowLabel = (currentSettings.dateFrom || currentSettings.dateTo)
+    ? 'custom range'
+    : 'last 90 days';
   const draw = (key) => {
     renderCurveChart(container, {
       mmp: currentMmpByWindow[key] || {},
       fit: currentFit,
+      fitWindowLabel,
     });
     tabs.forEach((t) => t.classList.toggle('is-active', t.dataset.window === key));
   };
@@ -1325,6 +1329,7 @@ function renderPredictBlock() {
               </div>`
           }
         </header>
+        <p class="curve-chart-note">Display window only · prediction uses the fit above</p>
         <div id="curve-chart" class="curve-chart"></div>
       </div>
 

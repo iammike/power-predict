@@ -782,42 +782,215 @@ body[data-app-state="manual"] #strava-connected {
   gap: 1.25rem;
   flex-wrap: wrap;
 }
-.results-foot__groups {
+
+/* DATA SOURCES — editorial colophon block.
+   Two columns share a vertical hairline. Each column anchors with a
+   hero element (a stat number or status pill), reads as italic
+   running prose, and ends with a vertical action list whose arrow
+   prefixes glide on hover. */
+.data-sources {
+  margin-top: 2.25rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--hair-strong);
   display: grid;
-  grid-template-columns: max-content 1fr;
-  column-gap: 1.4rem;
-  row-gap: 0.5rem;
-  align-items: baseline;
-  margin-top: 1rem;
-  width: 100%;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  position: relative;
 }
-.results-foot__group {
-  display: contents;
+.data-sources::before {
+  /* Vertical center rule between the two columns, inset top/bottom
+     so it reads as a hairline mark, not a hard divide. */
+  content: '';
+  position: absolute;
+  top: 1.5rem;
+  bottom: 1rem;
+  left: 50%;
+  width: 1px;
+  background: var(--hair);
 }
-.results-foot__group-label {
+.data-sources__col {
+  padding: 0 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.data-sources__col:first-child {
+  padding-left: 0;
+}
+.data-sources__col:last-child {
+  padding-right: 0;
+}
+
+/* Archive hero stat: oversized Fraunces, weighty oxblood, optical
+   size pinned to display. The number is the visual gravity of the
+   column. */
+.data-sources__stat {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: clamp(2.6rem, 5.5vw, 3.8rem);
+  line-height: 0.95;
+  color: var(--oxblood);
+  margin: 0;
+  font-variant-numeric: oldstyle-nums;
+  font-variation-settings: "opsz" 144, "SOFT" 30;
+  letter-spacing: -0.015em;
+}
+
+/* Strava status pill — stands in for the hero number on the right
+   column. Connected: oxblood with a pulsing dot. Off: neutral. */
+.data-sources__pill {
   font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  /* Match the visual height of the stat column so both columns
+     start their lede line on roughly the same baseline. */
+  min-height: clamp(2.6rem, 5.5vw, 3.8rem);
+}
+.data-sources__pill--off {
+  color: var(--muted);
+}
+.data-sources__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--oxblood);
+  animation: data-sources-dot 2s ease-in-out infinite;
+}
+@keyframes data-sources-dot {
+  0%, 100% { opacity: 0.45; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.1);  }
+}
+
+.data-sources__lede {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  margin: 0;
+  font-variation-settings: "opsz" 24;
+  max-width: 28ch;
+}
+.data-sources__lede em {
+  font-style: normal;
+  color: var(--oxblood);
+  font-family: var(--mono);
+  font-size: 0.88em;
+  letter-spacing: 0.04em;
+}
+
+.data-sources__label {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--muted);
-  white-space: nowrap;
+  margin: 0.25rem 0 0;
+  position: relative;
+  padding-left: 1.4rem;
 }
-.results-foot__group-actions {
+.data-sources__label::before {
+  /* Tiny rule before the label, like a department mark in a magazine. */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1rem;
+  height: 1px;
+  background: var(--ink);
+  transform: translateY(-0.5px);
+}
+
+.data-sources__actions {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
   display: flex;
-  gap: 1.25rem;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  flex-direction: column;
+  gap: 0.4rem;
 }
-@media (max-width: 600px) {
-  .results-foot__groups {
+.data-sources__actions li {
+  margin: 0;
+}
+
+/* The action verbs read as inline editorial links, prefixed with a
+   gliding arrow that translates right on hover. */
+.data-sources__link {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0.15rem 0;
+  cursor: pointer;
+  position: relative;
+  padding-left: 1.4rem;
+  transition: color 160ms ease;
+}
+.data-sources__link::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-55%);
+  color: var(--oxblood);
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1.05);
+}
+.data-sources__link:hover,
+.data-sources__link:focus-visible {
+  color: var(--oxblood);
+  outline: none;
+}
+.data-sources__link:hover::before,
+.data-sources__link:focus-visible::before {
+  transform: translate(0.35rem, -55%);
+}
+.data-sources__link--quiet {
+  color: var(--muted);
+}
+.data-sources__link--quiet::before {
+  color: var(--hair-strong);
+}
+.data-sources__link.is-loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.data-sources__link.is-loading::before {
+  animation: data-sources-link-loading 1s linear infinite;
+}
+@keyframes data-sources-link-loading {
+  0%   { transform: translate(0, -55%); }
+  50%  { transform: translate(0.45rem, -55%); }
+  100% { transform: translate(0, -55%); }
+}
+
+/* Sync status occupies the full width of the colophon, anchored to
+   the same starting edge as the archive lede. */
+.data-sources .sync-status {
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+}
+
+@media (max-width: 720px) {
+  .data-sources {
     grid-template-columns: 1fr;
-    row-gap: 1rem;
   }
-  .results-foot__group-actions {
-    flex-wrap: wrap;
-    white-space: normal;
+  .data-sources::before {
+    display: none;
+  }
+  .data-sources__col {
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .data-sources__col:last-of-type {
+    border-bottom: 0;
   }
 }
 .results-foot--manual {

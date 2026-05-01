@@ -633,31 +633,43 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="results-foot">
-      <p class="results-foot__note">
-        ${activityMmps.length} activities cached locally${fromCache ? ', loaded from your last visit.' : '.'}
-      </p>
-      <div class="results-foot__groups">
-        <div class="results-foot__group">
-          <span class="results-foot__group-label">Archive</span>
-          <div class="results-foot__group-actions">
-            <button type="button" class="link-button" id="upload-another">Upload another</button>
-            <button type="button" class="link-button" id="manual-from-data">Synthesize from FTP</button>
-            <button type="button" class="link-button" id="clear-cache">Clear cache</button>
-          </div>
-        </div>
-        <div class="results-foot__group">
-          <span class="results-foot__group-label">Strava</span>
-          <div class="results-foot__group-actions">
-            ${currentSettings.stravaSession
-              ? `<button type="button" class="link-button" id="results-foot-sync">Sync 180 days</button>
-                 <button type="button" class="link-button" id="results-foot-disconnect">Disconnect</button>`
-              : `<button type="button" class="link-button" id="results-foot-connect">Connect</button>`}
-          </div>
-        </div>
-      </div>
+    <aside class="data-sources" aria-label="Data sources">
+      <section class="data-sources__col data-sources__col--archive">
+        <p class="data-sources__stat">${activityMmps.length.toLocaleString()}</p>
+        <p class="data-sources__lede">
+          activities cached locally${fromCache ? ', loaded from your last visit' : ''}.
+        </p>
+        <p class="data-sources__label">Archive</p>
+        <ul class="data-sources__actions">
+          <li><button type="button" class="data-sources__link" id="upload-another">Upload another</button></li>
+          <li><button type="button" class="data-sources__link" id="manual-from-data">Synthesize from FTP</button></li>
+          <li><button type="button" class="data-sources__link data-sources__link--quiet" id="clear-cache">Clear cache</button></li>
+        </ul>
+      </section>
+      <section class="data-sources__col data-sources__col--strava">
+        ${currentSettings.stravaSession
+          ? `
+            <p class="data-sources__pill"><span class="data-sources__dot" aria-hidden="true"></span>Connected</p>
+            <p class="data-sources__lede">
+              athlete <em>#${currentSettings.stravaAthleteId}</em> · pull the last 180 days from Strava on demand.
+            </p>
+            <p class="data-sources__label">Strava</p>
+            <ul class="data-sources__actions">
+              <li><button type="button" class="data-sources__link" id="results-foot-sync">Sync 180 days</button></li>
+              <li><button type="button" class="data-sources__link data-sources__link--quiet" id="results-foot-disconnect">Disconnect</button></li>
+            </ul>`
+          : `
+            <p class="data-sources__pill data-sources__pill--off">Not connected</p>
+            <p class="data-sources__lede">
+              skip the archive download — sync the last 180 days straight from your Strava account.
+            </p>
+            <p class="data-sources__label">Strava</p>
+            <ul class="data-sources__actions">
+              <li><button type="button" class="data-sources__link" id="results-foot-connect">Connect</button></li>
+            </ul>`}
+      </section>
       <p class="sync-status" id="sync-status" hidden></p>
-    </div>
+    </aside>
     ${renderPredictBlock()}
   `;
   resultsEl.hidden = false;

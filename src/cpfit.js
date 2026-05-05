@@ -18,9 +18,10 @@ export const DEFAULT_FIT_RANGE = { minS: 180, maxS: 1200 };
 
 // 3-parameter (Morton) range can extend further down because the
 // pMax term tames the short-end behavior the 2-param hyperbola
-// can't represent. Lower bound 30s is a practical floor — below
-// that, neuromuscular contributions still dominate.
-export const DEFAULT_FIT_RANGE_3P = { minS: 30, maxS: 1200 };
+// can't represent. Lower bound 90s keeps the fit in W' territory:
+// below ~60s, PCr and neuromuscular contributions dominate and can
+// pull CP upward if the long-duration curve is relatively flat.
+export const DEFAULT_FIT_RANGE_3P = { minS: 90, maxS: 1200 };
 
 // Convert an MMP map ({60: 350, 300: 280, ...}) to an array of points.
 export function mmpToPoints(mmp) {
@@ -116,11 +117,18 @@ export function fitCp3(points, range = DEFAULT_FIT_RANGE_3P, opts = {}) {
   );
   if (filtered.length < 3) return null;
 
+  // CP is the power asymptote — it must be below every observed effort
+  // in the fitting range, not just within the generic [50, 600] bound.
+  // Without this, steep short-duration data can push the optimizer to a
+  // solution where CP exceeds the observed 20-min MMP (physically impossible).
+  const minPowerInRange = Math.min(...filtered.map((p) => p.powerW));
+
   let best = null;
   for (let tau = 1; tau <= 90; tau += 0.5) {
     const fit = fitLinearWithTau(filtered, tau);
     if (!fit) continue;
     if (fit.cpW < 50 || fit.cpW > 600) continue;
+    if (fit.cpW >= minPowerInRange) continue;
     if (fit.wPrimeJ < 1000 || fit.wPrimeJ > 60000) continue;
     if (fit.pMaxW < fit.cpW + 100 || fit.pMaxW > 2500) continue;
     if (!best || fit.sse < best.sse) best = { ...fit, tauS: tau };

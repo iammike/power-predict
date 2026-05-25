@@ -622,7 +622,6 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     && fallbackFit
     && fallbackFit.wPrimeJ >= currentFit.wPrimeJ * 1.3
   ) {
-    const recentWPrimeJ = currentFit.wPrimeJ;
     currentFit = {
       ...currentFit,
       wPrimeJ: fallbackFit.wPrimeJ,
@@ -631,7 +630,6 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
         ? currentFit.cpW + fallbackFit.wPrimeJ / fallbackFit.tauS
         : currentFit.pMaxW,
       wPrimeSource: 'history',
-      wPrimeRecentJ: recentWPrimeJ,
     };
   }
 
@@ -795,10 +793,9 @@ function wPrimeQuality(fit) {
 }
 function wPrimeTooltip(fit) {
   if (fit?.wPrimeSource === 'history') {
-    const recentKJ = (fit.wPrimeRecentJ / 1000).toFixed(1);
-    return 'Anaerobic work capacity above CP. The recent window lacked a hard sub-3-min effort '
-         + `(recent fit gave ${recentKJ} kJ), so W' is anchored on your longer training history `
-         + 'where the anaerobic ceiling is visible. CP still tracks recent fitness.';
+    return 'Anaerobic work capacity above CP. The recent window lacked a hard sub-3-min effort, '
+         + 'so W\' is anchored on your longer training history where the anaerobic ceiling is visible. '
+         + 'CP still tracks recent fitness.';
   }
   return 'Anaerobic work capacity above CP. Trained cyclists typically sit in the 10-25 kJ range; '
        + 'sprinters and track riders push higher. Very high values from a 2-param fit can also signal '

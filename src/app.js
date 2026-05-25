@@ -603,6 +603,38 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     ? { ...primaryFit, fallback: false }
     : (fallbackFit ? { ...fallbackFit, fallback: true } : null);
 
+  // W' is a physiologically stable anaerobic ceiling that doesn't drop
+  // the way CP does between training blocks. When the recent window
+  // lacks a hard sub-3-min effort, the regression's W' caves in even
+  // though the rider's actual capacity hasn't changed. The drift-
+  // normalized longer-history fit anchors W' to the real ceiling.
+  // Borrow it only when it's materially larger (≥ 1.3×) and the primary
+  // result wasn't a fallback or override — keeps the primary CP
+  // (recent fitness) but lifts W' (and the coupled τ / pMax shape) off
+  // a misleading recent-window floor. τ and pMax come along because
+  // they're physically tied to W' through τ = W' / (pMax − CP); using
+  // the recent τ with a lifted W' would predict unphysically high
+  // short-duration power.
+  if (
+    currentFit
+    && !currentFit.fallback
+    && !currentFit.overridden
+    && fallbackFit
+    && fallbackFit.wPrimeJ >= currentFit.wPrimeJ * 1.3
+  ) {
+    const recentWPrimeJ = currentFit.wPrimeJ;
+    currentFit = {
+      ...currentFit,
+      wPrimeJ: fallbackFit.wPrimeJ,
+      tauS: fallbackFit.tauS ?? currentFit.tauS,
+      pMaxW: Number.isFinite(fallbackFit.tauS)
+        ? currentFit.cpW + fallbackFit.wPrimeJ / fallbackFit.tauS
+        : currentFit.pMaxW,
+      wPrimeSource: 'history',
+      wPrimeRecentJ: recentWPrimeJ,
+    };
+  }
+
   // Apply CP override on top of the fit (W' stays from the underlying
   // fit so the curve shape is data-derived, not a hand-set hyperbola).
   if (currentFit && Number.isFinite(currentSettings.cpOverrideW)) {
@@ -753,14 +785,21 @@ function cpTooltip(fit) {
   }
   return 'CP came from a normal regression on the active window (last 90 days or your custom range).';
 }
-function wPrimeQuality(wPrimeJ) {
-  const kJ = wPrimeJ / 1000;
+function wPrimeQuality(fit) {
+  if (fit?.wPrimeSource === 'history') return { label: 'history', cls: 'is-mid' };
+  const kJ = (fit?.wPrimeJ ?? 0) / 1000;
   if (kJ < 8)  return { label: 'low',       cls: 'is-mid'  };
   if (kJ < 25) return { label: 'typical',   cls: 'is-good' };
   if (kJ < 40) return { label: 'high',      cls: 'is-good' };
   return            { label: 'very high', cls: 'is-mid'  };
 }
-function wPrimeTooltip(wPrimeJ) {
+function wPrimeTooltip(fit) {
+  if (fit?.wPrimeSource === 'history') {
+    const recentKJ = (fit.wPrimeRecentJ / 1000).toFixed(1);
+    return 'Anaerobic work capacity above CP. The recent window lacked a hard sub-3-min effort '
+         + `(recent fit gave ${recentKJ} kJ), so W' is anchored on your longer training history `
+         + 'where the anaerobic ceiling is visible. CP still tracks recent fitness.';
+  }
   return 'Anaerobic work capacity above CP. Trained cyclists typically sit in the 10-25 kJ range; '
        + 'sprinters and track riders push higher. Very high values from a 2-param fit can also signal '
        + 'a steep short-duration MMP relative to the threshold end — sanity-check against your sprint efforts.';
@@ -1291,9 +1330,9 @@ function renderPredictBlock() {
           <dt>CP${currentFit.overridden ? ' *' : ''}</dt>
           <dd>${formatPower(currentFit.cpW)}<span class="fit-stats__quality ${cpQuality(currentFit).cls}">${cpQuality(currentFit).label}</span></dd>
         </div>
-        <div data-tooltip="${wPrimeTooltip(currentFit.wPrimeJ)}">
+        <div data-tooltip="${wPrimeTooltip(currentFit)}">
           <dt>W'</dt>
-          <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ<span class="fit-stats__quality ${wPrimeQuality(currentFit.wPrimeJ).cls}">${wPrimeQuality(currentFit.wPrimeJ).label}</span></dd>
+          <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ<span class="fit-stats__quality ${wPrimeQuality(currentFit).cls}">${wPrimeQuality(currentFit).label}</span></dd>
         </div>
         ${currentEftpNow ? `
         <div data-tooltip="${eftpTooltip()}">

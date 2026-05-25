@@ -16,12 +16,14 @@
 
 export const DEFAULT_FIT_RANGE = { minS: 180, maxS: 1200 };
 
-// 3-parameter (Morton) range can extend further down because the
-// pMax term tames the short-end behavior the 2-param hyperbola
-// can't represent. Lower bound 90s keeps the fit in W' territory:
-// below ~60s, PCr and neuromuscular contributions dominate and can
-// pull CP upward if the long-duration curve is relatively flat.
-export const DEFAULT_FIT_RANGE_3P = { minS: 90, maxS: 1200 };
+// 3-parameter (Morton) range extends further down than the 2-param
+// model because the pMax term explicitly tames the short-end behavior
+// the 2-param hyperbola can't represent. 30s is the practical floor —
+// below that, neuromuscular contributions still dominate, and even the
+// 3-param fit can't separate them from W'. Keeping 30s in range gives
+// the optimizer enough short-end leverage to constrain W' when the
+// 5-20 min portion of the curve is unusually flat.
+export const DEFAULT_FIT_RANGE_3P = { minS: 30, maxS: 1200 };
 
 // Convert an MMP map ({60: 350, 300: 280, ...}) to an array of points.
 export function mmpToPoints(mmp) {
@@ -123,17 +125,29 @@ export function fitCp3(points, range = DEFAULT_FIT_RANGE_3P, opts = {}) {
   // solution where CP exceeds the observed 20-min MMP (physically impossible).
   const minPowerInRange = Math.min(...filtered.map((p) => p.powerW));
 
+  // τ grid bounds: τ = W'/(pMax − CP). Trained cyclists typically sit
+  // in the 10-40 s range. A solution that pins at either extreme is
+  // almost certainly the optimizer absorbing model mismatch into the
+  // pMax term rather than a real fit — reject those even if SSE is
+  // low. pMax above 2200 W on a non-track-sprinter is the same tell.
+  const TAU_MIN = 1, TAU_MAX = 90, TAU_STEP = 0.5;
+  const PMAX_MAX = 2200;
+
   let best = null;
-  for (let tau = 1; tau <= 90; tau += 0.5) {
+  for (let tau = TAU_MIN; tau <= TAU_MAX; tau += TAU_STEP) {
     const fit = fitLinearWithTau(filtered, tau);
     if (!fit) continue;
     if (fit.cpW < 50 || fit.cpW > 600) continue;
     if (fit.cpW >= minPowerInRange) continue;
     if (fit.wPrimeJ < 1000 || fit.wPrimeJ > 60000) continue;
-    if (fit.pMaxW < fit.cpW + 100 || fit.pMaxW > 2500) continue;
+    if (fit.pMaxW < fit.cpW + 100 || fit.pMaxW > PMAX_MAX) continue;
     if (!best || fit.sse < best.sse) best = { ...fit, tauS: tau };
   }
   if (!best) return null;
+  // Final degeneracy check: τ pinned at the grid edge means the
+  // optimizer wanted to keep going. The fit isn't trustworthy — let
+  // the caller fall back to the 2-param hyperbola.
+  if (best.tauS <= TAU_MIN || best.tauS >= TAU_MAX) return null;
 
   const n = filtered.length;
   const rmse = Math.sqrt(best.sse / n);

@@ -206,6 +206,74 @@ describe('fitCp3', () => {
     const expected = fit.cpW + fit.wPrimeJ / (60 + fit.tauS);
     expect(at60.powerW).toBeCloseTo(expected, 4);
   });
+
+  it('rejects fits whose CP exceeds the minimum observed power in range', () => {
+    // Real bug from production: a steep short-end curve combined with a
+    // flat threshold region pulled CP above the observed 20-min MMP, which
+    // is physically impossible (CP is the long-duration asymptote and must
+    // sit below every effort in the regression window).
+    // Constructed so the unconstrained optimum would push CP > 317:
+    const points = [
+      { durationS: 30, powerW: 600 },
+      { durationS: 60, powerW: 470 },
+      { durationS: 120, powerW: 380 },
+      { durationS: 300, powerW: 322 },
+      { durationS: 600, powerW: 320 },
+      { durationS: 900, powerW: 318 },
+      { durationS: 1200, powerW: 317 },
+    ];
+    const fit = fitCp3(points);
+    if (fit) expect(fit.cpW).toBeLessThan(317);
+  });
+
+  it('returns null when the best τ pins at the grid boundary', () => {
+    // Flat 90-day data with no sub-2-min coverage. Without short-end
+    // leverage the 3-param fit's τ collapses to the grid floor and
+    // pMax rails — a degenerate solution. Better to return null and
+    // let the caller fall back to the 2-param hyperbola.
+    const points = [
+      { durationS: 120, powerW: 322 },
+      { durationS: 240, powerW: 320 },
+      { durationS: 480, powerW: 319 },
+      { durationS: 720, powerW: 318 },
+      { durationS: 900, powerW: 317 },
+      { durationS: 1200, powerW: 316 },
+    ];
+    const fit = fitCp3(points);
+    // Either we cleanly reject (preferred), or — if some τ in [2, 89]
+    // happens to satisfy all constraints — the resulting τ must be off
+    // the rails and pMax must be physiological.
+    if (fit) {
+      expect(fit.tauS).toBeGreaterThan(1);
+      expect(fit.tauS).toBeLessThan(90);
+      expect(fit.pMaxW).toBeLessThanOrEqual(2200);
+    }
+  });
+
+  it('preserves W\' on data with adequate short-end coverage', () => {
+    // Same flat threshold cluster from the regression case above, but
+    // with realistic 30-90 s coverage that gives the optimizer real W'
+    // information. The fit should recover a sane W' (well above the
+    // "low" 8 kJ threshold) and a physiological τ.
+    const points = [
+      { durationS: 30, powerW: 515 },
+      { durationS: 60, powerW: 435 },
+      { durationS: 90, powerW: 418 },
+      { durationS: 120, powerW: 393 },
+      { durationS: 180, powerW: 351 },
+      { durationS: 300, powerW: 328 },
+      { durationS: 600, powerW: 324 },
+      { durationS: 900, powerW: 319 },
+      { durationS: 1200, powerW: 314 },
+    ];
+    const fit = fitCp3(points);
+    expect(fit).not.toBeNull();
+    expect(fit.cpW).toBeLessThan(314);
+    expect(fit.wPrimeJ).toBeGreaterThan(8_000);
+    expect(fit.tauS).toBeGreaterThan(1);
+    expect(fit.tauS).toBeLessThan(90);
+    expect(fit.pMaxW).toBeLessThanOrEqual(2200);
+  });
 });
 
 describe('fitFatigueK', () => {

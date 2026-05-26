@@ -786,6 +786,23 @@ body[data-app-state="manual"] #manual-mode {
   border-bottom-color: var(--oxblood);
 }
 
+/* "NEW" badge — flags an MMP cell whose owner ride was added in the
+   most recent Strava sync. Reuses the editorial oxblood-on-paper pill
+   style we already use for inline emphasis in status banners. */
+.mmp-cell__new {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  background: var(--oxblood);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  vertical-align: 0.1em;
+}
+
 
 .results-foot {
   display: flex;

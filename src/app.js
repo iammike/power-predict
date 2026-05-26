@@ -265,6 +265,15 @@ async function triggerStravaSync() {
       if (!(await hasActivity(a.startTime))) fresh.push(a);
     }
     if (fresh.length) await saveActivities(fresh);
+    // Record the Strava IDs introduced by this sync so the MMP table
+    // can flag cells whose owner activity is new this sync. Cleared
+    // on the next sync (even one that adds zero rides), so the badge
+    // reflects the *most recent* sync only.
+    currentSettings = {
+      ...currentSettings,
+      lastSyncNewIds: fresh.map((a) => a.stravaId).filter((id) => id != null && id !== ''),
+    };
+    await saveSettings(currentSettings);
     const all = await loadActivities();
     renderCurves(all);
     const noun = fresh.length === 1 ? 'ride' : 'rides';
@@ -654,14 +663,15 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   const ftpForLoad = currentFit?.cpW ? currentFit.cpW / 0.95 : null;
   currentLoad = computeLoadSeries(activityMmps, ftpForLoad);
 
+  const newSyncIds = new Set(currentSettings.lastSyncNewIds || []);
   const rows = DURATIONS_S
     .filter((d) => allTime[d] !== undefined)
     .map((d) => `
       <tr>
         <td>${formatDuration(d)}</td>
-        <td>${renderMmpCell(last30Owners[d])}</td>
-        <td class="featured">${renderMmpCell(last90Owners[d])}</td>
-        <td>${renderMmpCell(allTimeOwners[d])}</td>
+        <td>${renderMmpCell(last30Owners[d], newSyncIds)}</td>
+        <td class="featured">${renderMmpCell(last90Owners[d], newSyncIds)}</td>
+        <td>${renderMmpCell(allTimeOwners[d], newSyncIds)}</td>
       </tr>`)
     .join('');
 
@@ -806,17 +816,21 @@ function wPrimeTooltip(fit) {
 // filename, which is Strava's upload ID and points to a different
 // public activity. Cells without a resolved ID (legacy cache or an
 // archive without activities.csv) render as plain text.
-function renderMmpCell(owner) {
+function renderMmpCell(owner, newSyncIds) {
   if (!owner || typeof owner.value !== 'number') return '—';
   const watts = formatPower(owner.value);
   const date = Number.isFinite(owner.startTime)
     ? new Date(owner.startTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     : null;
+  const isNew = newSyncIds && owner.stravaId && newSyncIds.has(owner.stravaId);
+  const badge = isNew
+    ? ' <span class="mmp-cell__new" data-tooltip="Set by a ride added in the most recent sync">NEW</span>'
+    : '';
   if (!owner.stravaId) {
-    return date ? `<span data-tooltip="${date}">${watts}</span>` : watts;
+    return date ? `<span data-tooltip="${date}">${watts}</span>${badge}` : `${watts}${badge}`;
   }
   const tip = date ? `${date} · open on Strava` : 'Open this activity on Strava';
-  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" data-tooltip="${tip}">${watts}</a>`;
+  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" data-tooltip="${tip}">${watts}</a>${badge}`;
 }
 
 // eFTP is computed from a 90-day window ending at the most recent

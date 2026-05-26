@@ -264,17 +264,45 @@ async function triggerStravaSync() {
     for (const a of remoteActivities) {
       if (!(await hasActivity(a.startTime))) fresh.push(a);
     }
-    if (fresh.length) await saveActivities(fresh);
-    // Record the Strava IDs introduced by this sync so the MMP table
-    // can flag cells whose owner activity is new this sync. Cleared
-    // on the next sync (even one that adds zero rides), so the badge
-    // reflects the *most recent* sync only.
-    currentSettings = {
-      ...currentSettings,
-      lastSyncNewIds: fresh.map((a) => a.stravaId).filter((id) => id != null && id !== ''),
+    // Snapshot per-(duration, window) owners BEFORE saving the sync
+    // results so we can diff afterwards. The diff catches any cell
+    // whose owner activity changed — that's the right signal for
+    // "new this sync," more robust than "activity not in IDB by
+    // startTime," which misses rides that arrived via webhook between
+    // page loads or that share a startTime with an existing record.
+    const hadPriorActivities = currentActivities.length > 0;
+    const ownersBefore = {
+      allTime: rollingBestWithOwners(currentActivities),
+      last90:  rollingBestWithOwners(currentActivities, { windowDays: 90 }),
+      last30:  rollingBestWithOwners(currentActivities, { windowDays: 30 }),
     };
-    await saveSettings(currentSettings);
+    if (fresh.length) await saveActivities(fresh);
     const all = await loadActivities();
+    // Compute "new this sync" Strava IDs as the union of owners that
+    // changed in any window. Skip entirely on the very first sync
+    // (no prior activities) — every cell would be "new," which is
+    // noise, not signal.
+    const newSyncIds = [];
+    if (hadPriorActivities) {
+      const ownersAfter = {
+        allTime: rollingBestWithOwners(all),
+        last90:  rollingBestWithOwners(all, { windowDays: 90 }),
+        last30:  rollingBestWithOwners(all, { windowDays: 30 }),
+      };
+      const changed = new Set();
+      for (const w of Object.keys(ownersAfter)) {
+        for (const d of Object.keys(ownersAfter[w])) {
+          const after = ownersAfter[w][d];
+          const before = ownersBefore[w]?.[d];
+          if (after?.stravaId && after.stravaId !== before?.stravaId) {
+            changed.add(after.stravaId);
+          }
+        }
+      }
+      newSyncIds.push(...changed);
+    }
+    currentSettings = { ...currentSettings, lastSyncNewIds: newSyncIds };
+    await saveSettings(currentSettings);
     renderCurves(all);
     const noun = fresh.length === 1 ? 'ride' : 'rides';
     const completion = fresh.length === 0

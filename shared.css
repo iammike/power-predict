@@ -397,6 +397,10 @@ main {
   white-space: nowrap;
   max-width: calc(100vw - 2rem);
 }
+.status-banner.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
 @media (max-width: 480px) {
   .status-banner {
     top: 0;
@@ -412,10 +416,6 @@ main {
   .status-banner.is-visible {
     transform: translate(0, 0);
   }
-}
-.status-banner.is-visible {
-  opacity: 1;
-  transform: translate(-50%, 0);
 }
 .status-banner em {
   font-style: normal;

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'worker.js'
+      - 'worker/**'
       - 'wrangler.toml'
       - 'migrations/**'
   workflow_dispatch:

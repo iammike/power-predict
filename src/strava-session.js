@@ -26,6 +26,18 @@ export class UnauthenticatedError extends Error {
   }
 }
 
+// Thrown when the worker returns a 5xx — almost always because Strava
+// itself returned a transient server error ({"message":"error"}) that
+// outlasted the worker's retries. The caller surfaces a calm "try
+// again in a few minutes" rather than dumping the nested error body.
+export class StravaUnavailableError extends Error {
+  constructor(message = 'strava temporarily unavailable') {
+    super(message);
+    this.name = 'StravaUnavailableError';
+    this.stravaUnavailable = true;
+  }
+}
+
 // Read window.location.hash, return { session, athleteId, error }
 // when any auth params are present. Caller decides what to do —
 // success path stores them; error path surfaces to the user.
@@ -103,6 +115,7 @@ export async function syncRecent({ session, days = 180, knownIds = [], onProgres
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       if (res.status === 401) throw new UnauthenticatedError(`sync failed: 401 ${text}`);
+      if (res.status >= 500) throw new StravaUnavailableError(`sync failed: ${res.status} ${text}`);
       throw new Error(`sync failed: ${res.status} ${text}`);
     }
     const slice = await res.json();
@@ -132,6 +145,7 @@ export async function fetchSyncedActivities(session) {
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     if (res.status === 401) throw new UnauthenticatedError(`activities load failed: 401 ${text}`);
+    if (res.status >= 500) throw new StravaUnavailableError(`activities load failed: ${res.status} ${text}`);
     throw new Error(`activities load failed: ${res.status} ${text}`);
   }
   const body = await res.json();

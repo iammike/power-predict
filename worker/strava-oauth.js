@@ -8,12 +8,19 @@ const STRAVA_TOKEN = 'https://www.strava.com/oauth/token';
 // Build the redirect URL we send the user to when they click
 // "Connect Strava." Strava round-trips state back to our callback
 // so we can defeat CSRF and resume a frontend return path.
-export function buildAuthorizeUrl({ clientId, redirectUri, state, scope }) {
+//
+// approvalPrompt defaults to 'force' so the consent screen is shown
+// every time. With 'auto', Strava silently re-approves an already-
+// authorized app with whatever scopes it was last granted — so a user
+// who accidentally unchecked the activity permission can never re-grant
+// it by reconnecting; they'd be stuck with a read-only token that 500s
+// on every activity list. Forcing the prompt lets them fix it.
+export function buildAuthorizeUrl({ clientId, redirectUri, state, scope, approvalPrompt = 'force' }) {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    approval_prompt: 'auto',
+    approval_prompt: approvalPrompt,
     scope,
     state,
   });

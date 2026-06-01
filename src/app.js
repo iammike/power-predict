@@ -18,7 +18,7 @@ import { synthesizeFit } from './manual.js';
 import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
 import {
   parseAuthHash, clearAuthHash, loadSession, saveSession, clearSession, authorizeUrl,
-  syncRecent, fetchSyncedActivities, UnauthenticatedError,
+  syncRecent, fetchSyncedActivities, UnauthenticatedError, StravaUnavailableError,
 } from './strava-session.js';
 
 const dropZone = document.getElementById('archive-drop');
@@ -318,6 +318,14 @@ async function triggerStravaSync() {
     // generic error over a session that will keep failing.
     if (err instanceof UnauthenticatedError || err?.unauthenticated) {
       await handleExpiredSession();
+      return;
+    }
+    // A 5xx is almost always Strava erroring server-side (a generic
+    // {"message":"error"}) that outlasted the worker's retries — not
+    // something the user can act on beyond waiting. Show a calm,
+    // actionable line instead of the raw nested error body.
+    if (err instanceof StravaUnavailableError || err?.stravaUnavailable) {
+      showStatus('Strava is temporarily unavailable — try again in a few minutes.', { kind: 'error', dwellMs: 6000 });
       return;
     }
     showStatus(`Strava sync failed: ${err.message || err}`, { kind: 'error', dwellMs: 5000 });

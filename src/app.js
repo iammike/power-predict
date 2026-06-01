@@ -18,7 +18,7 @@ import { synthesizeFit } from './manual.js';
 import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
 import {
   parseAuthHash, clearAuthHash, loadSession, saveSession, clearSession, authorizeUrl,
-  syncRecent, fetchSyncedActivities,
+  syncRecent, fetchSyncedActivities, UnauthenticatedError,
 } from './strava-session.js';
 
 const dropZone = document.getElementById('archive-drop');
@@ -311,8 +311,39 @@ async function triggerStravaSync() {
     showStatus(completion, { kind: 'success', dwellMs: 3500 });
   } catch (err) {
     console.error('strava sync failed', err);
+    // A 401 means our browser session token is gone server-side (KV
+    // TTL lapsed or evicted) — there's nothing to refresh, the user
+    // has to re-OAuth. Drop the dead session so the UI flips back to
+    // the Connect state, then prompt a reconnect instead of leaving a
+    // generic error over a session that will keep failing.
+    if (err instanceof UnauthenticatedError || err?.unauthenticated) {
+      await handleExpiredSession();
+      return;
+    }
     showStatus(`Strava sync failed: ${err.message || err}`, { kind: 'error', dwellMs: 5000 });
   }
+}
+
+// Tear down a session the worker no longer recognizes and nudge the
+// user back through the connect flow. Clears the stale token, refreshes
+// every Strava UI surface to its disconnected state, and surfaces a
+// persistent reconnect prompt whose button reuses beginStravaConnect.
+async function handleExpiredSession() {
+  await clearSession();
+  currentSettings = (await loadSettings()) || {};
+  // refreshStravaUi handles the landing-page data-source surface;
+  // renderCurves re-renders the results footer. Both gate the
+  // Connected/Connect toggle on the now-cleared session, same as the
+  // Disconnect handler does.
+  await refreshStravaUi();
+  renderCurves(currentActivities, { fromCache: true });
+  showStatus(
+    `Strava session expired — <button type="button" class="link-button" id="reconnect-strava-btn">reconnect</button> to sync.`,
+    { kind: 'error', persistent: true },
+  );
+  document.getElementById('reconnect-strava-btn')?.addEventListener('click', (e) => {
+    beginStravaConnect(e.currentTarget);
+  });
 }
 
 async function handleArchive(file) {

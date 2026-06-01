@@ -11,6 +11,21 @@ import { loadSettings, saveSettings } from './storage.js';
 
 export const API_BASE = 'https://power-predict-api.iammikec.workers.dev';
 
+// Thrown when the worker rejects our browser session token (HTTP 401,
+// `{ error: 'unauthenticated' }`). The opaque session lives in KV with
+// a 30-day TTL and can be evicted earlier, so a 401 here means the
+// session is genuinely gone server-side — there's nothing to refresh,
+// the user has to re-OAuth. Callers catch this specifically to clear
+// the stale local session and prompt a reconnect, rather than showing
+// it as a generic transport failure.
+export class UnauthenticatedError extends Error {
+  constructor(message = 'session expired') {
+    super(message);
+    this.name = 'UnauthenticatedError';
+    this.unauthenticated = true;
+  }
+}
+
 // Read window.location.hash, return { session, athleteId, error }
 // when any auth params are present. Caller decides what to do —
 // success path stores them; error path surfaces to the user.
@@ -87,6 +102,7 @@ export async function syncRecent({ session, days = 180, knownIds = [], onProgres
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
+      if (res.status === 401) throw new UnauthenticatedError(`sync failed: 401 ${text}`);
       throw new Error(`sync failed: ${res.status} ${text}`);
     }
     const slice = await res.json();
@@ -115,6 +131,7 @@ export async function fetchSyncedActivities(session) {
   const res = await fetch(`${API_BASE}/activities/recent?session=${encodeURIComponent(session)}`);
   if (!res.ok) {
     const text = await res.text().catch(() => '');
+    if (res.status === 401) throw new UnauthenticatedError(`activities load failed: 401 ${text}`);
     throw new Error(`activities load failed: ${res.status} ${text}`);
   }
   const body = await res.json();

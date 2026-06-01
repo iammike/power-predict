@@ -1,10 +1,20 @@
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   parseAuthHash, authorizeUrl, API_BASE,
   loadSession, saveSession, clearSession,
+  syncRecent, fetchSyncedActivities, UnauthenticatedError,
 } from '../src/strava-session.js';
 import { saveSettings } from '../src/storage.js';
+
+function jsonResponse(status, body) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  };
+}
 
 describe('parseAuthHash', () => {
   it('returns null for empty / missing hash', () => {
@@ -68,5 +78,32 @@ describe('session persistence', () => {
     const { loadSettings: load } = await import('../src/storage.js');
     const s = await load();
     expect(s.cpOverrideW).toBe(280);
+  });
+});
+
+describe('401 handling', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('syncRecent throws UnauthenticatedError on a 401', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(401, { error: 'unauthenticated' })));
+    await expect(syncRecent({ session: 'dead' })).rejects.toBeInstanceOf(UnauthenticatedError);
+  });
+
+  it('syncRecent throws a plain Error on other failures', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(500, { error: 'boom' })));
+    const err = await syncRecent({ session: 'tok' }).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.unauthenticated).toBeUndefined();
+  });
+
+  it('fetchSyncedActivities throws UnauthenticatedError on a 401', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(401, { error: 'unauthenticated' })));
+    await expect(fetchSyncedActivities('dead')).rejects.toBeInstanceOf(UnauthenticatedError);
+  });
+
+  it('a thrown UnauthenticatedError carries the unauthenticated flag', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(401, { error: 'unauthenticated' })));
+    const err = await fetchSyncedActivities('dead').catch((e) => e);
+    expect(err.unauthenticated).toBe(true);
   });
 });

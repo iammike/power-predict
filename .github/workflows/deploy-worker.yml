@@ -21,7 +21,7 @@ jobs:
           cache: npm
       # Install so wrangler-action picks up the repo-pinned wrangler
       # (devDependencies) instead of falling back to its own bundled
-      # version — keeps CI deploys on the same wrangler we run locally.
+      # version. Keeps CI deploys on the same wrangler we run locally.
       - run: npm ci
       - uses: cloudflare/wrangler-action@v4
         with:

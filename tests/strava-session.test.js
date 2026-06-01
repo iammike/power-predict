@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   parseAuthHash, authorizeUrl, API_BASE,
   loadSession, saveSession, clearSession,
-  syncRecent, fetchSyncedActivities, UnauthenticatedError,
+  syncRecent, fetchSyncedActivities, UnauthenticatedError, StravaUnavailableError,
 } from '../src/strava-session.js';
 import { saveSettings } from '../src/storage.js';
 
@@ -89,11 +89,25 @@ describe('401 handling', () => {
     await expect(syncRecent({ session: 'dead' })).rejects.toBeInstanceOf(UnauthenticatedError);
   });
 
-  it('syncRecent throws a plain Error on other failures', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(500, { error: 'boom' })));
+  it('syncRecent throws StravaUnavailableError on a 5xx', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(500, { error: 'strava list activities 500' })));
+    const err = await syncRecent({ session: 'tok' }).catch((e) => e);
+    expect(err).toBeInstanceOf(StravaUnavailableError);
+    expect(err.stravaUnavailable).toBe(true);
+    expect(err.unauthenticated).toBeUndefined();
+  });
+
+  it('fetchSyncedActivities throws StravaUnavailableError on a 503', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(503, { error: 'unavailable' })));
+    await expect(fetchSyncedActivities('tok')).rejects.toBeInstanceOf(StravaUnavailableError);
+  });
+
+  it('syncRecent throws a plain Error on a 4xx that is not 401', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(400, { error: 'bad json' })));
     const err = await syncRecent({ session: 'tok' }).catch((e) => e);
     expect(err).toBeInstanceOf(Error);
     expect(err.unauthenticated).toBeUndefined();
+    expect(err.stravaUnavailable).toBeUndefined();
   });
 
   it('fetchSyncedActivities throws UnauthenticatedError on a 401', async () => {

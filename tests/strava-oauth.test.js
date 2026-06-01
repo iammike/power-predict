@@ -21,6 +21,20 @@ describe('buildAuthorizeUrl', () => {
     expect(url.searchParams.get('scope')).toBe('read,activity:read_all');
     expect(url.searchParams.get('response_type')).toBe('code');
   });
+
+  it("forces the consent screen by default so users can re-grant scope", () => {
+    const url = new URL(buildAuthorizeUrl({
+      clientId: '1', redirectUri: 'https://x/cb', state: 's', scope: 'read',
+    }));
+    expect(url.searchParams.get('approval_prompt')).toBe('force');
+  });
+
+  it('honors an explicit approvalPrompt override', () => {
+    const url = new URL(buildAuthorizeUrl({
+      clientId: '1', redirectUri: 'https://x/cb', state: 's', scope: 'read', approvalPrompt: 'auto',
+    }));
+    expect(url.searchParams.get('approval_prompt')).toBe('auto');
+  });
 });
 
 describe('exchangeCodeForTokens', () => {

@@ -427,6 +427,20 @@ main {
 .status-banner--success  { background: var(--ink); }
 .status-banner--error    { background: var(--oxblood); }
 .status-banner--progress { background: var(--ink); }
+/* The banner itself ignores pointer events so transient toasts don't
+   trap clicks on the page behind them, but an embedded action (e.g.
+   the reconnect link on an expired-session error) has to be clickable
+   and legible against the dark banner — the default oxblood link color
+   would vanish into the oxblood error background. */
+.status-banner .link-button {
+  pointer-events: auto;
+  color: var(--paper);
+  border-bottom-color: var(--paper);
+}
+.status-banner .link-button:hover {
+  color: var(--paper);
+  border-bottom-color: transparent;
+}
 /* Animated trailing ellipsis on progress toasts — reads as 'still
    working' on its own, so we don't also need the leading pulse dot. */
 .status-banner--progress::after {

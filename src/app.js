@@ -718,8 +718,17 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // Personal fatigue exponent fitted from long-duration MMP. Replaces
   // the default Riegel k = 0.10 at predict time when enough 20-min-to-
   // 4-hr points exist. Falls back to the default otherwise.
+  //
+  // Use the same effort-quality-filtered set the CP regression uses,
+  // NOT the raw rolling-best. Long-duration "bests" are usually sub-
+  // maximal — endurance rides ridden at endurance pace, not all-out
+  // 3-4h tests. Feeding those raw points to the slope fit reports a
+  // catastrophic decay (k pinned at the 0.20 rail) that reflects ride
+  // selection, not physiology. Filtering by IF drops the easy long
+  // rides; if too few hard long efforts remain, fitFatigueK returns
+  // null and we fall back to the gentler default 0.10.
   if (currentFit) {
-    const fatigueSource = currentFit.fallback ? fallbackObserved : primaryObserved;
+    const fatigueSource = currentFit.fallback ? fallbackPoints : primaryPoints;
     currentFit = { ...currentFit, fatigue: fitFatigueK(fatigueSource) };
   }
 

@@ -327,24 +327,17 @@ main {
   letter-spacing: 0.06em;
 }
 
-/* Strava connect / connected blocks. Sit between the drop zone and
-   the manual-mode disclosure on the onboarding screen. Quiet styling
-   — the affordance is the button label, not a colored bar. */
-/* Inline data-sources block (top-of-page strava entry on the
-   onboarding/manual screens). Same row layout as the data-screen
-   colophon, but no top border / extra margin since it sits inline
-   between the drop zone and the manual disclosure rather than at
-   the foot of a results section. */
-/* On the onboarding screen this is the PRIMARY call to action, so it
+/* Inline data-sources block: the top-of-page Strava entry on the
+   onboarding/manual screens. This is the PRIMARY call to action, so it
    takes the prominent bracketed-card treatment the drop zone used to
-   own. The internal row layout (label · status · actions) is unchanged. */
+   own, sitting above the drop zone and the manual disclosure. The
+   internal row layout (label · status · actions) is unchanged. */
 .data-sources--inline {
   position: relative;
   margin: 1.5rem 0 0;
   padding: clamp(1.75rem, 4vw, 2.5rem) 2rem;
   background: var(--paper-soft);
   border: 1px solid var(--hair-strong);
-  border-top: 1px solid var(--hair-strong);
 }
 .data-sources--inline::before, .data-sources--inline::after {
   content: "";

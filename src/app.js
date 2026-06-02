@@ -192,7 +192,7 @@ async function refreshStravaUi() {
     document.getElementById('strava-sync-btn').addEventListener('click', triggerStravaSync);
     document.getElementById('strava-disconnect').addEventListener('click', handleDisconnect);
   } else {
-    statusEl.textContent = 'Sync the last 180 days from your Strava account — no archive download required.';
+    statusEl.textContent = '';
     actionsEl.innerHTML = `<button type="button" class="link-button" id="strava-connect-btn">Connect</button>`;
     document.getElementById('strava-connect-btn').addEventListener('click', (e) => {
       beginStravaConnect(e.currentTarget);

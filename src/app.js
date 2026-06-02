@@ -12,7 +12,7 @@ import {
   loadSettings,
   saveSettings,
 } from './storage.js';
-import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints } from './cpfit.js';
+import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints, DEFAULT_DECAY } from './cpfit.js';
 import { parseDuration } from './duration.js';
 import { synthesizeFit } from './manual.js';
 import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
@@ -1015,26 +1015,34 @@ function formTooltip() {
 // Fatigue k: personal Riegel exponent fitted from 20-min-to-4-hr MMP.
 // When data is too sparse to fit, predictions fall back to k = 0.10 —
 // we show that here too so the cell isn't ever blank.
+// A clamped fit is discarded for prediction (see wirePredictForm /
+// renderCurveChart), so the readout reports the default k that's
+// actually in use — never the implausible rail value.
+function usesDefaultK(fit) {
+  return !fit.fatigue || fit.fatigue.clamped;
+}
 function fatigueValue(fit) {
-  const k = fit.fatigue?.k ?? 0.10;
+  const k = usesDefaultK(fit) ? DEFAULT_DECAY.k : fit.fatigue.k;
   return k.toFixed(2);
 }
 function fatigueQuality(fit) {
-  if (!fit.fatigue) return { label: 'default', cls: 'is-mid' };
-  if (fit.fatigue.clamped) return { label: 'clamped', cls: 'is-mid' };
+  if (usesDefaultK(fit)) return { label: 'default', cls: 'is-mid' };
   return { label: `${fit.fatigue.nPoints} pts`, cls: 'is-good' };
 }
 function fatigueTooltip(fit) {
-  if (!fit.fatigue) {
+  const def = DEFAULT_DECAY.k.toFixed(2);
+  if (usesDefaultK(fit)) {
+    const why = fit.fatigue
+      ? `Your long-duration data implied k = ${fit.fatigue.kRaw.toFixed(2)}, outside the `
+        + '0.04–0.20 plausible range — almost always sub-maximal long efforts rather than '
+        + 'real fatigue resistance, so it’s discarded. '
+      : 'Need 3+ MMP points between 20 min and 4 h to fit a personal value. ';
     return 'Riegel fatigue exponent k governs how predicted power decays past 20 min: '
-         + 'P(t) = P_anchor × (t_anchor / t)^k. Need 3+ MMP points between 20 min and 4 h '
-         + 'to fit a personal value; falling back to the cycling default 0.10.';
+         + `P(t) = P_anchor × (t_anchor / t)^k. ${why}`
+         + `Using the cycling default ${def}.`;
   }
-  const note = fit.fatigue.clamped
-    ? ` Raw fit was ${fit.fatigue.kRaw.toFixed(2)}, clamped into the 0.04–0.20 plausible range.`
-    : '';
   return `Personal Riegel fatigue exponent fitted from ${fit.fatigue.nPoints} long-duration MMP points `
-       + `(20 min – 4 h). Lower k = better endurance fall-off. Cycling default is 0.10.${note}`;
+       + `(20 min – 4 h). Lower k = better endurance fall-off. Cycling default is ${def}.`;
 }
 
 // Combined fit-quality summary: pick whichever of RMSE / points is
@@ -1483,7 +1491,12 @@ function wirePredictForm() {
       out.innerHTML = `<p class="predict-output__error">Couldn't parse that. Try "45m", "1h30m", or "90s".</p>`;
       return;
     }
-    const decayOpt = currentFit.fatigue ? { decay: { k: currentFit.fatigue.k } } : {};
+    // A clamped fatigue fit is physically implausible — almost always
+    // sub-maximal long efforts, not real fatigue resistance — so we
+    // discard it and let predictPower fall back to its default k.
+    const decayOpt = (currentFit.fatigue && !currentFit.fatigue.clamped)
+      ? { decay: { k: currentFit.fatigue.k } }
+      : {};
     const raw = predictPower(currentFit, seconds, decayOpt);
     if (!raw) {
       out.hidden = false;

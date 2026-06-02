@@ -146,7 +146,7 @@ export function renderCurveChart(container, { mmp, fit, fitWindowLabel = 'last 9
         value: (_u, v) => (v == null ? '—' : `${Math.round(v)} W`),
       },
       {
-        label: `CP fit · ${fitWindowLabel}`,
+        label: `CP model · fit to ${fitWindowLabel}`,
         stroke: ink,
         width: 1.5,
         points: { show: false },

@@ -716,7 +716,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   }
 
   // Personal fatigue exponent fitted from long-duration MMP. Replaces
-  // the default Riegel k = 0.10 at predict time when enough 20-min-to-
+  // the default Riegel k = 0.15 at predict time when enough 20-min-to-
   // 4-hr points exist. Falls back to the default otherwise.
   //
   // Use the same effort-quality-filtered set the CP regression uses,
@@ -726,7 +726,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // catastrophic decay (k pinned at the 0.20 rail) that reflects ride
   // selection, not physiology. Filtering by IF drops the easy long
   // rides; if too few hard long efforts remain, fitFatigueK returns
-  // null and we fall back to the gentler default 0.10.
+  // null and we fall back to the default 0.15.
   if (currentFit) {
     const fatigueSource = currentFit.fallback ? fallbackPoints : primaryPoints;
     currentFit = { ...currentFit, fatigue: fitFatigueK(fatigueSource) };
@@ -1013,7 +1013,7 @@ function formTooltip() {
 }
 
 // Fatigue k: personal Riegel exponent fitted from 20-min-to-4-hr MMP.
-// When data is too sparse to fit, predictions fall back to k = 0.10 —
+// When data is too sparse to fit, predictions fall back to k = 0.15 —
 // we show that here too so the cell isn't ever blank.
 // A clamped fit is discarded for prediction (see wirePredictForm /
 // renderCurveChart), so the readout reports the default k that's

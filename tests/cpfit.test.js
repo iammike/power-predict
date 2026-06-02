@@ -58,10 +58,10 @@ describe('predictPower', () => {
     const out = predictPower(fit, 3600); // 60 min
     // anchor at 20 min (no longer-duration data on this fit):
     //   anchor power = 280 + 22000/1200 = 298.33
-    //   decay factor = (1200/3600)^0.10 ≈ 0.8959
-    //   expected = 298.33 × 0.8959 ≈ 267.3
+    //   decay factor = (1200/3600)^0.15 ≈ 0.8480
+    //   expected = 298.33 × 0.8480 ≈ 253.0
     expect(out.decayed).toBe(true);
-    expect(out.powerW).toBeCloseTo(298.333 * (1200 / 3600) ** 0.10, 2);
+    expect(out.powerW).toBeCloseTo(298.333 * (1200 / 3600) ** 0.15, 2);
     expect(out.powerW).toBeLessThan(fit.cpW);
   });
 
@@ -72,7 +72,7 @@ describe('predictPower', () => {
       { durationS: 3600, powerW: 200 }, // low-effort 1h base ride
     ]);
     const lowOut = predictPower(fitLowLong, 7200);
-    const expectedThresholdAnchored = (280 + 22000 / 1200) * (1200 / 7200) ** 0.10;
+    const expectedThresholdAnchored = (280 + 22000 / 1200) * (1200 / 7200) ** 0.15;
     expect(lowOut.powerW).toBeCloseTo(expectedThresholdAnchored, 2);
 
     // Case B: long observed MMP EXCEEDS model — anchor on it.
@@ -81,7 +81,7 @@ describe('predictPower', () => {
       { durationS: 3600, powerW: 290 }, // genuinely strong 1h
     ]);
     const highOut = predictPower(fitHighLong, 7200);
-    expect(highOut.powerW).toBeCloseTo(290 * (3600 / 7200) ** 0.10, 2);
+    expect(highOut.powerW).toBeCloseTo(290 * (3600 / 7200) ** 0.15, 2);
   });
 
   it('never predicts below a real observation at the same duration', () => {
@@ -107,11 +107,11 @@ describe('predictPower', () => {
     ]);
     const out = predictPower(lowFit, 3600);
     // Should anchor at (2700, 242) and decay to 3600.
-    expect(out.powerW).toBeCloseTo(242 * (2700 / 3600) ** 0.10, 1);
+    expect(out.powerW).toBeCloseTo(242 * (2700 / 3600) ** 0.15, 1);
   });
 
   it('respects an explicit decay override', () => {
-    const aggressive = predictPower(fit, 7200, { decay: { fromS: 600, k: 0.15 } });
+    const aggressive = predictPower(fit, 7200, { decay: { fromS: 600, k: 0.20 } });
     const standard = predictPower(fit, 7200);
     expect(aggressive.powerW).toBeLessThan(standard.powerW);
   });

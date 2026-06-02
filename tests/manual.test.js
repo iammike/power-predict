@@ -29,13 +29,13 @@ describe('synthesizeFit', () => {
 
   it('decays past 60 min, anchored at FTP', () => {
     const fit = synthesizeFit({ ftpW: 280 });
-    // 2 h: 280 × (3600/7200)^0.10 ≈ 280 × 0.9330 ≈ 261.2
+    // 2 h: 280 × (3600/7200)^0.15 ≈ 280 × 0.9012 ≈ 252.3
     const at2h = predictPower(fit, 7200);
-    expect(at2h.powerW).toBeCloseTo(280 * (3600 / 7200) ** 0.10, 2);
+    expect(at2h.powerW).toBeCloseTo(280 * (3600 / 7200) ** 0.15, 2);
     // 4 h: deeper decay, well below FTP.
     const at4h = predictPower(fit, 14400);
     expect(at4h.powerW).toBeLessThan(280);
-    expect(at4h.powerW).toBeCloseTo(280 * (3600 / 14400) ** 0.10, 2);
+    expect(at4h.powerW).toBeCloseTo(280 * (3600 / 14400) ** 0.15, 2);
   });
 
   it('derives W\' from a 1-min sprint via the 2-param hyperbola seed', () => {

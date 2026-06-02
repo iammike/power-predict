@@ -205,8 +205,10 @@ function fitLinearWithTau(points, tau) {
 // Empirically, single-k Riegel underpredicts decay for ultra-endurance
 // durations. Skiba publishes k = 0.07 for cycling, which matches Coggan
 // well in the 1-4h range; beyond that, observed pro/amateur profiles
-// fall off faster, more like k ≈ 0.10. Default is 0.10 here so 12h+
-// predictions land in the 65-75% CP range observed in practice.
+// fall off faster. A gentle default (≈0.10) leaves long-duration
+// predictions too optimistic, so the default is k = 0.15 — a firmer
+// falloff partway to the 0.20 fatigue clamp — which better tracks
+// sustained 6-12h+ power in practice.
 //
 // When a longer-duration MMP point exists in the user's data than the
 // fitting window's ceiling, predictPower anchors the decay at *that
@@ -220,7 +222,7 @@ function fitLinearWithTau(points, tau) {
 //   - Pinot & Grappe, "The Record Power Profile" (2011)
 export const DEFAULT_DECAY = {
   fromS: 1200,  // top of standard CP fitting window (20 min)
-  k: 0.10,
+  k: 0.15,
 };
 
 // Fit a personal Riegel exponent from MMP points in the long-duration
@@ -288,7 +290,7 @@ export function predictPower(fit, durationS, opts = {}) {
   // default 20 min — otherwise decay starting at 20 min drags the
   // 60-min prediction below the user's stated FTP. Inside 60 min
   // the calibrated hyperbola handles things on its own.
-  const manualDecayDefault = { fromS: 3600, k: 0.10 };
+  const manualDecayDefault = { fromS: 3600, k: 0.15 };
   let decay;
   if (opts.decay === false) {
     decay = null;

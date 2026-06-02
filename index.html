@@ -33,37 +33,37 @@
 
     <ol class="steps" aria-label="How it works">
       <li>
-        <span class="step-num">01 / Request</span>
-        <h2>Ask Strava for your archive</h2>
-        <p>They prepare it offline and email a link within hours. <a href="docs/strava-archive-guide.html">Step-by-step</a></p>
+        <span class="step-num">01 / Connect</span>
+        <h2>Connect your Strava</h2>
+        <p>Authorize once and we sync your last 180 days. No download, no waiting.</p>
       </li>
       <li>
-        <span class="step-num">02 / Drop</span>
-        <h2>Drag the zip onto the page</h2>
-        <p>Parsed in your browser. Raw streams never leave your machine.</p>
-      </li>
-      <li>
-        <span class="step-num">03 / Read</span>
+        <span class="step-num">02 / Read</span>
         <h2>See your power-duration curve</h2>
-        <p>Connect Strava later so new rides flow in automatically.</p>
+        <p>Recent rides weighted heaviest, so it reflects current fitness.</p>
+      </li>
+      <li>
+        <span class="step-num">03 / Extend</span>
+        <h2>Want your full history?</h2>
+        <p>Download your Strava archive and drop the zip in. Parsed in your browser; raw streams never leave your machine. <a href="docs/strava-archive-guide.html">Step-by-step</a></p>
       </li>
     </ol>
+
+    <aside id="strava-data-source" class="data-sources data-sources--inline" aria-label="Strava data source">
+      <section class="data-sources__row">
+        <span class="data-sources__label">Strava</span>
+        <p class="data-sources__line">
+          <span class="data-sources__status" id="strava-status-text">Sync the last 180 days from your Strava account — no archive download required.</span>
+          <span class="data-sources__actions" id="strava-status-actions"><button type="button" class="link-button" id="strava-connect-btn">Connect</button></span>
+        </p>
+      </section>
+    </aside>
 
     <div id="archive-drop" class="drop" tabindex="0" role="button" aria-label="Drop your archive">
       <input type="file" id="archive-input" accept=".zip" hidden>
       <span class="drop__label">Drop your archive</span>
       <span class="drop__hint">strava_export_*.zip · or click to browse</span>
     </div>
-
-    <aside id="strava-data-source" class="data-sources data-sources--inline" aria-label="Strava data source" hidden>
-      <section class="data-sources__row">
-        <span class="data-sources__label">Strava</span>
-        <p class="data-sources__line">
-          <span class="data-sources__status" id="strava-status-text">Sync the last 180 days from your Strava account — no archive download required.</span>
-          <span class="data-sources__actions" id="strava-status-actions"></span>
-        </p>
-      </section>
-    </aside>
 
     <details id="manual-mode" class="manual-mode">
       <summary id="manual-mode-summary">Predict from FTP or CP</summary>

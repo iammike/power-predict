@@ -298,39 +298,18 @@ main {
 
 .drop {
   position: relative;
-  margin: 1.5rem 0 0;
-  padding: clamp(2.5rem, 6vw, 4rem) 2rem;
+  margin: 0.75rem 0 0;
+  padding: 1.25rem 2rem;
   background: var(--paper-soft);
-  border: 1px solid var(--hair-strong);
+  border: 1px dashed var(--hair-strong);
   text-align: center;
   cursor: pointer;
   transition: background 200ms ease, border-color 200ms ease;
-}
-.drop::before, .drop::after {
-  content: "";
-  position: absolute;
-  width: 14px; height: 14px;
-  border: 1px solid var(--ink);
-  transition: border-color 200ms ease, width 200ms ease, height 200ms ease;
-}
-.drop::before {
-  top: -1px; left: -1px;
-  border-right: none; border-bottom: none;
-}
-.drop::after {
-  bottom: -1px; right: -1px;
-  border-left: none; border-top: none;
 }
 .drop:hover, .drop.is-active, .drop:focus-visible {
   background: var(--paper);
   border-color: var(--oxblood);
   outline: none;
-}
-.drop:hover::before, .drop:hover::after,
-.drop.is-active::before, .drop.is-active::after,
-.drop:focus-visible::before, .drop:focus-visible::after {
-  border-color: var(--oxblood);
-  width: 22px; height: 22px;
 }
 .drop__label {
   font-family: var(--serif);
@@ -348,18 +327,31 @@ main {
   letter-spacing: 0.06em;
 }
 
-/* Strava connect / connected blocks. Sit between the drop zone and
-   the manual-mode disclosure on the onboarding screen. Quiet styling
-   — the affordance is the button label, not a colored bar. */
-/* Inline data-sources block (top-of-page strava entry on the
-   onboarding/manual screens). Same row layout as the data-screen
-   colophon, but no top border / extra margin since it sits inline
-   between the drop zone and the manual disclosure rather than at
-   the foot of a results section. */
+/* Inline data-sources block: the top-of-page Strava entry on the
+   onboarding/manual screens. This is the PRIMARY call to action, so it
+   takes the prominent bracketed-card treatment the drop zone used to
+   own, sitting above the drop zone and the manual disclosure. The
+   internal row layout (label · status · actions) is unchanged. */
 .data-sources--inline {
-  margin: 1rem 0 0;
-  padding: 0.6rem 0;
-  border-top: 0;
+  position: relative;
+  margin: 1.5rem 0 0;
+  padding: clamp(1.75rem, 4vw, 2.5rem) 2rem;
+  background: var(--paper-soft);
+  border: 1px solid var(--hair-strong);
+}
+.data-sources--inline::before, .data-sources--inline::after {
+  content: "";
+  position: absolute;
+  width: 14px; height: 14px;
+  border: 1px solid var(--ink);
+}
+.data-sources--inline::before {
+  top: -1px; left: -1px;
+  border-right: none; border-bottom: none;
+}
+.data-sources--inline::after {
+  bottom: -1px; right: -1px;
+  border-left: none; border-top: none;
 }
 /* Loading state on link buttons: the floating status banner
    carries the message + pulsing marker, so the button just dims
@@ -1734,8 +1726,8 @@ body[data-app-state="manual"] #manual-mode {
 .steps > li:nth-child(1) { animation-delay: 540ms; }
 .steps > li:nth-child(2) { animation-delay: 640ms; }
 .steps > li:nth-child(3) { animation-delay: 740ms; }
-.drop              { animation-delay: 880ms; }
-#strava-data-source { animation-delay: 940ms; }
+#strava-data-source { animation-delay: 880ms; }
+.drop              { animation-delay: 940ms; }
 .manual-mode       { animation-delay: 1000ms; }
 
 #results[data-revealed] {

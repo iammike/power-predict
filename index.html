@@ -36,6 +36,10 @@
         <span class="step-num">01 / Connect</span>
         <h2>Connect your Strava</h2>
         <p>Authorize once and we sync your last 180 days. No download, no waiting.</p>
+        <div id="strava-data-source" class="step-action" aria-label="Strava data source">
+          <span id="strava-status-text"></span>
+          <span id="strava-status-actions"><button type="button" class="link-button" id="strava-connect-btn">Connect</button></span>
+        </div>
       </li>
       <li>
         <span class="step-num">02 / Read</span>
@@ -45,26 +49,13 @@
       <li>
         <span class="step-num">03 / Extend</span>
         <h2>Want your full history?</h2>
-        <p>Download your Strava archive and drop the zip in. Parsed in your browser; raw streams never leave your machine. <a href="docs/strava-archive-guide.html">Step-by-step</a></p>
+        <p><a href="docs/strava-archive-guide.html">Download your Strava archive and drop the zip in.</a> Parsed in your browser; raw streams never leave your machine.</p>
+        <div id="archive-drop" class="step-action" role="button" tabindex="0" aria-label="Upload your Strava archive zip, or drop it here">
+          <input type="file" id="archive-input" accept=".zip" hidden>
+          <span class="link-button">Upload .zip</span>
+        </div>
       </li>
     </ol>
-
-    <aside id="strava-data-source" class="data-sources data-sources--inline" aria-label="Strava data source">
-      <section class="data-sources__row">
-        <span class="data-sources__label">Strava</span>
-        <p class="data-sources__line">
-          <span class="data-sources__status" id="strava-status-text">Sync the last 180 days from your Strava account — no archive download required.</span>
-          <span class="data-sources__actions" id="strava-status-actions"><button type="button" class="link-button" id="strava-connect-btn">Connect</button></span>
-        </p>
-      </section>
-    </aside>
-
-    <div id="archive-drop" class="drop" tabindex="0" role="button" aria-label="Drop your Strava archive zip, or click to browse">
-      <input type="file" id="archive-input" accept=".zip" hidden>
-      <span class="drop__label">or drop your full Strava archive</span>
-      <span class="drop__hint">.zip · or click to browse</span>
-      <span class="drop__arrow" aria-hidden="true">→</span>
-    </div>
 
     <details id="manual-mode" class="manual-mode">
       <summary id="manual-mode-summary">Predict from FTP or CP</summary>

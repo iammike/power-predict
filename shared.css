@@ -306,14 +306,6 @@ main {
   cursor: pointer;
   transition: background 200ms ease, border-color 200ms ease;
 }
-.drop::before {
-  top: -1px; left: -1px;
-  border-right: none; border-bottom: none;
-}
-.drop::after {
-  bottom: -1px; right: -1px;
-  border-left: none; border-top: none;
-}
 .drop:hover, .drop.is-active, .drop:focus-visible {
   background: var(--paper);
   border-color: var(--oxblood);

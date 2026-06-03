@@ -396,6 +396,7 @@ async function handleArchive(file) {
   let lastActivitiesSeen = 0;
   let parseFailed = 0;
   let parseFailedSamples = [];
+  let parseSkippedNonRide = 0;
 
   const worker = new Worker('dist/archive-worker.js');
 
@@ -439,6 +440,7 @@ async function handleArchive(file) {
         } else if (msg.type === 'done') {
           parseFailed = msg.failed || 0;
           parseFailedSamples = msg.failedSamples || [];
+          parseSkippedNonRide = msg.skippedNonRide || 0;
           resolve();
         } else if (msg.type === 'error') {
           reject(new Error(msg.message));
@@ -469,10 +471,17 @@ async function handleArchive(file) {
     await saveActivities(newList);
   }
 
+  // Non-ride activities (runs, e-bikes, …) skipped at parse time —
+  // surfaced so the counts make sense (e.g. a runs-heavy archive that
+  // yields few or no rides).
+  const nonRideNote = parseSkippedNonRide > 0
+    ? ` · skipped ${parseSkippedNonRide} non-ride ${parseSkippedNonRide === 1 ? 'activity' : 'activities'}`
+    : '';
+
   const all = await loadActivities();
   if (all.length === 0) {
     showStatus(
-      `No power-equipped activities found (${lastActivitiesSeen} activity files seen)`,
+      `No power-equipped rides found (${lastActivitiesSeen} activity files seen${nonRideNote})`,
       { kind: 'success', dwellMs: 5000 },
     );
     clearStatus();
@@ -494,7 +503,7 @@ async function handleArchive(file) {
       { kind: 'error', dwellMs: 8000 },
     );
   } else {
-    showStatus(`Parsed ${newList.length} new activities`, { kind: 'success', dwellMs: 3000 });
+    showStatus(`Parsed ${newList.length} new activities${nonRideNote}`, { kind: 'success', dwellMs: 3000 });
   }
   renderCurves(all);
 }

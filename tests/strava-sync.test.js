@@ -41,6 +41,8 @@ function makeDb(state = {}) {
           state.activities.set(id, { id, user_id, start_time, duration_s, distance_m, avg_power, normalized_power, ingested_at, has_power: 1 });
         } else if (sql.startsWith('DELETE FROM mmp_records')) {
           state.mmp = state.mmp.filter((m) => m.activity_id !== b[0]);
+        } else if (sql.startsWith('DELETE FROM activities')) {
+          state.activities.delete(b[0]);
         } else if (sql.startsWith('UPDATE users SET last_sync_at')) {
           const u = state.users.get(b[1]) || {};
           state.users.set(b[1], { ...u, last_sync_at: b[0] });
@@ -175,6 +177,38 @@ describe('runSyncSlice', () => {
     const out = await runSyncSlice({ env, athleteId: 42, fetchImpl: fakeFetch });
     expect(out.totalSeen).toBe(3);
     expect(out.totalWithPower).toBe(1);
+    expect(out.cursor.pending.map((p) => p.id)).toEqual([1]);
+  });
+
+  it('reconciles previously-synced non-rides out of D1 and reports their ids', async () => {
+    const db = makeDb();
+    db.state.users.set(42, {
+      access_token: 'tok', refresh_token: 'r',
+      token_expires_at: Math.floor(Date.now() / 1000) + 3600,
+    });
+    // A run was synced before the ride-only filter existed — it's
+    // sitting in D1 with MMP rows.
+    db.state.activities.set(2, { id: 2, user_id: 42, has_power: 1, start_time: 0 });
+    db.state.mmp.push({ activity_id: 2, duration_s: 1200, power_w: 314 });
+    const fakeFetch = async (urlStr) => {
+      if (urlStr.includes('/athlete/activities')) {
+        return new Response(JSON.stringify([
+          { id: 1, type: 'Ride', sport_type: 'Ride', device_watts: true, average_watts: 200,
+            start_date: '2026-05-01T00:00:00Z', elapsed_time: 600, distance: 5000 },
+          { id: 2, type: 'Run', sport_type: 'Run', device_watts: true, average_watts: 314,
+            start_date: '2026-05-06T00:00:00Z', elapsed_time: 1200, distance: 8000 },
+        ]), { status: 200 });
+      }
+      throw new Error('first slice should not fetch streams');
+    };
+    const env = { DB: db, RATE_LIMIT: makeKv(), STRAVA_CLIENT_ID: 'c', STRAVA_CLIENT_SECRET: 's' };
+    const out = await runSyncSlice({ env, athleteId: 42, fetchImpl: fakeFetch });
+    // The run (id 2) is deleted from D1 along with its MMP rows, and
+    // reported back as a removed Strava id (string form).
+    expect(db.state.activities.has(2)).toBe(false);
+    expect(db.state.mmp.some((m) => m.activity_id === 2)).toBe(false);
+    expect(out.removedIds).toEqual(['2']);
+    // The fresh ride (id 1) is still queued for stream fetching.
     expect(out.cursor.pending.map((p) => p.id)).toEqual([1]);
   });
 

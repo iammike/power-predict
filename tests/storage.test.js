@@ -5,6 +5,7 @@ import {
   saveActivities,
   hasActivity,
   clearActivities,
+  removeActivitiesByStravaId,
   activityCount,
 } from '../src/storage.js';
 
@@ -40,6 +41,26 @@ describe('storage', () => {
   it('clearActivities empties the store', async () => {
     await saveActivities([{ startTime: 1, durationS: 1, mmp: {} }]);
     await clearActivities();
+    expect(await activityCount()).toBe(0);
+  });
+
+  it('removeActivitiesByStravaId prunes only the matching rows', async () => {
+    await saveActivities([
+      { startTime: 1000, stravaId: '1', durationS: 60, mmp: {} },
+      { startTime: 2000, stravaId: '2', durationS: 60, mmp: {} }, // the run
+      { startTime: 3000, stravaId: '3', durationS: 60, mmp: {} },
+      { startTime: 4000, durationS: 60, mmp: {} },                // archive upload, no stravaId
+    ]);
+    const removed = await removeActivitiesByStravaId(['2']);
+    expect(removed).toBe(1);
+    const left = (await loadActivities()).map((a) => a.startTime).sort((x, y) => x - y);
+    expect(left).toEqual([1000, 3000, 4000]);
+  });
+
+  it('removeActivitiesByStravaId matches numeric and string ids and no-ops on empty', async () => {
+    await saveActivities([{ startTime: 1000, stravaId: 12345, durationS: 60, mmp: {} }]);
+    expect(await removeActivitiesByStravaId([])).toBe(0);
+    expect(await removeActivitiesByStravaId(['12345'])).toBe(1);
     expect(await activityCount()).toBe(0);
   });
 });

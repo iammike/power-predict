@@ -95,7 +95,29 @@ export async function runSyncSlice({
       .prepare('SELECT id FROM activities WHERE user_id = ?')
       .bind(athleteId)
       .all();
-    const skip = new Set((existing.results || []).map((r) => r.id));
+    const existingIds = new Set((existing.results || []).map((r) => r.id));
+
+    // Reconcile: drop previously-synced activities that the listing now
+    // classifies as non-rides (runs/walks/e-bikes) or otherwise not a
+    // ride-with-power. The listing covers the whole window, so a run
+    // ingested before the ride-only filter existed gets cleaned out of
+    // D1 here on the next sync. We return the removed Strava ids so the
+    // client can prune them from its IndexedDB cache too. Scoped to the
+    // listed window — older rows aren't re-listed, so aren't touched.
+    const validIds = new Set(powered.map((a) => a.id));
+    const removedIds = all
+      .filter((a) => !validIds.has(a.id) && existingIds.has(a.id))
+      .map((a) => a.id);
+    if (removedIds.length) {
+      const stmts = [];
+      for (const id of removedIds) {
+        stmts.push(env.DB.prepare('DELETE FROM mmp_records WHERE activity_id = ?').bind(id));
+        stmts.push(env.DB.prepare('DELETE FROM activities WHERE id = ? AND user_id = ?').bind(id, athleteId));
+      }
+      await env.DB.batch(stmts);
+    }
+
+    const skip = new Set(existingIds);
     for (const id of knownIds) {
       const n = Number(id);
       if (Number.isFinite(n)) skip.add(n);
@@ -115,6 +137,7 @@ export async function runSyncSlice({
       totalSeen,
       totalWithPower,
       remaining: pending.length,
+      removedIds: removedIds.map(String),
       errors: [],
       cursor: pending.length > 0 ? { pending, totalSeen, totalWithPower } : null,
     };

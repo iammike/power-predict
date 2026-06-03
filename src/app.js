@@ -8,6 +8,7 @@ import {
   saveActivities,
   hasActivity,
   clearActivities,
+  removeActivitiesByStravaId,
   activityCount,
   loadSettings,
   saveSettings,
@@ -245,7 +246,7 @@ async function triggerStravaSync() {
     const knownIds = currentActivities
       .map((a) => a.stravaId)
       .filter((id) => id != null && id !== '');
-    await syncRecent({
+    const { removedIds } = await syncRecent({
       session: session.session,
       days: 180,
       knownIds,
@@ -254,6 +255,14 @@ async function triggerStravaSync() {
         setSync(`Syncing from Strava · <em>${processed}</em> / <em>${total}</em> activities · <em>${remaining}</em> remaining`);
       },
     });
+    // The worker reconciles previously-synced non-rides (runs/e-bikes)
+    // out of D1 and reports their ids; prune the matching rows from the
+    // local cache + in-memory list so they stop feeding the curve.
+    if (removedIds?.length) {
+      await removeActivitiesByStravaId(removedIds);
+      const removedSet = new Set(removedIds.map(String));
+      currentActivities = currentActivities.filter((a) => !removedSet.has(String(a.stravaId)));
+    }
     setSync('Loading synced data');
     const remoteActivities = await fetchSyncedActivities(session.session);
     if (remoteActivities.length === 0) {

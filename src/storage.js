@@ -74,6 +74,31 @@ export async function clearActivities() {
   return withStore(ACTIVITIES_STORE, 'readwrite', (store) => store.clear());
 }
 
+// Delete cached activities by Strava id. Used after a sync reconciles
+// previously-stored non-rides (runs/e-bikes) out of the server: the
+// worker reports the removed ids and we prune the matching IDB rows so
+// they stop feeding the curve. The store is keyed by startTime, so we
+// cursor the whole store and delete rows whose stravaId is in the set.
+// Returns the number of rows removed.
+export async function removeActivitiesByStravaId(stravaIds) {
+  const ids = new Set((stravaIds || []).map(String).filter((s) => s !== ''));
+  if (ids.size === 0) return 0;
+  return withStore(ACTIVITIES_STORE, 'readwrite', (store) =>
+    new Promise((resolve, reject) => {
+      let removed = 0;
+      const req = store.openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) { resolve(removed); return; }
+        const sid = cursor.value?.stravaId;
+        if (sid != null && ids.has(String(sid))) { cursor.delete(); removed++; }
+        cursor.continue();
+      };
+      req.onerror = () => reject(req.error);
+    })
+  );
+}
+
 export async function activityCount() {
   return withStore(ACTIVITIES_STORE, 'readonly', (store) =>
     new Promise((resolve, reject) => {

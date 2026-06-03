@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildIdMap, parseCsv } from '../src/archive-worker.js';
+import { buildIdMap, buildTypeMap, parseCsv } from '../src/archive-worker.js';
 
 const enc = (s) => new TextEncoder().encode(s);
 
@@ -58,5 +58,31 @@ describe('buildIdMap', () => {
     const m = buildIdMap(csv);
     expect(m.size).toBe(2); // 7 → "activities/X.fit" + "X.fit"
     expect(m.get('activities/X.fit')).toBe('7');
+  });
+});
+
+describe('buildTypeMap', () => {
+  it('maps filename to Activity Type by full path and basename', () => {
+    const csv = enc(
+      'Activity ID,Activity Type,Filename\n' +
+      '1,Ride,activities/1.fit.gz\n' +
+      '2,Run,activities/2.fit.gz\n'
+    );
+    const m = buildTypeMap(csv);
+    expect(m.get('activities/1.fit.gz')).toBe('Ride');
+    expect(m.get('1.fit.gz')).toBe('Ride');
+    expect(m.get('activities/2.fit.gz')).toBe('Run');
+  });
+
+  it('resolves columns by header name (order-independent)', () => {
+    const csv = enc(
+      'Filename,Activity Type,Activity ID\n' +
+      'activities/A.fit.gz,Mountain Bike Ride,99\n'
+    );
+    expect(buildTypeMap(csv).get('activities/A.fit.gz')).toBe('Mountain Bike Ride');
+  });
+
+  it('returns null when the Activity Type column is missing', () => {
+    expect(buildTypeMap(enc('Activity ID,Filename\n1,activities/1.fit\n'))).toBeNull();
   });
 });

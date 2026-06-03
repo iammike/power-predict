@@ -14,6 +14,7 @@ import { parseFit } from './fit.js';
 import { parseTcx } from './tcx.js';
 import { extractMmp } from './mmp.js';
 import { normalizedPower } from './aggregate.js';
+import { isRideType } from './sport.js';
 
 const FIT_PATH = /^activities\/[^/]+\.fit(\.gz)?$/i;
 const TCX_PATH = /^activities\/[^/]+\.tcx(\.gz)?$/i;
@@ -38,6 +39,9 @@ async function parseArchive(file) {
   let parsedCount = 0;
   let withPower = 0;
   let failed = 0;
+  // Non-cycling activities (runs, walks, e-bikes, …) skipped via the
+  // activities.csv "Activity Type" column. Reported in the done event.
+  let skippedNonRide = 0;
   // Sample of basenames for the first few failures, for the post-parse
   // notice. Cap at 5 so a fully corrupt archive doesn't bloat the
   // postMessage payload.
@@ -127,14 +131,28 @@ async function parseArchive(file) {
     })();
   });
 
-  // ------- Parse activities.csv → filename → Strava ID map -------
+  // ------- Parse activities.csv → filename → Strava ID + type maps -------
   // The map keys are normalized: full path (`activities/X.fit.gz`)
   // and basename (`X.fit.gz`). Looking up a FIT entry tries both, so
   // small differences in CSV path formatting don't break linking.
   const idByName = csvBytes ? buildIdMap(csvBytes) : null;
+  const typeByName = csvBytes ? buildTypeMap(csvBytes) : null;
 
   // ------- Parse FIT and TCX files -------
   for (const { name, bytes, kind } of pendingFits) {
+    const base = name.split('/').pop() || name;
+    // Rides only. Skip non-cycling activities (runs, walks, e-bikes, …)
+    // whose power would corrupt the cycling CP fit. We classify via the
+    // activities.csv "Activity Type" column; when the type is unknown
+    // (no CSV, or this file isn't listed) we fall through and parse, to
+    // avoid dropping legitimate rides we simply couldn't classify.
+    const sportType = typeByName?.get(name) ?? typeByName?.get(base) ?? null;
+    if (sportType && !isRideType(sportType)) {
+      skippedNonRide++;
+      parsedCount++;
+      if (parsedCount % 5 === 0 || parsedCount === pendingFits.length) post({ phase: 'parsing' });
+      continue;
+    }
     let b = bytes;
     try {
       if (name.endsWith('.gz')) b = gunzipSync(b);
@@ -161,7 +179,6 @@ async function parseArchive(file) {
         // The number in the FIT filename is the upload ID — globally
         // unique but distinct from the activity ID a user URL uses,
         // so we can't fall back to the filename here.
-        const base = name.split('/').pop() || name;
         const stravaId = idByName?.get(name) ?? idByName?.get(base) ?? null;
         self.postMessage({
           type: 'activity',
@@ -189,10 +206,10 @@ async function parseArchive(file) {
   }
   pendingFits.length = 0;
 
-  self.postMessage({ type: 'done', activitiesSeen, parsedCount, withPower, failed, failedSamples });
+  self.postMessage({ type: 'done', activitiesSeen, parsedCount, withPower, failed, failedSamples, skippedNonRide });
 }
 
-export { buildIdMap, parseCsv };
+export { buildIdMap, buildTypeMap, parseCsv };
 
 // Build { fullPath, basename → activity_id } from activities.csv.
 // Strava export columns shift between versions, so we resolve them
@@ -216,6 +233,32 @@ function buildIdMap(csvBytes) {
     map.set(fn, id);
     const base = fn.split('/').pop();
     if (base && base !== fn) map.set(base, id);
+  }
+  return map;
+}
+
+// Build { fullPath, basename → "Activity Type" } from activities.csv,
+// so the FIT/TCX loop can skip non-cycling activities. Same dual-key
+// indexing and header-name resolution as buildIdMap. Returns null when
+// the Activity Type or Filename column is absent (older exports), in
+// which case the loop parses everything rather than dropping data.
+function buildTypeMap(csvBytes) {
+  const text = new TextDecoder().decode(csvBytes);
+  const rows = parseCsv(text);
+  if (!rows.length) return null;
+  const header = rows[0].map((s) => s.trim().toLowerCase());
+  const typeIdx = header.indexOf('activity type');
+  const fnIdx = header.indexOf('filename');
+  if (typeIdx < 0 || fnIdx < 0) return null;
+  const map = new Map();
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    const type = row[typeIdx]?.trim();
+    const fn = row[fnIdx]?.trim();
+    if (!type || !fn) continue;
+    map.set(fn, type);
+    const base = fn.split('/').pop();
+    if (base && base !== fn) map.set(base, type);
   }
   return map;
 }

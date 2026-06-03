@@ -149,6 +149,35 @@ describe('runSyncSlice', () => {
     expect(out.cursor.pending[0].id).toBe(1001);
   });
 
+  it('excludes non-ride activities (runs, e-bikes) even when power-equipped', async () => {
+    const db = makeDb();
+    db.state.users.set(42, {
+      access_token: 'tok', refresh_token: 'r',
+      token_expires_at: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const fakeFetch = async (urlStr) => {
+      if (urlStr.includes('/athlete/activities')) {
+        return new Response(JSON.stringify([
+          // A real ride with power — kept.
+          { id: 1, type: 'Ride', sport_type: 'Ride', device_watts: true, average_watts: 200,
+            start_date: '2026-01-01T00:00:00Z', elapsed_time: 600, distance: 5000 },
+          // A run with a running power meter — dropped despite device_watts.
+          { id: 2, type: 'Run', sport_type: 'Run', device_watts: true, average_watts: 300,
+            start_date: '2026-01-02T00:00:00Z', elapsed_time: 600, distance: 5000 },
+          // E-bike (legacy type says Ride, sport_type reveals the assist) — dropped.
+          { id: 3, type: 'Ride', sport_type: 'EBikeRide', device_watts: true, average_watts: 250,
+            start_date: '2026-01-03T00:00:00Z', elapsed_time: 600, distance: 5000 },
+        ]), { status: 200 });
+      }
+      throw new Error('first slice should not fetch streams');
+    };
+    const env = { DB: db, RATE_LIMIT: makeKv(), STRAVA_CLIENT_ID: 'c', STRAVA_CLIENT_SECRET: 's' };
+    const out = await runSyncSlice({ env, athleteId: 42, fetchImpl: fakeFetch });
+    expect(out.totalSeen).toBe(3);
+    expect(out.totalWithPower).toBe(1);
+    expect(out.cursor.pending.map((p) => p.id)).toEqual([1]);
+  });
+
   it('second slice fetches streams and writes MMP rows', async () => {
     const db = makeDb();
     db.state.users.set(42, {

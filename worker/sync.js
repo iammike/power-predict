@@ -4,6 +4,7 @@
 
 import { extractMmp } from '../src/mmp.js';
 import { normalizedPower } from '../src/aggregate.js';
+import { isRideActivity } from '../src/sport.js';
 import { listActivitiesAfter, fetchPowerStream, hasRealPower } from './strava-api.js';
 import { refreshTokens } from './strava-oauth.js';
 
@@ -80,7 +81,11 @@ export async function runSyncSlice({
     const after = Math.floor(Date.now() / 1000) - days * 86400;
     const all = await listActivitiesAfter({ accessToken, afterEpoch: after }, fetchImpl);
     const totalSeen = all.length;
-    const powered = all.filter(hasRealPower);
+    // Rides only. A run/walk recorded with a power meter (e.g. Stryd)
+    // sets device_watts too, but running power isn't comparable to
+    // cycling power and would corrupt the CP fit — so filter by sport
+    // type before the power check. E-bikes are excluded as well.
+    const powered = all.filter((a) => isRideActivity(a) && hasRealPower(a));
     const totalWithPower = powered.length;
     // Skip the ones we've already ingested in D1, plus anything the
     // client tells us is already in its IndexedDB cache (archive

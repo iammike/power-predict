@@ -98,6 +98,11 @@ export function authorizeUrl(returnTo = '/') {
 export async function syncRecent({ session, days = 180, knownIds = [], onProgress }) {
   let cursor = null;
   let cumulativeProcessed = 0;
+  // Activities the worker reconciled out of D1 (e.g. previously-synced
+  // runs now excluded by the ride-only filter). Surfaced so the caller
+  // can prune them from the IndexedDB cache. Only the first slice
+  // reports these, but accumulate defensively.
+  const removedIds = [];
   while (true) {
     const res = await fetch(`${API_BASE}/sync/recent`, {
       method: 'POST',
@@ -120,6 +125,9 @@ export async function syncRecent({ session, days = 180, knownIds = [], onProgres
     }
     const slice = await res.json();
     cumulativeProcessed += slice.processed || 0;
+    if (Array.isArray(slice.removedIds) && slice.removedIds.length) {
+      removedIds.push(...slice.removedIds);
+    }
     if (typeof slice.elapsedMs === 'number') {
       // Visibility into per-slice wall time. Logged but not shown to
       // the user — useful when tuning ACTIVITIES_PER_CALL or chasing
@@ -132,7 +140,7 @@ export async function syncRecent({ session, days = 180, knownIds = [], onProgres
       remaining: slice.remaining,
       errors: slice.errors,
     });
-    if (slice.done) return { processed: cumulativeProcessed, totalWithPower: slice.totalWithPower };
+    if (slice.done) return { processed: cumulativeProcessed, totalWithPower: slice.totalWithPower, removedIds };
     cursor = slice.cursor;
   }
 }

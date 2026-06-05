@@ -1521,31 +1521,25 @@ function wirePredictForm() {
       out.innerHTML = `<p class="predict-output__error">Prediction failed.</p>`;
       return;
     }
-    // Apply the form-based multiplier to the predicted wattage and
-    // its confidence band. Capped at ±5% inside formMultiplier so
-    // it's a nudge, not a rewrite. We surface the applied delta on the
-    // output so the user can reconcile the predicted watts against the
-    // chart curve (which doesn't bake form in).
+    // The headline is the form-free "fresh" estimate. That's the number
+    // that matters for race planning — you'll be tapered and rested on
+    // the day — and it matches the chart, which also bakes no form in.
+    // Today's form adjustment (capped at ±5% inside formMultiplier) is
+    // demoted to a subtext line: informative, but it no longer drags the
+    // headline below what you'd actually hit fresh.
     const mult = currentLoad.hasFtp ? formMultiplier(currentLoad.tsb) : 1;
-    const result = mult === 1 ? raw : {
-      ...raw,
-      powerW: raw.powerW * mult,
-      low: raw.low * mult,
-      high: raw.high * mult,
-    };
     const adjPct = Math.round((mult - 1) * 100);
-    const formChip = adjPct === 0
+    const extrapChip = raw.extrapolated
+      ? '<span class="predict-output__flag">extrapolated</span>'
+      : '';
+    const formLine = adjPct === 0
       ? ''
-      : `<span class="predict-output__flag predict-output__flag--form" title="${formTooltip()}">${adjPct > 0 ? '+' : ''}${adjPct}% form</span>`;
+      : `<p class="predict-output__band" title="${formTooltip()}">At today's form (${adjPct > 0 ? '+' : ''}${adjPct}%): ${Math.round(raw.powerW * mult)} W</p>`;
     out.hidden = false;
     out.innerHTML = `
       <p class="predict-output__label">Predicted for ${formatDuration(seconds)}</p>
-      <p class="predict-output__value">${Math.round(result.powerW)}<span class="predict-output__unit">W</span></p>
-      <p class="predict-output__band">
-        Range ${Math.round(result.low)}–${Math.round(result.high)} W
-        ${result.extrapolated ? '<span class="predict-output__flag">extrapolated</span>' : ''}
-        ${formChip}
-      </p>
+      <p class="predict-output__value">${Math.round(raw.powerW)}<span class="predict-output__unit">W</span>${extrapChip}</p>
+      ${formLine}
     `;
   });
 }

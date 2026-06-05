@@ -1541,9 +1541,10 @@ body[data-app-state="manual"] #manual-mode {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--burnt);
-  margin-left: 0.5rem;
+  margin-left: 0.6rem;
   padding: 0.1rem 0.4rem;
   border: 1px solid currentColor;
+  vertical-align: middle;
 }
 .predict-output__error {
   font-family: var(--serif);

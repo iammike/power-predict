@@ -11,6 +11,14 @@ export const DURATIONS_S = [
   18000, 21600, 25200, 28800, 32400, 36000, 39600, 43200,
 ];
 
+// Extraction version. Stamped onto each stored activity so a change to
+// the bucket set or extraction logic forces a re-extraction of already-
+// stored rides on the next sync (rather than silently serving stale
+// MMP rows). Bump this whenever DURATIONS_S or extractMmp changes.
+//   v1 — original bucket set capped at 4h
+//   v2 — extended to hourly buckets through 12h
+export const MMP_VERSION = 2;
+
 // Adjacent-duration ratio sanity checks. Real cycling power kinetics
 // bound how much shorter durations can exceed longer ones — even a
 // world-class sprinter's 1s peak sits roughly 1.5-1.8x their 5s peak.

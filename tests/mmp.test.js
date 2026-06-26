@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractMmp, dropAnomalies, DURATIONS_S } from '../src/mmp.js';
+import { extractMmp, dropAnomalies, DURATIONS_S, MMP_VERSION } from '../src/mmp.js';
 
 describe('extractMmp', () => {
   it('returns empty for empty stream', () => {
@@ -80,5 +80,11 @@ describe('dropAnomalies', () => {
   it('handles missing pairs gracefully', () => {
     expect(dropAnomalies({})).toEqual({});
     expect(dropAnomalies({ 60: 250 })).toEqual({ 60: 250 });
+  });
+});
+
+describe('MMP_VERSION', () => {
+  it('is the current extraction version (bumped for the 12h bucket set)', () => {
+    expect(MMP_VERSION).toBe(2);
   });
 });

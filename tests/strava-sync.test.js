@@ -321,7 +321,7 @@ describe('mmp version re-extraction', () => {
     const state = {};
     const db = makeDb(state);
     state.users.set(7, { id: 7, access_token: 't', refresh_token: 'r', token_expires_at: 9e12 });
-    state.activities.set(555, { id: 555, user_id: 7, start_time: 1, duration_s: 100, mmp_version: 2, has_power: 1 });
+    state.activities.set(555, { id: 555, user_id: 7, start_time: 1, duration_s: 100, mmp_version: MMP_VERSION, has_power: 1 });
     const env = { DB: db, STRAVA_CLIENT_ID: '1', STRAVA_CLIENT_SECRET: 's' };
     const fetchImpl = makeFetchImpl(555, 120);
     const first = await runSyncSlice({ env, athleteId: 7, days: 180, cursor: null, knownIds: [], fetchImpl });

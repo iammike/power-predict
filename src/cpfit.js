@@ -226,7 +226,7 @@ export const DEFAULT_DECAY = {
 };
 
 // Fit a personal Riegel exponent from MMP points in the long-duration
-// range (default 20 min – 4 h). The relation
+// range (default 20 min – 12 h). The relation
 //   P(t) = P_anchor × (t_anchor / t)^k
 // linearizes under log/log to log P = a − k · log t, so a least-squares
 // regression on (log t, log P) gives slope = −k.

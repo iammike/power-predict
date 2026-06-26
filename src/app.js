@@ -1,4 +1,5 @@
-import { DURATIONS_S } from './mmp.js';
+import { DURATIONS_S, MMP_VERSION } from './mmp.js';
+import { activitiesToRefresh } from './sync-merge.js';
 import { rollingBest, rollingBestWithOwners, estimateFtp } from './aggregate.js';
 import { normalizeForDrift } from './drift.js';
 import { renderCurveChart } from './curve-chart.js';
@@ -244,7 +245,11 @@ async function triggerStravaSync() {
     // Tell the worker which Strava ids the IDB cache already has so it
     // skips them in the worklist — no point re-fetching streams the
     // user already ingested via archive upload.
+    // Only rides already extracted at the current version are safe to
+    // declare "known" — a stale-version ride must NOT be suppressed, or
+    // the server would skip re-extracting it with the new bucket set.
     const knownIds = currentActivities
+      .filter((a) => a.mmpVersion === MMP_VERSION)
       .map((a) => a.stravaId)
       .filter((id) => id != null && id !== '');
     const { removedIds } = await syncRecent({
@@ -270,10 +275,9 @@ async function triggerStravaSync() {
       showStatus('No power-equipped rides in the synced window.', { kind: 'success', dwellMs: 3500 });
       return;
     }
-    const fresh = [];
-    for (const a of remoteActivities) {
-      if (!(await hasActivity(a.startTime))) fresh.push(a);
-    }
+    // Write rides that are new OR whose server-side mmpVersion changed
+    // (a re-extraction). hasActivity alone would miss the latter.
+    const fresh = activitiesToRefresh(remoteActivities, currentActivities);
     // Snapshot per-(duration, window) owners BEFORE saving the sync
     // results so we can diff afterwards. The diff catches any cell
     // whose owner activity changed — that's the right signal for
@@ -440,6 +444,7 @@ async function handleArchive(file) {
                 avgPower: msg.avgPower,
                 npW: msg.npW ?? msg.avgPower,
                 mmp: msg.mmp,
+                mmpVersion: msg.mmpVersion ?? MMP_VERSION,
                 stravaId: msg.stravaId ?? null,
               });
             }

@@ -12,7 +12,7 @@
 import { Unzip, UnzipInflate, gunzipSync } from 'fflate';
 import { parseFit } from './fit.js';
 import { parseTcx } from './tcx.js';
-import { extractMmp } from './mmp.js';
+import { extractMmp, MMP_VERSION } from './mmp.js';
 import { normalizedPower } from './aggregate.js';
 import { isRideType } from './sport.js';
 
@@ -188,6 +188,7 @@ async function parseArchive(file) {
           avgPower,
           npW,
           mmp,
+          mmpVersion: MMP_VERSION,
           stravaId,
         });
         withPower++;

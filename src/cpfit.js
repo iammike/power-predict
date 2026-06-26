@@ -236,7 +236,7 @@ export const DEFAULT_DECAY = {
 // above ~0.20 implies catastrophic decay seen only in untrained or sick
 // riders. Outside that window we still report the clamped value with a
 // `clamped` flag so callers can distinguish "fitted" from "rail-pinned."
-export const DEFAULT_FATIGUE_RANGE = { minS: 1200, maxS: 14400 };
+export const DEFAULT_FATIGUE_RANGE = { minS: 1200, maxS: 43200 };
 const FATIGUE_K_MIN = 0.04;
 const FATIGUE_K_MAX = 0.20;
 const FATIGUE_MIN_POINTS = 3;

@@ -204,4 +204,14 @@ describe('effort gate', () => {
     const best = rollingBest(acts, { minIF: 0.70, ftp: 300 });
     expect(best[14400]).toBe(217);
   });
+
+  it('recencyWeightedBest keeps a hard long ride and drops an easy one', () => {
+    const acts = [
+      { startTime: 1000, durationS: 19872, avgPower: 207, mmp: { 14400: 217 } },
+      { startTime: 1000, durationS: 19872, avgPower: 165, mmp: { 10800: 180 } },
+    ];
+    const best = recencyWeightedBest(acts, { minIF: 0.70, ftp: 300, now: 1000 });
+    expect(best[14400]).toBe(217);   // hard ride kept
+    expect(best[10800]).toBeUndefined(); // easy ride dropped
+  });
 });

@@ -15,6 +15,7 @@ export const EFFORT_GATE_ANCHOR_S = 3600; // floor is flat at/below 1h
 export const EFFORT_GATE_DECAY = 0.06;    // calibrated so 5.5h ≈ 0.63
 
 export function effortGateThreshold(minIF, durationS) {
+  if (!Number.isFinite(minIF)) return minIF;
   if (!Number.isFinite(durationS) || durationS <= EFFORT_GATE_ANCHOR_S) return minIF;
   return minIF * (EFFORT_GATE_ANCHOR_S / durationS) ** EFFORT_GATE_DECAY;
 }

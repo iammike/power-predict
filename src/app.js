@@ -17,6 +17,7 @@ import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints, DEFAULT_DECAY }
 import { parseDuration } from './duration.js';
 import { synthesizeFit } from './manual.js';
 import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
+import { partitionDurations } from './table.js';
 import {
   parseAuthHash, clearAuthHash, loadSession, saveSession, clearSession, authorizeUrl,
   syncRecent, fetchSyncedActivities, UnauthenticatedError, StravaUnavailableError,
@@ -758,16 +759,17 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   currentLoad = computeLoadSeries(activityMmps, ftpForLoad);
 
   const newSyncIds = new Set(currentSettings.lastSyncNewIds || []);
-  const rows = DURATIONS_S
-    .filter((d) => allTime[d] !== undefined)
-    .map((d) => `
+  const shownDurations = DURATIONS_S.filter((d) => allTime[d] !== undefined);
+  const { short, long } = partitionDurations(shownDurations);
+  const rowFor = (d) => `
       <tr>
         <td>${formatDuration(d)}</td>
         <td>${renderMmpCell(last30Owners[d], newSyncIds)}</td>
         <td class="featured">${renderMmpCell(last90Owners[d], newSyncIds)}</td>
         <td>${renderMmpCell(allTimeOwners[d], newSyncIds)}</td>
-      </tr>`)
-    .join('');
+      </tr>`;
+  const shortRows = short.map(rowFor).join('');
+  const longRows = long.map(rowFor).join('');
 
   // Preserve the predict input across re-renders so changing an
   // override (CP value, date range, preset) live-updates the existing
@@ -793,8 +795,10 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
           <th data-tooltip="Best across the entire local cache. Earlier rides may not be present if you only synced a recent window.">${allTimeLabel(activityMmps)}</th>
         </tr>
       </thead>
-      <tbody>${rows}</tbody>
+      <tbody>${shortRows}</tbody>
+      ${longRows ? `<tbody id="mmp-long" hidden>${longRows}</tbody>` : ''}
     </table>
+    ${longRows ? `<button type="button" class="link-button mmp-expand" id="mmp-expand" aria-expanded="false" aria-controls="mmp-long">Show longer efforts ▾</button>` : ''}
     <aside class="data-sources" aria-label="Data sources">
       <section class="data-sources__row">
         <p class="data-sources__line">${activityMmps.length.toLocaleString()} activities cached locally · ${latestActivityLabel(activityMmps)}</p>
@@ -821,6 +825,16 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   resultsEl.hidden = false;
   resultsEl.dataset.revealed = '';
   document.getElementById('clear-cache').addEventListener('click', handleClearCache);
+  const expandBtn = document.getElementById('mmp-expand');
+  if (expandBtn) {
+    expandBtn.addEventListener('click', () => {
+      const body = document.getElementById('mmp-long');
+      const opening = body.hidden;
+      body.hidden = !opening;
+      expandBtn.setAttribute('aria-expanded', String(opening));
+      expandBtn.textContent = opening ? 'Show fewer ▴' : 'Show longer efforts ▾';
+    });
+  }
   document.getElementById('upload-another').addEventListener('click', () => {
     fileInput?.click();
   });

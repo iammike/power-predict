@@ -1755,3 +1755,9 @@ body[data-app-state="manual"] #manual-mode {
   .mmp-table th:first-child, .mmp-table td:first-child { padding-left: 0; }
   .mmp-table th:last-child, .mmp-table td:last-child { padding-right: 0; }
 }
+
+.mmp-expand {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}

@@ -24,6 +24,24 @@ describe('extractMmp', () => {
   });
 });
 
+describe('extended duration range', () => {
+  it('includes hourly buckets from 5h to 12h, sorted ascending', () => {
+    for (const d of [18000, 21600, 25200, 28800, 32400, 36000, 39600, 43200]) {
+      expect(DURATIONS_S).toContain(d);
+    }
+    const sorted = [...DURATIONS_S].sort((a, b) => a - b);
+    expect(DURATIONS_S).toEqual(sorted);
+  });
+
+  it('fills only the buckets a ride is long enough for', () => {
+    const sixHours = new Array(21600).fill(200); // exactly 6h
+    const mmp = extractMmp(sixHours);
+    expect(mmp[18000]).toBe(200); // 5h reachable
+    expect(mmp[21600]).toBe(200); // 6h reachable
+    expect(mmp[25200]).toBeUndefined(); // 7h not reachable
+  });
+});
+
 describe('dropAnomalies', () => {
   it('passes a realistic sprint profile through unchanged', () => {
     const mmp = { 1: 900, 2: 870, 3: 830, 5: 780, 15: 600, 30: 500, 60: 380, 300: 280 };

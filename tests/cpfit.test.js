@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints } from '../src/cpfit.js';
+import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints, DEFAULT_FATIGUE_RANGE } from '../src/cpfit.js';
 
 // Generate synthetic MMP points from a known CP/W' so we can verify
 // the fit recovers them.
@@ -327,5 +327,17 @@ describe('fitFatigueK', () => {
   it('returns null for non-array input', () => {
     expect(fitFatigueK(null)).toBeNull();
     expect(fitFatigueK(undefined)).toBeNull();
+  });
+});
+
+describe('fatigue-k range extension', () => {
+  it('consumes long-duration points up to the new ceiling', () => {
+    expect(DEFAULT_FATIGUE_RANGE.maxS).toBe(43200);
+    // P(t) = 300 * (1200/t)^0.1 — a clean k=0.1 decay
+    const p = (t) => ({ durationS: t, powerW: 300 * (1200 / t) ** 0.1 });
+    const points = [p(1200), p(7200), p(14400), p(28800)];
+    const fit = fitFatigueK(points);
+    expect(fit.nPoints).toBe(4); // 28800 included; would be 3 under the old 14400 cap
+    expect(fit.k).toBeCloseTo(0.1, 2);
   });
 });

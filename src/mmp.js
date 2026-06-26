@@ -8,6 +8,7 @@ export const DURATIONS_S = [
   1, 2, 3, 5, 10, 15, 30, 60, 90, 120, 180, 240, 300,
   360, 480, 600, 720, 900, 1200, 1800, 2700, 3600,
   4500, 5400, 7200, 10800, 14400,
+  18000, 21600, 25200, 28800, 32400, 36000, 39600, 43200,
 ];
 
 // Adjacent-duration ratio sanity checks. Real cycling power kinetics

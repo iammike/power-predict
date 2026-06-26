@@ -2,7 +2,7 @@
 // MMP, writes to D1. Pure-ish: takes env + fetch + a session lookup
 // so it can be tested with stubbed dependencies.
 
-import { extractMmp } from '../src/mmp.js';
+import { extractMmp, MMP_VERSION } from '../src/mmp.js';
 import { normalizedPower } from '../src/aggregate.js';
 import { isRideActivity } from '../src/sport.js';
 import { listActivitiesAfter, fetchPowerStream, hasRealPower } from './strava-api.js';
@@ -92,10 +92,17 @@ export async function runSyncSlice({
     // ingest doesn't write to D1, so the worker would otherwise
     // re-fetch streams the client already has).
     const existing = await env.DB
-      .prepare('SELECT id FROM activities WHERE user_id = ?')
+      .prepare('SELECT id, mmp_version FROM activities WHERE user_id = ?')
       .bind(athleteId)
       .all();
-    const existingIds = new Set((existing.results || []).map((r) => r.id));
+    const existingRows = existing.results || [];
+    const existingIds = new Set(existingRows.map((r) => r.id));
+    // Only rides already extracted at the CURRENT version are safe to
+    // skip. Stale/NULL-version rides get re-fetched and re-extracted so
+    // a bucket-set change (DURATIONS_S) actually reaches stored history.
+    const currentVersionIds = new Set(
+      existingRows.filter((r) => r.mmp_version === MMP_VERSION).map((r) => r.id)
+    );
 
     // Reconcile: drop previously-synced activities that the listing now
     // classifies as non-rides (runs/walks/e-bikes) or otherwise not a
@@ -117,7 +124,7 @@ export async function runSyncSlice({
       await env.DB.batch(stmts);
     }
 
-    const skip = new Set(existingIds);
+    const skip = new Set(currentVersionIds);
     for (const id of knownIds) {
       const n = Number(id);
       if (Number.isFinite(n)) skip.add(n);
@@ -176,12 +183,12 @@ export async function runSyncSlice({
         .prepare(
           `INSERT OR REPLACE INTO activities
             (id, user_id, start_time, duration_s, distance_m, avg_power, normalized_power,
-             intensity_factor, tss, has_power, source, ingested_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, 'api', ?)`
+             intensity_factor, tss, has_power, source, ingested_at, mmp_version)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, 'api', ?, ?)`
         )
         .bind(
           a.id, athleteId, a.startTime, a.durationS, a.distanceM,
-          a.avgPower, npW, Math.floor(Date.now() / 1000),
+          a.avgPower, npW, Math.floor(Date.now() / 1000), MMP_VERSION,
         )
         .run();
       // Bulk insert the per-duration MMP records. We delete + insert
@@ -228,7 +235,7 @@ export async function runSyncSlice({
 // the same shape the frontend feeds into its renderCurves pipeline.
 export async function loadActivities(env, athleteId) {
   const acts = await env.DB
-    .prepare(`SELECT id, start_time, duration_s, distance_m, avg_power, normalized_power
+    .prepare(`SELECT id, start_time, duration_s, distance_m, avg_power, normalized_power, mmp_version
               FROM activities
               WHERE user_id = ? AND has_power = 1
               ORDER BY start_time ASC`)
@@ -260,5 +267,6 @@ export async function loadActivities(env, athleteId) {
     avgPower: r.avg_power,
     npW: r.normalized_power,
     mmp: mmpByActivity.get(r.id) || {},
+    mmpVersion: r.mmp_version ?? null,
   }));
 }

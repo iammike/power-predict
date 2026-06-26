@@ -4,6 +4,7 @@ import {
   getValidAccessToken,
   runSyncSlice,
 } from '../worker/sync.js';
+import { MMP_VERSION } from '../src/mmp.js';
 
 // ---------- D1 stub ----------
 //
@@ -37,8 +38,8 @@ function makeDb(state = {}) {
           const u = state.users.get(id) || {};
           state.users.set(id, { ...u, access_token: accessToken, refresh_token: refreshToken, token_expires_at: expiresAt });
         } else if (sql.startsWith('INSERT OR REPLACE INTO activities')) {
-          const [id, user_id, start_time, duration_s, distance_m, avg_power, normalized_power, , , , , ingested_at] = b;
-          state.activities.set(id, { id, user_id, start_time, duration_s, distance_m, avg_power, normalized_power, ingested_at, has_power: 1 });
+          const [id, user_id, start_time, duration_s, distance_m, avg_power, normalized_power, ingested_at, mmp_version] = b;
+          state.activities.set(id, { id, user_id, start_time, duration_s, distance_m, avg_power, normalized_power, ingested_at, mmp_version, has_power: 1 });
         } else if (sql.startsWith('DELETE FROM mmp_records')) {
           state.mmp = state.mmp.filter((m) => m.activity_id !== b[0]);
         } else if (sql.startsWith('DELETE FROM activities')) {
@@ -53,11 +54,8 @@ function makeDb(state = {}) {
       },
       async all() {
         const b = getBound();
-        if (sql.startsWith('SELECT id FROM activities')) {
-          const results = [...state.activities.values()]
-            .filter((a) => a.user_id === b[0])
-            .map((a) => ({ id: a.id }));
-          return { results };
+        if (sql.startsWith('SELECT id, mmp_version FROM activities')) {
+          return { results: [...state.activities.values()].map((a) => ({ id: a.id, mmp_version: a.mmp_version ?? null })) };
         }
         return { results: [] };
       },
@@ -245,7 +243,7 @@ describe('runSyncSlice', () => {
       access_token: 'tok', refresh_token: 'r',
       token_expires_at: Math.floor(Date.now() / 1000) + 3600,
     });
-    db.state.activities.set(1001, { id: 1001, user_id: 42, has_power: 1, start_time: 0 });
+    db.state.activities.set(1001, { id: 1001, user_id: 42, has_power: 1, start_time: 0, mmp_version: MMP_VERSION });
     const fakeFetch = async (urlStr) => {
       if (urlStr.includes('/athlete/activities')) {
         return new Response(JSON.stringify([
@@ -253,7 +251,7 @@ describe('runSyncSlice', () => {
             start_date: '2026-01-01T00:00:00Z', elapsed_time: 600, distance: 5000 },
         ]), { status: 200 });
       }
-      throw new Error('should not fetch streams for already-ingested rides');
+      throw new Error('should not fetch streams for current-version rides');
     };
     const env = { DB: db, RATE_LIMIT: makeKv(), STRAVA_CLIENT_ID: 'c', STRAVA_CLIENT_SECRET: 's' };
     const out = await runSyncSlice({ env, athleteId: 42, fetchImpl: fakeFetch });
@@ -287,5 +285,59 @@ describe('runSyncSlice', () => {
     expect(out.totalWithPower).toBe(2);
     expect(out.remaining).toBe(1);
     expect(out.cursor.pending[0].id).toBe(1002);
+  });
+});
+
+describe('mmp version re-extraction', () => {
+  // Minimal Strava listing + stream fetch stubs. One ride, in the window.
+  function makeFetchImpl(activityId, durationS) {
+    return async (url) => {
+      const u = String(url);
+      if (u.includes('/athlete/activities')) {
+        return new Response(JSON.stringify([{
+          id: activityId, type: 'Ride', start_date: '2026-06-20T13:00:00Z',
+          elapsed_time: durationS, distance: 100000, average_watts: 200, device_watts: true,
+        }]), { status: 200 });
+      }
+      if (u.includes('/streams')) {
+        return new Response(JSON.stringify({ watts: { data: new Array(durationS).fill(200) } }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    };
+  }
+
+  it('does NOT skip a ride whose stored mmp_version is stale (null)', async () => {
+    const state = {};
+    const db = makeDb(state);
+    state.users.set(7, { id: 7, access_token: 't', refresh_token: 'r', token_expires_at: 9e12 });
+    state.activities.set(555, { id: 555, user_id: 7, start_time: 1, duration_s: 100, mmp_version: null, has_power: 1 });
+    const env = { DB: db, STRAVA_CLIENT_ID: '1', STRAVA_CLIENT_SECRET: 's' };
+    const fetchImpl = makeFetchImpl(555, 120);
+    const first = await runSyncSlice({ env, athleteId: 7, days: 180, cursor: null, knownIds: [], fetchImpl });
+    expect(first.remaining).toBe(1); // stale ride queued for re-extraction, not skipped
+  });
+
+  it('skips a ride already at the current mmp_version', async () => {
+    const state = {};
+    const db = makeDb(state);
+    state.users.set(7, { id: 7, access_token: 't', refresh_token: 'r', token_expires_at: 9e12 });
+    state.activities.set(555, { id: 555, user_id: 7, start_time: 1, duration_s: 100, mmp_version: 2, has_power: 1 });
+    const env = { DB: db, STRAVA_CLIENT_ID: '1', STRAVA_CLIENT_SECRET: 's' };
+    const fetchImpl = makeFetchImpl(555, 120);
+    const first = await runSyncSlice({ env, athleteId: 7, days: 180, cursor: null, knownIds: [], fetchImpl });
+    expect(first.remaining).toBe(0); // current-version ride skipped
+  });
+
+  it('stamps MMP_VERSION on re-extracted rides', async () => {
+    const state = {};
+    const db = makeDb(state);
+    state.users.set(7, { id: 7, access_token: 't', refresh_token: 'r', token_expires_at: 9e12 });
+    state.activities.set(555, { id: 555, user_id: 7, start_time: 1, duration_s: 100, mmp_version: null, has_power: 1 });
+    const env = { DB: db, STRAVA_CLIENT_ID: '1', STRAVA_CLIENT_SECRET: 's' };
+    const fetchImpl = makeFetchImpl(555, 120);
+    const first = await runSyncSlice({ env, athleteId: 7, days: 180, cursor: null, knownIds: [], fetchImpl });
+    const second = await runSyncSlice({ env, athleteId: 7, days: 180, cursor: first.cursor, knownIds: [], fetchImpl });
+    expect(second.processed).toBe(1);
+    expect(state.activities.get(555).mmp_version).toBe(MMP_VERSION);
   });
 });

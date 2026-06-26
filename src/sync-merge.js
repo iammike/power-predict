@@ -1,7 +1,7 @@
 // Decide which synced activities the client needs to (re)write to its
 // IndexedDB cache. A remote activity is written when it is new (no
 // cached row at that startTime) or when its mmpVersion differs from the
-// cached copy — the latter is how a server-side re-extraction (new
+// cached copy. The latter is how a server-side re-extraction (new
 // bucket set) propagates into the local cache. startTime (unix ms) is
 // the IDB key, so two rides can't collide on it.
 export function activitiesToRefresh(remoteActivities, cachedActivities) {

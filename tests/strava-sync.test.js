@@ -55,7 +55,7 @@ function makeDb(state = {}) {
       async all() {
         const b = getBound();
         if (sql.startsWith('SELECT id, mmp_version FROM activities')) {
-          return { results: [...state.activities.values()].map((a) => ({ id: a.id, mmp_version: a.mmp_version ?? null })) };
+          return { results: [...state.activities.values()].filter((a) => a.user_id === b[0]).map((a) => ({ id: a.id, mmp_version: a.mmp_version ?? null })) };
         }
         return { results: [] };
       },

@@ -4,6 +4,30 @@
 
 import { DURATIONS_S, dropAnomalies } from './mmp.js';
 
+// Effort-quality gate. A flat IF floor (e.g. 0.70) is only physiological
+// up to ~1h: a rider can hold high intensity for under an hour, so an
+// easy sub-hour ride should be dropped. Beyond 1h, sustainable whole-
+// ride IF falls, so the floor decays Riegel-style from the 1h anchor —
+// letting genuine multi-hour efforts through while still excluding easy
+// long rides. Continuous at the anchor (value unchanged; only the slope
+// bends), so there is no jump at 1h.
+export const EFFORT_GATE_ANCHOR_S = 3600; // floor is flat at/below 1h
+export const EFFORT_GATE_DECAY = 0.06;    // calibrated so 5.5h ≈ 0.63
+
+export function effortGateThreshold(minIF, durationS) {
+  if (!Number.isFinite(durationS) || durationS <= EFFORT_GATE_ANCHOR_S) return minIF;
+  return minIF * (EFFORT_GATE_ANCHOR_S / durationS) ** EFFORT_GATE_DECAY;
+}
+
+// True when the ride is hard enough to trust. No-op (returns true) when
+// the filter isn't configured (minIF/ftp not finite) or the activity has
+// no avgPower (legacy cache) — matching the prior all-or-nothing filter.
+export function passesEffortGate(avgPower, ftp, durationS, minIF) {
+  if (!Number.isFinite(minIF) || !Number.isFinite(ftp) || ftp <= 0) return true;
+  if (!Number.isFinite(avgPower)) return true;
+  return avgPower / ftp >= effortGateThreshold(minIF, durationS);
+}
+
 export function rollingBest(activityMmps, {
   windowDays = null,
   now = Date.now(),
@@ -11,11 +35,10 @@ export function rollingBest(activityMmps, {
   ftp = null,
 } = {}) {
   const cutoff = windowDays ? now - windowDays * 86400_000 : 0;
-  const filterEnabled = Number.isFinite(minIF) && Number.isFinite(ftp) && ftp > 0;
   const best = {};
-  for (const { startTime, mmp, avgPower } of activityMmps) {
+  for (const { startTime, mmp, avgPower, durationS } of activityMmps) {
     if (startTime < cutoff) continue;
-    if (filterEnabled && Number.isFinite(avgPower) && avgPower / ftp < minIF) continue;
+    if (!passesEffortGate(avgPower, ftp, durationS, minIF)) continue;
     const cleaned = dropAnomalies(mmp);
     for (const d of DURATIONS_S) {
       const v = cleaned[d];
@@ -36,11 +59,10 @@ export function rollingBestWithOwners(activityMmps, {
   ftp = null,
 } = {}) {
   const cutoff = windowDays ? now - windowDays * 86400_000 : 0;
-  const filterEnabled = Number.isFinite(minIF) && Number.isFinite(ftp) && ftp > 0;
   const best = {};
   for (const a of activityMmps) {
     if (a.startTime < cutoff) continue;
-    if (filterEnabled && Number.isFinite(a.avgPower) && a.avgPower / ftp < minIF) continue;
+    if (!passesEffortGate(a.avgPower, ftp, a.durationS, minIF)) continue;
     const cleaned = dropAnomalies(a.mmp);
     for (const d of DURATIONS_S) {
       const v = cleaned?.[d];
@@ -84,14 +106,10 @@ export function recencyWeightedBest(activityMmps, {
   const cutoff = windowDays ? now - windowDays * 86400_000 : 0;
   const halfLifeMs = halfLifeDays * 86400_000;
   const ln2 = Math.log(2);
-  const filterEnabled = Number.isFinite(minIF) && Number.isFinite(ftp) && ftp > 0;
   const winner = {}; // { [duration]: { raw, weighted } }
-  for (const { startTime, mmp, avgPower } of activityMmps) {
+  for (const { startTime, mmp, avgPower, durationS } of activityMmps) {
     if (startTime < cutoff) continue;
-    if (filterEnabled && Number.isFinite(avgPower)) {
-      const intensity = avgPower / ftp;
-      if (intensity < minIF) continue;
-    }
+    if (!passesEffortGate(avgPower, ftp, durationS, minIF)) continue;
     const ageMs = Math.max(0, now - startTime);
     const weight = Math.exp((-ln2 * ageMs) / halfLifeMs);
     for (const d of DURATIONS_S) {
@@ -136,7 +154,7 @@ export function effortQualityStats(activityMmps, { minIF, ftp }) {
   }
   for (const a of activityMmps) {
     if (!Number.isFinite(a.avgPower)) { unknown++; continue; }
-    if (a.avgPower / ftp < minIF) excluded++;
+    if (a.avgPower / ftp < effortGateThreshold(minIF, a.durationS)) excluded++;
     else included++;
   }
   return { included, excluded, unknown };

@@ -7,6 +7,8 @@ import {
   effortQualityStats,
   normalizedPower,
   avgPower,
+  effortGateThreshold,
+  passesEffortGate,
 } from '../src/aggregate.js';
 
 describe('rollingBest', () => {
@@ -162,5 +164,44 @@ describe('normalizedPower', () => {
     const np = normalizedPower(stream);
     const ap = avgPower(stream);
     expect(np).toBeGreaterThan(ap);
+  });
+});
+
+describe('effort gate', () => {
+  it('is flat at the anchor IF for rides up to 1h', () => {
+    expect(effortGateThreshold(0.70, 600)).toBe(0.70);
+    expect(effortGateThreshold(0.70, 1800)).toBe(0.70);
+    expect(effortGateThreshold(0.70, 3600)).toBe(0.70);
+  });
+
+  it('decays gently beyond 1h (continuous at the anchor)', () => {
+    expect(effortGateThreshold(0.70, 3601)).toBeCloseTo(0.70, 3);
+    // 5.5h ride: 0.70 * (3600/19872)^0.06
+    expect(effortGateThreshold(0.70, 19872)).toBeCloseTo(0.632, 3);
+    expect(effortGateThreshold(0.70, 32400)).toBeLessThan(0.632);
+  });
+
+  it('passes a hard 5.5h ride that the flat gate would drop', () => {
+    // avg 207 / ftp 300 = 0.69, below flat 0.70 but above the 0.63 long floor
+    expect(passesEffortGate(207, 300, 19872, 0.70)).toBe(true);
+  });
+
+  it('still drops an easy short ride and an easy long ride', () => {
+    expect(passesEffortGate(195, 300, 1800, 0.70)).toBe(false);   // 0.65 @ 30min
+    expect(passesEffortGate(165, 300, 19872, 0.70)).toBe(false);  // 0.55 @ 5.5h
+  });
+
+  it('is a no-op without a usable ftp/minIF or avgPower', () => {
+    expect(passesEffortGate(100, null, 19872, 0.70)).toBe(true);
+    expect(passesEffortGate(NaN, 300, 19872, 0.70)).toBe(true);
+  });
+
+  it('rollingBest keeps a hard long ride and drops an easy one', () => {
+    const acts = [
+      { startTime: 1, durationS: 19872, avgPower: 207, mmp: { 14400: 217, 1200: 291 } },
+      { startTime: 2, durationS: 19872, avgPower: 165, mmp: { 14400: 170 } },
+    ];
+    const best = rollingBest(acts, { minIF: 0.70, ftp: 300 });
+    expect(best[14400]).toBe(217);
   });
 });

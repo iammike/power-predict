@@ -1671,10 +1671,12 @@ body[data-app-state="manual"] #manual-mode {
 
 /* FOOTER */
 
+/* No margin-top: the page wrapper already sets the gap above the rule via its
+   own 4rem bottom padding -- `main` on the landing page, `.article` on the
+   docs pages. Having both stacked them into ~126px of dead space. */
 .site-footer {
   position: relative;
   z-index: 1;
-  margin-top: 4rem;
   padding: 1.75rem var(--gutter);
   border-top: var(--rule-soft);
   display: flex;

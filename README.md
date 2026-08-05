@@ -58,6 +58,8 @@ npm test            # vitest, 72 unit tests across 8 suites
 
 GitHub Pages serves `index.html` + `dist/` from `main`. The deploy workflow runs tests, builds, and publishes on every push.
 
+It also writes `version.json` (short SHA + commit URL) to the site root. Nothing on the page reads it — `curl https://power.iammike.org/version.json` to confirm which commit is live.
+
 The Cloudflare Worker is wired but unused until Phase 4 ships:
 
 ```bash

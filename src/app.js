@@ -1572,39 +1572,3 @@ async function handleClearCache() {
   setAppState('onboarding');
   showStatus('Cache cleared', { kind: 'success', dwellMs: 2200 });
 }
-
-
-// Build/version tag in the footer so we can confirm a deploy landed.
-// version.json is written by the deploy workflow at build time.
-(async () => {
-  try {
-    const el = document.getElementById('build-version');
-    if (!el) return;
-    let text = 'dev';
-    let href = null;
-    try {
-      const res = await fetch('version.json', { cache: 'no-store' });
-      if (res.ok) {
-        const v = await res.json();
-        if (v?.commit) {
-          text = v.commit;
-          href = v.url || null;
-        }
-      }
-    } catch { /* keep "dev" */ }
-    const live = document.getElementById('build-version');
-    if (!live) return;
-    if (href) {
-      const a = document.createElement('a');
-      a.href = href;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.textContent = text;
-      live.replaceChildren(a);
-    } else {
-      live.textContent = text;
-    }
-  } catch (err) {
-    console.warn('build version tag failed', err);
-  }
-})();

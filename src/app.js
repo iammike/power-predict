@@ -599,7 +599,7 @@ function resetTitle() {
   if (typeof document !== 'undefined') document.title = ORIGINAL_TITLE;
 }
 
-function formatBytes(bytes) {
+export function formatBytes(bytes) {
   if (!bytes) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
   let i = 0;
@@ -929,7 +929,7 @@ function wPrimeTooltip(fit) {
 // filename, which is Strava's upload ID and points to a different
 // public activity. Cells without a resolved ID (legacy cache or an
 // archive without activities.csv) render as plain text.
-function renderMmpCell(owner, newSyncIds) {
+export function renderMmpCell(owner, newSyncIds) {
   if (!owner || typeof owner.value !== 'number') return '—';
   const watts = formatPower(owner.value);
   const date = Number.isFinite(owner.startTime)
@@ -957,7 +957,7 @@ function renderMmpCell(owner, newSyncIds) {
 // month-day for anything older. Surfaces cache staleness at a
 // glance so a user with sync connected has a natural prompt to
 // hit Sync if the most recent ride is days behind today.
-function latestActivityLabel(activities) {
+export function latestActivityLabel(activities) {
   if (!Array.isArray(activities) || activities.length === 0) return 'no rides';
   let maxMs = -Infinity;
   for (const a of activities) {
@@ -988,7 +988,7 @@ function latestActivityLabel(activities) {
 // to literal 'All-time' when the cache reaches well into the past
 // (≥ 3 years), otherwise reads as 'Since Mar 2024' so a 180-day
 // sync user isn't told their three-month window is 'all-time'.
-function allTimeLabel(activities) {
+export function allTimeLabel(activities) {
   if (!Array.isArray(activities) || activities.length === 0) return 'All-time';
   let minMs = Infinity;
   for (const a of activities) {

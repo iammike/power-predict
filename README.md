@@ -76,8 +76,8 @@ wrangler secret put STRAVA_WEBHOOK_VERIFY_TOKEN
 Open issues are grouped by phase: see [milestones](https://github.com/iammike/power-predict/milestones). Highlights still queued:
 
 - **Phase 3 (modeling)** — done. 3-parameter CP fit with P_max (#12), training-load adjustment via CTL/ATL/TSB (#42), fitness-drift normalization (#17), anomaly filter (#18), manual mode (#73).
-- **Phase 4 (sync)** — Strava OAuth + webhook ingest (#20, #21), 180-day API backfill (#39), rate-limit budget (#22), connect UI (#26)
-- **Phase 5 (polish)** — privacy / accessibility / account deletion, robust FIT error recovery (#29)
+- **Phase 4 (sync)** — OAuth (#20), API backfill (#39), and connect UI (#26) shipped. Remaining work is the webhook auto-sync path: ingest handler (#21), authenticated ingest endpoint (#23), subscription bootstrap (#25), rate-limit budget (#22) — tracked under epic #177.
+- **Phase 5 (polish)** — privacy policy + Terms of Service (#27), account deletion (#30).
 
 ## Strava setup (for Phase 4)
 

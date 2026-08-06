@@ -1612,8 +1612,6 @@ body[data-app-state="manual"] #manual-mode {
   background: var(--paper-soft);
   padding: 0.1em 0.4em;
   border: 1px solid var(--hair);
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }
 .article a {
   color: var(--oxblood);
@@ -1621,6 +1619,17 @@ body[data-app-state="manual"] #manual-mode {
   border-bottom: 1px solid var(--oxblood);
 }
 .article a:hover { color: var(--oxblood-deep); border-bottom-color: var(--oxblood-deep); }
+
+/* Some article tables (e.g. the archive file listing) hold long
+   unbreakable `code` strings that are wider than a narrow viewport.
+   Scope the table in `.table-scroll` so it can scroll horizontally
+   on its own instead of forcing the whole page wider. */
+.table-scroll {
+  overflow-x: auto;
+}
+.table-scroll table {
+  min-width: 100%;
+}
 
 .article table {
   width: 100%;

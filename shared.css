@@ -1623,12 +1623,21 @@ body[data-app-state="manual"] #manual-mode {
 /* Some article tables (e.g. the archive file listing) hold long
    unbreakable `code` strings that are wider than a narrow viewport.
    Scope the table in `.table-scroll` so it can scroll horizontally
-   on its own instead of forcing the whole page wider. */
-.table-scroll {
+   on its own instead of forcing the whole page wider. The vertical
+   margin lives on the wrapper, not the table -- overflow-x: auto
+   makes `.table-scroll` a new block-formatting context, so a margin
+   on the table itself would stop collapsing with the surrounding
+   headings and add extra vertical gap. */
+.article .table-scroll {
   overflow-x: auto;
+  margin: 1rem 0 1.5rem;
 }
-.table-scroll table {
-  min-width: 100%;
+.article .table-scroll:focus-visible {
+  outline: 2px solid var(--oxblood);
+  outline-offset: 2px;
+}
+.article .table-scroll table {
+  margin: 0;
 }
 
 .article table {

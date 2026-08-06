@@ -1612,6 +1612,8 @@ body[data-app-state="manual"] #manual-mode {
   background: var(--paper-soft);
   padding: 0.1em 0.4em;
   border: 1px solid var(--hair);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .article a {
   color: var(--oxblood);

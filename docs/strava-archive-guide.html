@@ -61,17 +61,19 @@
 
     <h2>What's in the archive</h2>
 
-    <table>
-      <thead><tr><th>Path</th><th>Contents</th></tr></thead>
-      <tbody>
-        <tr><td><code>activities.csv</code></td><td>Metadata for every activity (date, name, distance, duration).</td></tr>
-        <tr><td><code>activities/&lt;id&gt;.fit.gz</code></td><td>Full FIT file — power, HR, cadence, GPS at 1 Hz.</td></tr>
-        <tr><td><code>activities/&lt;id&gt;.tcx.gz</code></td><td>Older Garmin Connect uploads. Power read from the <code>&lt;Watts&gt;</code> extension when present.</td></tr>
-        <tr><td><code>activities/&lt;id&gt;.gpx.gz</code></td><td>GPX rarely carries power, so these are skipped.</td></tr>
-        <tr><td><code>media/</code></td><td>Activity photos. Power Predict ignores these.</td></tr>
-        <tr><td><code>profile.csv</code>, <code>bikes.csv</code></td><td>Account info. Also ignored.</td></tr>
-      </tbody>
-    </table>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Archive file listing">
+      <table>
+        <thead><tr><th>Path</th><th>Contents</th></tr></thead>
+        <tbody>
+          <tr><td><code>activities.csv</code></td><td>Metadata for every activity (date, name, distance, duration).</td></tr>
+          <tr><td><code>activities/&lt;id&gt;.fit.gz</code></td><td>Full FIT file — power, HR, cadence, GPS at 1 Hz.</td></tr>
+          <tr><td><code>activities/&lt;id&gt;.tcx.gz</code></td><td>Older Garmin Connect uploads. Power read from the <code>&lt;Watts&gt;</code> extension when present.</td></tr>
+          <tr><td><code>activities/&lt;id&gt;.gpx.gz</code></td><td>GPX rarely carries power, so these are skipped.</td></tr>
+          <tr><td><code>media/</code></td><td>Activity photos. Power Predict ignores these.</td></tr>
+          <tr><td><code>profile.csv</code>, <code>bikes.csv</code></td><td>Account info. Also ignored.</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <h2>Troubleshooting</h2>
 

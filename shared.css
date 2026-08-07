@@ -1620,14 +1620,14 @@ body[data-app-state="manual"] #manual-mode {
 }
 .article a:hover { color: var(--oxblood-deep); border-bottom-color: var(--oxblood-deep); }
 
-/* Some article tables (e.g. the archive file listing) hold long
-   unbreakable `code` strings that are wider than a narrow viewport.
-   Scope the table in `.table-scroll` so it can scroll horizontally
-   on its own instead of forcing the whole page wider. The vertical
-   margin lives on the wrapper, not the table -- overflow-x: auto
-   makes `.table-scroll` a new block-formatting context, so a margin
-   on the table itself would stop collapsing with the surrounding
-   headings and add extra vertical gap. */
+/* This article table (the archive file listing) holds long unbreakable
+   `code` strings that are wider than a narrow viewport. Wrap the table
+   in `.table-scroll` so it can scroll horizontally on its own instead
+   of forcing the whole page wider. The vertical margin lives on the
+   wrapper, not the table -- overflow-x: auto makes `.table-scroll` a
+   new block-formatting context, so a margin on the table itself would
+   stop collapsing with the surrounding headings and add extra
+   vertical gap. */
 .article .table-scroll {
   overflow-x: auto;
   margin: 1rem 0 1.5rem;
@@ -1660,6 +1660,20 @@ body[data-app-state="manual"] #manual-mode {
   font-size: 0.72rem;
   color: var(--muted);
   border-bottom: 1px solid var(--ink);
+}
+
+/* At phone widths the file-listing table's Path column (long `code`
+   strings) leaves the Contents column too narrow to read without
+   scrolling .table-scroll sideways, which has no visible affordance
+   at rest. Trim cell padding so the whole table fits without needing
+   to scroll at all -- this is preferable to word-breaking `code`,
+   which fragments it into multiple bordered boxes (see #220). */
+@media (max-width: 480px) {
+  .article .table-scroll th,
+  .article .table-scroll td {
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+  }
 }
 
 .lead {

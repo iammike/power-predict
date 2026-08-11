@@ -107,6 +107,8 @@ body {
   font-feature-settings: "ss01", "cv11", "kern";
   position: relative;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 body::before {
@@ -192,6 +194,11 @@ a:hover { color: var(--oxblood-deep); }
 main {
   position: relative;
   z-index: 1;
+  flex: 1;
+  /* auto margins below suppress flex stretch, so this is load-bearing --
+     without it main becomes shrink-to-fit and stops tracking the
+     viewport on resize. */
+  width: 100%;
   max-width: 1080px;
   margin: 0 auto;
   padding: clamp(2rem, 6vw, 4.5rem) var(--gutter) 4rem;
@@ -1569,6 +1576,9 @@ body[data-app-state="manual"] #manual-mode {
 .article {
   position: relative;
   z-index: 1;
+  flex: 1;
+  /* see main's width: 100% comment -- same reason, same fix. */
+  width: 100%;
   max-width: 38rem;
   margin: 0 auto;
   padding: clamp(2rem, 6vw, 4.5rem) var(--gutter) 4rem;

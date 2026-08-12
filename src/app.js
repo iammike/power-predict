@@ -786,6 +786,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     return { value: input.value, hadOutput: out && !out.hidden };
   })();
 
+  destroyCurveChart();
   resultsEl.innerHTML = `
     <header class="results-head">
       <h2>Mean Maximal Power</h2>
@@ -1260,6 +1261,24 @@ function wireOverrideForm() {
   });
 }
 
+// Call before any wholesale resultsEl.innerHTML replacement that would
+// discard the existing #curve-chart element -- renderCurveChart only
+// destroys the outgoing chart when it's reused on the *same* container;
+// when the container itself is thrown away, uPlot's module-level
+// cursorPlots registry keeps the old instance (and its window/document
+// listeners) alive indefinitely unless destroy() is called first.
+// Also disconnects the ResizeObserver: the container is about to be
+// detached, and its own resize-to-0 on removal would otherwise call
+// setSize() on the chart we just destroyed.
+function destroyCurveChart() {
+  const el = document.getElementById('curve-chart');
+  if (!el) return;
+  el._resizeObserver?.disconnect();
+  el._resizeObserver = null;
+  el._chart?.destroy();
+  el._chart = null;
+}
+
 function wireCurveChart() {
   const container = document.getElementById('curve-chart');
   if (!container || !currentFit) return;
@@ -1310,6 +1329,7 @@ function renderManualMode(fit, inputs = {}) {
   const sprintInit = Number.isFinite(inputs.sprint1minW) ? Math.round(inputs.sprint1minW) : '';
   const headerMeta = unit === 'cp' ? 'Synthesized from CP' : 'Synthesized from FTP';
 
+  destroyCurveChart();
   resultsEl.innerHTML = `
     <section class="predict predict--manual">
       <header class="results-head">
@@ -1567,6 +1587,7 @@ async function handleClearCache() {
   if (!confirm('Clear all cached activity data from this browser?')) return;
   await clearActivities();
   resultsEl.hidden = true;
+  destroyCurveChart();
   resultsEl.innerHTML = '';
   currentActivities = [];
   setAppState('onboarding');

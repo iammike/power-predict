@@ -38,6 +38,12 @@ const STANDARD_TICKS = [
 
 export function renderCurveChart(container, { mmp, fit, fitWindowLabel = 'last 90 days' }) {
   if (!container) return;
+  // Each tab click (last30/last90/all-time) re-renders into the same
+  // container. Destroy the outgoing chart -- uPlot attaches window/
+  // document listeners for cursor tracking that innerHTML clearing
+  // alone won't remove -- before wiping the DOM for the new one.
+  container._chart?.destroy();
+  container._chart = null;
   container.innerHTML = '';
   if (!fit) {
     container.innerHTML = '<p class="results-foot__note">Need a fit before plotting the curve.</p>';
@@ -177,16 +183,27 @@ export function renderCurveChart(container, { mmp, fit, fitWindowLabel = 'last 9
   };
 
   const chart = new uPlot(opts, data, container);
-  // Resize on window changes
-  if (!container.dataset.resizeBound) {
-    container.dataset.resizeBound = '1';
+  container._chart = chart;
+
+  // Bound once per container, not per chart: a tab click builds a new
+  // chart into this same container (see the destroy() above), and a
+  // window listener bound here would keep resizing the discarded
+  // instance forever. The observer callback re-reads container._chart
+  // on every fire, so it always targets whatever chart is live rather
+  // than needing to be rebound on each render. Watching the container
+  // itself (not window resize) also catches layout-driven size changes
+  // that aren't a window resize at all. Guarded by the observer
+  // reference itself, not a separate dataset flag, so the guard can't
+  // desync from the thing it's guarding.
+  if (!container._resizeObserver) {
     let resizeTimer = null;
-    window.addEventListener('resize', () => {
+    container._resizeObserver = new ResizeObserver(() => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        chart.setSize({ width: container.clientWidth, height: 360 });
+        container._chart?.setSize({ width: container.clientWidth, height: 360 });
       }, 80);
     });
+    container._resizeObserver.observe(container);
   }
 }
 

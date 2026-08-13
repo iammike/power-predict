@@ -5,6 +5,26 @@
 import uPlot from 'uplot';
 import { DEFAULT_DECAY, predictPower } from './cpfit.js';
 
+const CHART_HEIGHT = 360;
+
+// container.clientWidth is the padding box; .curve-chart carries its own
+// left/right padding (shared.css), so sizing the chart from clientWidth
+// alone renders it wider than the content area it actually has to fit
+// in. Subtract the padding to get the true available width.
+function contentWidth(el, fallback) {
+  if (!el) return fallback;
+  const w = el.clientWidth;
+  // Also guards a real browser quirk: a display:none container reports
+  // clientWidth 0 but getComputedStyle still resolves percentage padding
+  // as an unresolved string ("10%" rather than a px value), which would
+  // parseFloat to a bogus 10. Bailing out here before that read matters.
+  if (!w) return fallback;
+  const cs = getComputedStyle(el);
+  const px = (v) => parseFloat(v) || 0;
+  const padding = px(cs.paddingLeft) + px(cs.paddingRight);
+  return Math.max(0, w - padding);
+}
+
 const SAMPLE_DURATIONS = (() => {
   // Dense log-spaced samples 1s..24h for the model and decay lines.
   const out = [];
@@ -118,8 +138,8 @@ export function renderCurveChart(container, { mmp, fit, fitWindowLabel = 'last 9
   const hair = 'rgba(26, 22, 18, 0.18)';
 
   const opts = {
-    width: container.clientWidth || 720,
-    height: 360,
+    width: contentWidth(container, 720),
+    height: CHART_HEIGHT,
     padding: [16, 16, 8, 8],
     scales: {
       x: { distr: 3, log: 10 },          // log10 scale on duration
@@ -200,7 +220,7 @@ export function renderCurveChart(container, { mmp, fit, fitWindowLabel = 'last 9
     container._resizeObserver = new ResizeObserver(() => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        container._chart?.setSize({ width: container.clientWidth, height: 360 });
+        container._chart?.setSize({ width: contentWidth(container, 0), height: CHART_HEIGHT });
       }, 80);
     });
     container._resizeObserver.observe(container);

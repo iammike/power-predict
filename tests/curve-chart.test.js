@@ -9,7 +9,8 @@ import { mmpToPoints, fitCp2 } from '../src/cpfit.js';
 // were called on a given instance.
 vi.mock('uplot', () => {
   class FakeUPlot {
-    constructor() {
+    constructor(opts) {
+      this.opts = opts;
       this.destroyed = false;
       this.setSizeCalls = [];
     }
@@ -139,5 +140,79 @@ describe('renderCurveChart lifecycle (#231)', () => {
   it('does nothing when given no container', () => {
     const { mmp, fit } = makeFit();
     expect(() => renderCurveChart(null, { mmp, fit })).not.toThrow();
+  });
+});
+
+// jsdom doesn't run real layout, so a plain createElement('div').clientWidth
+// is always 0 -- these tests stub it explicitly to exercise the padding
+// arithmetic (#233) that a real browser's box model would otherwise hide.
+describe('renderCurveChart sizing (#233)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    FakeResizeObserver.instances = [];
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function stubBox(container, { clientWidth, paddingLeft = '8px', paddingRight = '8px' }) {
+    Object.defineProperty(container, 'clientWidth', { value: clientWidth, configurable: true });
+    container.style.paddingLeft = paddingLeft;
+    container.style.paddingRight = paddingRight;
+  }
+
+  it('sizes the initial chart from content width, not the full padding box', () => {
+    const container = document.createElement('div');
+    stubBox(container, { clientWidth: 916 });
+    const { mmp, fit } = makeFit();
+
+    renderCurveChart(container, { mmp, fit });
+
+    // 916 clientWidth - 8px - 8px padding = 900. Before the fix this
+    // was 916, wider than the container actually has room for.
+    expect(container._chart.opts.width).toBe(900);
+  });
+
+  it('sizes a resize the same way, matching the padding box at fire time', () => {
+    const container = document.createElement('div');
+    stubBox(container, { clientWidth: 916 });
+    const { mmp, fit } = makeFit();
+    renderCurveChart(container, { mmp, fit });
+
+    stubBox(container, { clientWidth: 616, paddingLeft: '10px', paddingRight: '6px' });
+    FakeResizeObserver.instances[0].cb();
+    vi.advanceTimersByTime(100);
+
+    const lastCall = container._chart.setSizeCalls.at(-1);
+    expect(lastCall.width).toBe(600); // 616 - 10 - 6
+  });
+
+  it('falls back to the default width on initial render when the container has no measurable size', () => {
+    const container = document.createElement('div');
+    stubBox(container, { clientWidth: 0 });
+    const { mmp, fit } = makeFit();
+
+    renderCurveChart(container, { mmp, fit });
+
+    expect(container._chart.opts.width).toBe(720);
+  });
+
+  it('falls back to 0 (not the initial-render default) when a resize fires on a hidden container', () => {
+    // Matches pre-fix behavior for this edge case: the old code passed
+    // container.clientWidth straight through with no fallback at all,
+    // so a hidden container's resize always resized to 0.
+    const container = document.createElement('div');
+    stubBox(container, { clientWidth: 916 });
+    const { mmp, fit } = makeFit();
+    renderCurveChart(container, { mmp, fit });
+
+    stubBox(container, { clientWidth: 0 });
+    FakeResizeObserver.instances[0].cb();
+    vi.advanceTimersByTime(100);
+
+    expect(container._chart.setSizeCalls.at(-1).width).toBe(0);
   });
 });

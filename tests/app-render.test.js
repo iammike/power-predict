@@ -10,6 +10,7 @@ import {
   formatTsb, usesDefaultK, fatigueValue, fatigueQuality, fatigueTooltip,
   combinedFitQuality, combinedFitTooltip,
   eftpWindowLabel, eftpTooltip, formQuality, formTooltip,
+  filterExcludedActivities, renderExcludedRow,
 } from '../src/app.js';
 
 describe('formatBytes', () => {
@@ -96,6 +97,20 @@ describe('renderMmpCell', () => {
     const newSyncIds = new Set(['999']);
     const el = parse(renderMmpCell({ value: 300, stravaId: '123456' }, newSyncIds));
     expect(el.querySelector('.mmp-cell__new')).toBeNull();
+  });
+
+  it('renders an exclude button keyed on startTime when startTime is known', () => {
+    const startTime = new Date('2026-03-15T12:00:00').getTime();
+    const el = parse(renderMmpCell({ value: 300, startTime, stravaId: '123456' }, null));
+    const btn = el.querySelector('.mmp-cell__exclude');
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute('data-exclude-start')).toBe(String(startTime));
+    expect(btn.getAttribute('aria-label')).toBe('Exclude this ride');
+  });
+
+  it('omits the exclude button when startTime is not known', () => {
+    const el = parse(renderMmpCell({ value: 300, stravaId: '123456' }, null));
+    expect(el.querySelector('.mmp-cell__exclude')).toBeNull();
   });
 });
 
@@ -475,5 +490,68 @@ describe('formTooltip', () => {
 
   it('reports a negative capped adjustment for a TSB past the cap threshold', () => {
     expect(formTooltip(50, 45, -40)).toMatch(/-5% applied to predictions/);
+  });
+});
+
+describe('filterExcludedActivities', () => {
+  it('returns the input unchanged when there are no excluded ids', () => {
+    const activities = [{ startTime: 1 }, { startTime: 2 }];
+    expect(filterExcludedActivities(activities, [])).toBe(activities);
+    expect(filterExcludedActivities(activities, null)).toBe(activities);
+    expect(filterExcludedActivities(activities, undefined)).toBe(activities);
+  });
+
+  it('drops activities whose startTime is in the excluded list', () => {
+    const activities = [{ startTime: 1 }, { startTime: 2 }, { startTime: 3 }];
+    expect(filterExcludedActivities(activities, [2])).toEqual([{ startTime: 1 }, { startTime: 3 }]);
+  });
+
+  it('drops multiple matches and ignores excluded ids with no matching activity', () => {
+    const activities = [{ startTime: 1 }, { startTime: 2 }, { startTime: 3 }];
+    expect(filterExcludedActivities(activities, [1, 3, 999])).toEqual([{ startTime: 2 }]);
+  });
+
+  it('returns an empty array when every activity is excluded', () => {
+    const activities = [{ startTime: 1 }, { startTime: 2 }];
+    expect(filterExcludedActivities(activities, [1, 2])).toEqual([]);
+  });
+});
+
+describe('renderExcludedRow', () => {
+  const parse = (html) => {
+    const ul = document.createElement('ul');
+    ul.innerHTML = html;
+    return ul;
+  };
+
+  it('renders the formatted date and a Restore button keyed on startTime', () => {
+    const startTime = new Date('2026-03-15T12:00:00').getTime();
+    const el = parse(renderExcludedRow({ startTime }));
+    const expectedDate = new Date(startTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    expect(el.textContent).toContain(expectedDate);
+    const btn = el.querySelector('[data-restore-start]');
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute('data-restore-start')).toBe(String(startTime));
+    expect(btn.textContent).toBe('Restore');
+  });
+
+  it('adds a Strava view link when stravaId is present', () => {
+    const startTime = new Date('2026-03-15T12:00:00').getTime();
+    const el = parse(renderExcludedRow({ startTime, stravaId: '123456' }));
+    const link = el.querySelector('a');
+    expect(link).not.toBeNull();
+    expect(link.getAttribute('href')).toBe('https://www.strava.com/activities/123456');
+    expect(link.getAttribute('target')).toBe('_blank');
+  });
+
+  it('omits the Strava link when stravaId is absent', () => {
+    const startTime = new Date('2026-03-15T12:00:00').getTime();
+    const el = parse(renderExcludedRow({ startTime }));
+    expect(el.querySelector('a')).toBeNull();
+  });
+
+  it('falls back to "unknown date" when startTime is not finite', () => {
+    const el = parse(renderExcludedRow({}));
+    expect(el.textContent).toContain('unknown date');
   });
 });

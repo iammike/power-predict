@@ -89,8 +89,8 @@ async function hydrateFromCache() {
   try {
     const [cached, settings] = await Promise.all([loadActivities(), loadSettings()]);
     currentSettings = settings || {};
-    currentActivities = cached;
     currentActivitiesRaw = cached;
+    currentActivities = filterExcludedActivities(cached, currentSettings.excludedStartTimes);
     if (cached.length > 0) {
       renderCurves(cached, { fromCache: true });
     }
@@ -643,8 +643,10 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // all-excluded cache is still a populated cache, not an empty one.
   setAppState(activityMmps.length > 0 ? 'data' : 'onboarding');
   const excludedSet = new Set(excludedStartTimes);
+  // Newest-excluded-first — a ride you just excluded should be at the
+  // top of the list, not wherever IDB's startTime-ascending order put it.
   const excludedActivities = excludedSet.size
-    ? activityMmps.filter((a) => excludedSet.has(a.startTime))
+    ? activityMmps.filter((a) => excludedSet.has(a.startTime)).sort((a, b) => b.startTime - a.startTime)
     : [];
   // Filter activities by the user's date range, if set.
   const dateFromMs = currentSettings.dateFrom ? Date.parse(currentSettings.dateFrom) : null;
@@ -979,8 +981,9 @@ export function renderMmpCell(owner, newSyncIds) {
   // startTime is the exclusion key (#132) — always present on a real
   // owner in practice, but guarded since a synthetic/legacy owner
   // without one can't be excluded.
+  const excludeLabel = date ? `Exclude ride from ${date}` : 'Exclude this ride';
   const exclude = Number.isFinite(owner.startTime)
-    ? ` <button type="button" class="mmp-cell__exclude" data-exclude-start="${owner.startTime}" data-tooltip="Exclude this ride from all stats" aria-label="Exclude this ride">×</button>`
+    ? ` <button type="button" class="mmp-cell__exclude" data-exclude-start="${owner.startTime}" data-tooltip="Exclude this ride from all stats" aria-label="${excludeLabel}">×</button>`
     : '';
   if (!owner.stravaId) {
     return date ? `<span data-tooltip="${date}">${watts}</span>${badge}${exclude}` : `${watts}${badge}${exclude}`;

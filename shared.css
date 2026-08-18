@@ -822,11 +822,13 @@ body[data-app-state="manual"] #manual-mode {
 @media (hover: hover) {
   .mmp-cell__exclude {
     opacity: 0;
+    pointer-events: none;
     transition: opacity 120ms ease, color 120ms ease;
   }
   .mmp-table tr:hover .mmp-cell__exclude,
   .mmp-cell__exclude:focus-visible {
     opacity: 1;
+    pointer-events: auto;
   }
 }
 .mmp-cell__exclude:hover {

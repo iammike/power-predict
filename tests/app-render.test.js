@@ -99,13 +99,15 @@ describe('renderMmpCell', () => {
     expect(el.querySelector('.mmp-cell__new')).toBeNull();
   });
 
-  it('renders an exclude button keyed on startTime when startTime is known', () => {
+  it('renders an exclude button keyed on startTime, labeled with the ride date, when startTime is known', () => {
     const startTime = new Date('2026-03-15T12:00:00').getTime();
     const el = parse(renderMmpCell({ value: 300, startTime, stravaId: '123456' }, null));
     const btn = el.querySelector('.mmp-cell__exclude');
     expect(btn).not.toBeNull();
     expect(btn.getAttribute('data-exclude-start')).toBe(String(startTime));
-    expect(btn.getAttribute('aria-label')).toBe('Exclude this ride');
+    const expectedDate = new Date(startTime)
+      .toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    expect(btn.getAttribute('aria-label')).toBe(`Exclude ride from ${expectedDate}`);
   });
 
   it('omits the exclude button when startTime is not known', () => {

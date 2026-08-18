@@ -802,8 +802,12 @@ body[data-app-state="manual"] #manual-mode {
   vertical-align: 0.1em;
 }
 
-/* Exclude control (#132) — quiet until the row is hovered/focused, so
-   the table doesn't read as button-heavy at rest. */
+/* Exclude control (#132). On hover-capable devices it's quiet until
+   the row is hovered/focused, so the table doesn't read as
+   button-heavy at rest. On touch, there's no hover to reveal it, and
+   opacity:0 doesn't stop it from being tappable — so it stays visible
+   and skips the reveal transition entirely rather than being an
+   invisible-but-active tap target. */
 .mmp-cell__exclude {
   margin-left: 0.35rem;
   padding: 0 0.3rem;
@@ -814,12 +818,16 @@ body[data-app-state="manual"] #manual-mode {
   font-size: 0.85rem;
   line-height: 1;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease;
 }
-tr:hover .mmp-cell__exclude,
-.mmp-cell__exclude:focus-visible {
-  opacity: 1;
+@media (hover: hover) {
+  .mmp-cell__exclude {
+    opacity: 0;
+    transition: opacity 120ms ease, color 120ms ease;
+  }
+  .mmp-table tr:hover .mmp-cell__exclude,
+  .mmp-cell__exclude:focus-visible {
+    opacity: 1;
+  }
 }
 .mmp-cell__exclude:hover,
 .mmp-cell__exclude:focus-visible {

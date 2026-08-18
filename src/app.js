@@ -90,6 +90,7 @@ async function hydrateFromCache() {
     const [cached, settings] = await Promise.all([loadActivities(), loadSettings()]);
     currentSettings = settings || {};
     currentActivities = cached;
+    currentActivitiesRaw = cached;
     if (cached.length > 0) {
       renderCurves(cached, { fromCache: true });
     }
@@ -253,7 +254,7 @@ async function triggerStravaSync() {
     // Only rides already extracted at the current version are safe to
     // declare "known" — a stale-version ride must NOT be suppressed, or
     // the server would skip re-extracting it with the new bucket set.
-    const knownIds = currentActivities
+    const knownIds = currentActivitiesRaw
       .filter((a) => a.mmpVersion === MMP_VERSION)
       .map((a) => a.stravaId)
       .filter((id) => id != null && id !== '');
@@ -272,7 +273,7 @@ async function triggerStravaSync() {
     if (removedIds?.length) {
       await removeActivitiesByStravaId(removedIds);
       const removedSet = new Set(removedIds.map(String));
-      currentActivities = currentActivities.filter((a) => !removedSet.has(String(a.stravaId)));
+      currentActivitiesRaw = currentActivitiesRaw.filter((a) => !removedSet.has(String(a.stravaId)));
     }
     setSync('Loading synced data');
     const remoteActivities = await fetchSyncedActivities(session.session);
@@ -281,19 +282,21 @@ async function triggerStravaSync() {
       return;
     }
     // Write rides that are new OR whose server-side mmpVersion changed
-    // (a re-extraction). hasActivity alone would miss the latter.
-    const fresh = activitiesToRefresh(remoteActivities, currentActivities);
+    // (a re-extraction). hasActivity alone would miss the latter. Uses
+    // the raw (unfiltered) set — an excluded ride is still genuinely
+    // cached and must not be re-classified as "fresh" on every sync.
+    const fresh = activitiesToRefresh(remoteActivities, currentActivitiesRaw);
     // Snapshot per-(duration, window) owners BEFORE saving the sync
     // results so we can diff afterwards. The diff catches any cell
     // whose owner activity changed — that's the right signal for
     // "new this sync," more robust than "activity not in IDB by
     // startTime," which misses rides that arrived via webhook between
     // page loads or that share a startTime with an existing record.
-    const hadPriorActivities = currentActivities.length > 0;
+    const hadPriorActivities = currentActivitiesRaw.length > 0;
     const ownersBefore = {
-      allTime: rollingBestWithOwners(currentActivities),
-      last90:  rollingBestWithOwners(currentActivities, { windowDays: 90 }),
-      last30:  rollingBestWithOwners(currentActivities, { windowDays: 30 }),
+      allTime: rollingBestWithOwners(currentActivitiesRaw),
+      last90:  rollingBestWithOwners(currentActivitiesRaw, { windowDays: 90 }),
+      last30:  rollingBestWithOwners(currentActivitiesRaw, { windowDays: 30 }),
     };
     if (fresh.length) await saveActivities(fresh);
     const all = await loadActivities();
@@ -1236,6 +1239,7 @@ function wireMmpTable() {
       excludedStartTimes: (currentSettings.excludedStartTimes || []).filter((t) => t !== startTime),
     };
     await saveSettings(currentSettings);
+    showStatus('Ride restored to all stats.', { kind: 'success', dwellMs: 2200 });
     renderCurves(currentActivitiesRaw, { fromCache: true });
   });
 }
@@ -1296,17 +1300,17 @@ function wireOverrideForm() {
     renderCurves(currentActivitiesRaw, { fromCache: true });
   });
   document.getElementById('reset-override').addEventListener('click', async () => {
-    // Reset clears the override-form fields (CP override + date range)
-    // but must preserve the Strava session and any excluded rides (#132)
-    // — those keys belong to different features, not the fit override.
-    const preserved = {
-      stravaSession: currentSettings.stravaSession,
-      stravaAthleteId: currentSettings.stravaAthleteId,
-      excludedStartTimes: currentSettings.excludedStartTimes,
-    };
-    currentSettings = Object.fromEntries(
-      Object.entries(preserved).filter(([, v]) => v != null)
-    );
+    // Reset clears only the override-form's own fields. Deleting by
+    // name (rather than rebuilding from an allowlist of keys to keep)
+    // means every other settings field — Strava session, excluded
+    // rides (#132), lastSyncNewIds, minIF, whatever's added next —
+    // survives automatically instead of needing to be remembered here.
+    const next = { ...currentSettings };
+    delete next.cpOverrideW;
+    delete next.overrideUnit;
+    delete next.dateFrom;
+    delete next.dateTo;
+    currentSettings = next;
     await saveSettings(currentSettings);
     renderCurves(currentActivitiesRaw, { fromCache: true });
   });
@@ -1380,8 +1384,12 @@ function renderManualMode(fit, inputs = {}) {
   // Snapshot the existing data-driven state so the user can swap
   // back without reloading. Manual mode replaces the rendered view
   // but does not clear IDB or the in-memory activity list — we just
-  // hold onto it for the "Back to my data" link below.
-  const priorActivities = currentActivities;
+  // hold onto it for the "Back to my data" link below. Snapshot the
+  // raw (unfiltered) set, not currentActivities — renderCurves needs
+  // the complete set to re-derive the exclusion filter from, or a
+  // previously-excluded ride would have nothing to restore from after
+  // a manual-mode round trip.
+  const priorActivities = currentActivitiesRaw;
   const priorSettings = currentSettings;
   currentFit = fit;
   currentEftpNow = null;
@@ -1657,6 +1665,7 @@ async function handleClearCache() {
   destroyCurveChart();
   resultsEl.innerHTML = '';
   currentActivities = [];
+  currentActivitiesRaw = [];
   setAppState('onboarding');
   showStatus('Cache cleared', { kind: 'success', dwellMs: 2200 });
 }

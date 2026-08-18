@@ -874,32 +874,32 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
 
 // Quality bands for the fit stats. Bands are rules of thumb for the
 // 2-param CP fit on real cyclist data; see methodology doc.
-function rmseQuality(rmse) {
+export function rmseQuality(rmse) {
   if (rmse < 5)  return { label: 'excellent', cls: 'is-good' };
   if (rmse < 15) return { label: 'good',      cls: 'is-good' };
   if (rmse < 30) return { label: 'noisy',     cls: 'is-mid'  };
   return                 { label: 'poor fit', cls: 'is-bad'  };
 }
-function rmseTooltip(rmse) {
+export function rmseTooltip(rmse) {
   return 'Root-mean-squared error of the regression. Lower = tighter fit. '
        + 'Typical bands: <5W excellent (clean test data), 5-15W good (real-world riding), '
        + '15-30W noisy, >30W means the model isn\'t fitting your data well. '
        + 'Note: the fit line is a least-squares smoother, so individual MMP dots can sit '
        + 'slightly above or below it — RMSE is the size of that gap.';
 }
-function pointsQuality(n) {
+export function pointsQuality(n) {
   // 9 durations available in our DURATIONS_S between 3 and 20 min.
   if (n >= 7) return { label: 'full',     cls: 'is-good' };
   if (n >= 4) return { label: 'ok',       cls: 'is-mid'  };
   if (n >= 2) return { label: 'minimal',  cls: 'is-bad'  };
   return            { label: 'too few',  cls: 'is-bad'  };
 }
-function cpQuality(fit) {
+export function cpQuality(fit) {
   if (fit.overridden) return { label: 'override', cls: 'is-mid'  };
   if (fit.fallback)   return { label: 'all-time', cls: 'is-mid'  };
   return                     { label: 'data',     cls: 'is-good' };
 }
-function cpTooltip(fit) {
+export function cpTooltip(fit) {
   if (fit.overridden) return 'CP is pinned to your manual override. W\' is still derived from the regression so the curve shape stays data-driven.';
   if (fit.fallback)   return 'The 90-day window had too few MMP points in the fit range, so the fit fell back to all-time data.';
   if (fit.model === '3p' && Number.isFinite(fit.pMaxW)) {
@@ -907,7 +907,7 @@ function cpTooltip(fit) {
   }
   return 'CP came from a normal regression on the active window (last 90 days or your custom range).';
 }
-function wPrimeQuality(fit) {
+export function wPrimeQuality(fit) {
   if (fit?.wPrimeSource === 'history') return { label: 'history', cls: 'is-mid' };
   const kJ = (fit?.wPrimeJ ?? 0) / 1000;
   if (kJ < 8)  return { label: 'low',       cls: 'is-mid'  };
@@ -915,7 +915,7 @@ function wPrimeQuality(fit) {
   if (kJ < 40) return { label: 'high',      cls: 'is-good' };
   return            { label: 'very high', cls: 'is-mid'  };
 }
-function wPrimeTooltip(fit) {
+export function wPrimeTooltip(fit) {
   if (fit?.wPrimeSource === 'history') {
     return 'Anaerobic work capacity above CP. The recent window lacked a hard sub-3-min effort, '
          + 'so W\' is anchored on your longer training history where the anaerobic ceiling is visible. '
@@ -1031,7 +1031,7 @@ function eftpTooltip() {
 
 // Form (TSB) display helpers. TSB is unitless; we report it with a
 // sign so a glance tells the user whether they're fresh or fatigued.
-function formatTsb(tsb) {
+export function formatTsb(tsb) {
   const v = Math.round(tsb);
   return v > 0 ? `+${v}` : String(v);
 }
@@ -1056,18 +1056,18 @@ function formTooltip() {
 // A clamped fit is discarded for prediction (see wirePredictForm /
 // renderCurveChart), so the readout reports the default k that's
 // actually in use — never the implausible rail value.
-function usesDefaultK(fit) {
+export function usesDefaultK(fit) {
   return !fit.fatigue || fit.fatigue.clamped;
 }
-function fatigueValue(fit) {
+export function fatigueValue(fit) {
   const k = usesDefaultK(fit) ? DEFAULT_DECAY.k : fit.fatigue.k;
   return k.toFixed(2);
 }
-function fatigueQuality(fit) {
+export function fatigueQuality(fit) {
   if (usesDefaultK(fit)) return { label: 'default', cls: 'is-mid' };
   return { label: `${fit.fatigue.nPoints} pts`, cls: 'is-good' };
 }
-function fatigueTooltip(fit) {
+export function fatigueTooltip(fit) {
   const def = DEFAULT_DECAY.k.toFixed(2);
   if (usesDefaultK(fit)) {
     const why = fit.fatigue
@@ -1087,17 +1087,17 @@ function fatigueTooltip(fit) {
 // the worse of the two so the headline label reflects the limiting
 // factor. Tooltip lists both numbers + the per-axis interpretation.
 const QUALITY_RANK = { 'is-good': 0, 'is-mid': 1, 'is-bad': 2 };
-function combinedFitQuality(fit) {
+export function combinedFitQuality(fit) {
   const r = rmseQuality(fit.rmse);
   const p = pointsQuality(fit.nPoints);
   return QUALITY_RANK[p.cls] >= QUALITY_RANK[r.cls] ? p : r;
 }
-function combinedFitTooltip(fit) {
+export function combinedFitTooltip(fit) {
   return `Fit quality summary. RMSE ${fit.rmse.toFixed(1)} W (${rmseQuality(fit.rmse).label}) · ${fit.nPoints} points (${pointsQuality(fit.nPoints).label}). `
        + 'RMSE is regression error in watts; points is how many MMP durations between 3 and 20 min the fit had to work with.';
 }
 
-function pointsTooltip(n) {
+export function pointsTooltip(n) {
   return 'Number of MMP points (durations between 3 and 20 minutes) the regression fitted on. '
        + 'Up to 9 possible. 7+ is a full picture, 4-6 is workable, 2-3 is minimal — '
        + 'a fit through only 2 points has no error to speak of but very little to corroborate it.';

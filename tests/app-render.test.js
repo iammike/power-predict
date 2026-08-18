@@ -3,7 +3,13 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 // not of anything in this file) -- without a real IDB it fails safely into
 // a caught rejection, but this keeps that path quiet.
 import 'fake-indexeddb/auto';
-import { formatBytes, renderMmpCell, latestActivityLabel, allTimeLabel } from '../src/app.js';
+import {
+  formatBytes, renderMmpCell, latestActivityLabel, allTimeLabel,
+  rmseQuality, rmseTooltip, pointsQuality, pointsTooltip,
+  cpQuality, cpTooltip, wPrimeQuality, wPrimeTooltip,
+  formatTsb, usesDefaultK, fatigueValue, fatigueQuality, fatigueTooltip,
+  combinedFitQuality, combinedFitTooltip,
+} from '../src/app.js';
 
 describe('formatBytes', () => {
   it('formats sub-KB sizes as whole bytes', () => {
@@ -211,5 +217,183 @@ describe('allTimeLabel', () => {
     vi.setSystemTime(now);
     const startTime = now.getTime() - (365 * 3 * 86_400_000 + 1);
     expect(allTimeLabel([{ startTime }])).toBe('All-time');
+  });
+});
+
+describe('rmseQuality', () => {
+  it('bands watts into excellent/good/noisy/poor fit', () => {
+    expect(rmseQuality(4.9)).toEqual({ label: 'excellent', cls: 'is-good' });
+    expect(rmseQuality(5)).toEqual({ label: 'good', cls: 'is-good' });
+    expect(rmseQuality(14.9)).toEqual({ label: 'good', cls: 'is-good' });
+    expect(rmseQuality(15)).toEqual({ label: 'noisy', cls: 'is-mid' });
+    expect(rmseQuality(29.9)).toEqual({ label: 'noisy', cls: 'is-mid' });
+    expect(rmseQuality(30)).toEqual({ label: 'poor fit', cls: 'is-bad' });
+  });
+});
+
+describe('rmseTooltip', () => {
+  it('describes the RMSE bands regardless of input', () => {
+    expect(rmseTooltip(10)).toMatch(/excellent/);
+    expect(rmseTooltip(10)).toMatch(/Root-mean-squared error/);
+  });
+});
+
+describe('pointsQuality', () => {
+  it('bands point counts into full/ok/minimal/too few', () => {
+    expect(pointsQuality(9)).toEqual({ label: 'full', cls: 'is-good' });
+    expect(pointsQuality(7)).toEqual({ label: 'full', cls: 'is-good' });
+    expect(pointsQuality(6)).toEqual({ label: 'ok', cls: 'is-mid' });
+    expect(pointsQuality(4)).toEqual({ label: 'ok', cls: 'is-mid' });
+    expect(pointsQuality(3)).toEqual({ label: 'minimal', cls: 'is-bad' });
+    expect(pointsQuality(2)).toEqual({ label: 'minimal', cls: 'is-bad' });
+    expect(pointsQuality(1)).toEqual({ label: 'too few', cls: 'is-bad' });
+    expect(pointsQuality(0)).toEqual({ label: 'too few', cls: 'is-bad' });
+  });
+});
+
+describe('pointsTooltip', () => {
+  it('explains the point-count scale', () => {
+    expect(pointsTooltip(5)).toMatch(/Up to 9 possible/);
+  });
+});
+
+describe('cpQuality', () => {
+  it('flags override and fallback fits before treating anything else as data-driven', () => {
+    expect(cpQuality({ overridden: true, fallback: true })).toEqual({ label: 'override', cls: 'is-mid' });
+    expect(cpQuality({ fallback: true })).toEqual({ label: 'all-time', cls: 'is-mid' });
+    expect(cpQuality({})).toEqual({ label: 'data', cls: 'is-good' });
+  });
+});
+
+describe('cpTooltip', () => {
+  it('explains an override fit', () => {
+    expect(cpTooltip({ overridden: true })).toMatch(/manual override/);
+  });
+
+  it('explains a fallback fit', () => {
+    expect(cpTooltip({ fallback: true })).toMatch(/fell back to all-time data/);
+  });
+
+  it('reports the P_max asymptote for a 3-parameter fit', () => {
+    expect(cpTooltip({ model: '3p', pMaxW: 812.4 })).toMatch(/P_max ≈ 812 W/);
+  });
+
+  it('falls back to a generic explanation for a plain regression', () => {
+    expect(cpTooltip({ model: '2p' })).toBe('CP came from a normal regression on the active window (last 90 days or your custom range).');
+  });
+});
+
+describe('wPrimeQuality', () => {
+  it('flags a history-sourced W\' regardless of magnitude', () => {
+    expect(wPrimeQuality({ wPrimeSource: 'history', wPrimeJ: 50000 })).toEqual({ label: 'history', cls: 'is-mid' });
+  });
+
+  it('bands regression-sourced W\' by kJ', () => {
+    expect(wPrimeQuality({ wPrimeJ: 7999 })).toEqual({ label: 'low', cls: 'is-mid' });
+    expect(wPrimeQuality({ wPrimeJ: 8000 })).toEqual({ label: 'typical', cls: 'is-good' });
+    expect(wPrimeQuality({ wPrimeJ: 24999 })).toEqual({ label: 'typical', cls: 'is-good' });
+    expect(wPrimeQuality({ wPrimeJ: 25000 })).toEqual({ label: 'high', cls: 'is-good' });
+    expect(wPrimeQuality({ wPrimeJ: 39999 })).toEqual({ label: 'high', cls: 'is-good' });
+    expect(wPrimeQuality({ wPrimeJ: 40000 })).toEqual({ label: 'very high', cls: 'is-mid' });
+  });
+
+  it('treats a missing fit or missing wPrimeJ as 0 J', () => {
+    expect(wPrimeQuality(null)).toEqual({ label: 'low', cls: 'is-mid' });
+    expect(wPrimeQuality({})).toEqual({ label: 'low', cls: 'is-mid' });
+  });
+});
+
+describe('wPrimeTooltip', () => {
+  it('explains a history-sourced W\'', () => {
+    expect(wPrimeTooltip({ wPrimeSource: 'history' })).toMatch(/anchored on your longer training history/);
+  });
+
+  it('explains a regression-sourced W\'', () => {
+    expect(wPrimeTooltip({})).toMatch(/10-25 kJ range/);
+  });
+});
+
+describe('formatTsb', () => {
+  it('rounds and signs positive values', () => {
+    expect(formatTsb(4.6)).toBe('+5');
+  });
+
+  it('does not sign zero or negative values', () => {
+    expect(formatTsb(0)).toBe('0');
+    expect(formatTsb(-4.6)).toBe('-5');
+  });
+});
+
+describe('usesDefaultK', () => {
+  it('uses the default when there is no personal fatigue fit', () => {
+    expect(usesDefaultK({})).toBe(true);
+  });
+
+  it('uses the default when the personal fit was clamped', () => {
+    expect(usesDefaultK({ fatigue: { clamped: true, k: 0.5 } })).toBe(true);
+  });
+
+  it('uses the personal fit when present and unclamped', () => {
+    expect(usesDefaultK({ fatigue: { clamped: false, k: 0.12 } })).toBe(false);
+  });
+});
+
+describe('fatigueValue', () => {
+  it('reports the cycling default k to 2 decimals when falling back', () => {
+    expect(fatigueValue({})).toBe('0.15');
+  });
+
+  it('reports the personal k to 2 decimals when a fit is used', () => {
+    expect(fatigueValue({ fatigue: { clamped: false, k: 0.123 } })).toBe('0.12');
+  });
+});
+
+describe('fatigueQuality', () => {
+  it('labels a default-k readout as default/is-mid', () => {
+    expect(fatigueQuality({})).toEqual({ label: 'default', cls: 'is-mid' });
+  });
+
+  it('labels a personal fit by its point count', () => {
+    expect(fatigueQuality({ fatigue: { clamped: false, nPoints: 5 } })).toEqual({ label: '5 pts', cls: 'is-good' });
+  });
+});
+
+describe('fatigueTooltip', () => {
+  it('explains an implausible fit that got clamped away', () => {
+    const tip = fatigueTooltip({ fatigue: { clamped: true, kRaw: 0.31 } });
+    expect(tip).toMatch(/outside the/);
+    expect(tip).toMatch(/k = 0\.31/);
+    expect(tip).toMatch(/Using the cycling default 0\.15/);
+  });
+
+  it('explains too few points to fit at all', () => {
+    const tip = fatigueTooltip({});
+    expect(tip).toMatch(/Need 3\+ MMP points/);
+    expect(tip).toMatch(/Using the cycling default 0\.15/);
+  });
+
+  it('explains a personal fit in use', () => {
+    const tip = fatigueTooltip({ fatigue: { clamped: false, nPoints: 6 } });
+    expect(tip).toMatch(/fitted from 6 long-duration MMP points/);
+  });
+});
+
+describe('combinedFitQuality', () => {
+  it('reports the worse of RMSE and points quality, points winning ties', () => {
+    expect(combinedFitQuality({ rmse: 2, nPoints: 9 })).toEqual({ label: 'full', cls: 'is-good' });
+    expect(combinedFitQuality({ rmse: 2, nPoints: 1 })).toEqual({ label: 'too few', cls: 'is-bad' });
+    expect(combinedFitQuality({ rmse: 40, nPoints: 9 })).toEqual({ label: 'poor fit', cls: 'is-bad' });
+  });
+
+  it('picks points as the tiebreaker label when both axes tie in rank', () => {
+    expect(combinedFitQuality({ rmse: 10, nPoints: 5 })).toEqual({ label: 'ok', cls: 'is-mid' });
+  });
+});
+
+describe('combinedFitTooltip', () => {
+  it('summarizes both axes with their labels', () => {
+    const tip = combinedFitTooltip({ rmse: 12.34, nPoints: 6 });
+    expect(tip).toMatch(/12\.3 W \(good\)/);
+    expect(tip).toMatch(/6 points \(ok\)/);
   });
 });

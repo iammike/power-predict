@@ -639,7 +639,9 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     ? filterExcludedActivities(activityMmps, excludedStartTimes)
     : activityMmps;
   currentActivities = visibleActivityMmps;
-  setAppState(visibleActivityMmps.length > 0 ? 'data' : 'onboarding');
+  // Onboarding-vs-data keys on the raw cache, not the visible set — an
+  // all-excluded cache is still a populated cache, not an empty one.
+  setAppState(activityMmps.length > 0 ? 'data' : 'onboarding');
   const excludedSet = new Set(excludedStartTimes);
   const excludedActivities = excludedSet.size
     ? activityMmps.filter((a) => excludedSet.has(a.startTime))
@@ -812,6 +814,12 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     if (!input || !input.value) return null;
     return { value: input.value, hadOutput: out && !out.hidden };
   })();
+  // Also preserve open/collapsed UI state across a re-render — the
+  // exclude/restore controls (#132) trigger a full re-render on every
+  // click, and without this the table would collapse or the
+  // exclusions panel would close on every single toggle.
+  const wasLongExpanded = document.getElementById('mmp-long')?.hidden === false;
+  const wasExclusionsOpen = document.querySelector('.exclusions-panel')?.open ?? false;
 
   destroyCurveChart();
   resultsEl.innerHTML = `
@@ -829,12 +837,12 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
         </tr>
       </thead>
       <tbody>${shortRows}</tbody>
-      ${longRows ? `<tbody id="mmp-long" hidden>${longRows}</tbody>` : ''}
+      ${longRows ? `<tbody id="mmp-long"${wasLongExpanded ? '' : ' hidden'}>${longRows}</tbody>` : ''}
     </table>
-    ${longRows ? `<button type="button" class="link-button mmp-expand" id="mmp-expand" aria-expanded="false" aria-controls="mmp-long">Show longer efforts ▾</button>` : ''}
+    ${longRows ? `<button type="button" class="link-button mmp-expand" id="mmp-expand" aria-expanded="${wasLongExpanded}" aria-controls="mmp-long">${wasLongExpanded ? 'Show fewer ▴' : 'Show longer efforts ▾'}</button>` : ''}
     <aside class="data-sources" aria-label="Data sources">
       <section class="data-sources__row">
-        <p class="data-sources__line">${visibleActivityMmps.length.toLocaleString()} activities cached locally · ${latestActivityLabel(visibleActivityMmps)}</p>
+        <p class="data-sources__line">${activityMmps.length.toLocaleString()} activities cached locally · ${latestActivityLabel(activityMmps)}</p>
         <span class="data-sources__actions">
           <button type="button" class="link-button" id="upload-another">Upload archive</button>
           <button type="button" class="link-button" id="clear-cache">Clear cache</button>
@@ -842,7 +850,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
       </section>
       ${excludedActivities.length ? `
       <section class="data-sources__row">
-        <details class="exclusions-panel">
+        <details class="exclusions-panel"${wasExclusionsOpen ? ' open' : ''}>
           <summary>${excludedActivities.length} ride${excludedActivities.length === 1 ? '' : 's'} excluded from stats</summary>
           <ul>${excludedActivities.map(renderExcludedRow).join('')}</ul>
         </details>
@@ -987,7 +995,10 @@ export function renderExcludedRow(activity) {
   const date = Number.isFinite(activity.startTime)
     ? new Date(activity.startTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     : 'unknown date';
-  const link = activity.stravaId
+  // stravaId is resolved from the user's uploaded activities.csv
+  // (archive-worker.js) — validate it's actually numeric before it
+  // goes into an href, rather than trusting archive-derived text.
+  const link = /^\d+$/.test(String(activity.stravaId))
     ? ` · <a href="https://www.strava.com/activities/${activity.stravaId}" target="_blank" rel="noopener">view</a>`
     : '';
   return `<li>${date}${link} <button type="button" class="link-button" data-restore-start="${activity.startTime}">Restore</button></li>`;

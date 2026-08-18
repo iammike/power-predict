@@ -550,6 +550,13 @@ describe('renderExcludedRow', () => {
     expect(el.querySelector('a')).toBeNull();
   });
 
+  it('omits the Strava link when stravaId is not purely numeric', () => {
+    const startTime = new Date('2026-03-15T12:00:00').getTime();
+    const el = parse(renderExcludedRow({ startTime, stravaId: '123"><script>alert(1)</script>' }));
+    expect(el.querySelector('a')).toBeNull();
+    expect(el.querySelector('script')).toBeNull();
+  });
+
   it('falls back to "unknown date" when startTime is not finite', () => {
     const el = parse(renderExcludedRow({}));
     expect(el.textContent).toContain('unknown date');

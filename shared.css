@@ -829,10 +829,13 @@ body[data-app-state="manual"] #manual-mode {
     opacity: 1;
   }
 }
-.mmp-cell__exclude:hover,
+.mmp-cell__exclude:hover {
+  color: var(--oxblood);
+}
 .mmp-cell__exclude:focus-visible {
   color: var(--oxblood);
-  outline: none;
+  outline: 2px solid var(--oxblood);
+  outline-offset: 1px;
 }
 
 

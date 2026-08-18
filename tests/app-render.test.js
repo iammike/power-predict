@@ -9,6 +9,7 @@ import {
   cpQuality, cpTooltip, wPrimeQuality, wPrimeTooltip,
   formatTsb, usesDefaultK, fatigueValue, fatigueQuality, fatigueTooltip,
   combinedFitQuality, combinedFitTooltip,
+  eftpWindowLabel, eftpTooltip, formQuality, formTooltip,
 } from '../src/app.js';
 
 describe('formatBytes', () => {
@@ -387,5 +388,88 @@ describe('combinedFitTooltip', () => {
     const tip = combinedFitTooltip({ rmse: 12.34, nPoints: 6 });
     expect(tip).toMatch(/12\.3 W \(good\)/);
     expect(tip).toMatch(/6 points \(ok\)/);
+  });
+});
+
+describe('eftpWindowLabel', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const fmt = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+  it('defaults to "last 90d" with no date bounds', () => {
+    expect(eftpWindowLabel(null, null)).toBe('last 90d');
+    expect(eftpWindowLabel('', '')).toBe('last 90d');
+  });
+
+  it('reports a day count for a range ending today or later', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00'));
+    expect(eftpWindowLabel('2026-05-16', '2026-06-15')).toBe('last 30d');
+    expect(eftpWindowLabel('2026-06-01', '2026-06-20')).toBe('last 19d');
+  });
+
+  it('formats a fully past range as a from -> to span', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00'));
+    expect(eftpWindowLabel('2026-01-01', '2026-01-31')).toBe(`${fmt('2026-01-01')} → ${fmt('2026-01-31')}`);
+  });
+
+  it('falls back to a from -> to span for a zero-length range even when dateTo is today', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00'));
+    expect(eftpWindowLabel('2026-06-15', '2026-06-15')).toBe(`${fmt('2026-06-15')} → ${fmt('2026-06-15')}`);
+  });
+
+  it('reports an open-ended lower bound as "since X"', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00'));
+    expect(eftpWindowLabel('2026-05-01', null)).toBe(`since ${fmt('2026-05-01')}`);
+  });
+
+  it('reports an open-ended upper bound as "through X"', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00'));
+    expect(eftpWindowLabel(null, '2026-05-01')).toBe(`through ${fmt('2026-05-01')}`);
+  });
+});
+
+describe('eftpTooltip', () => {
+  it('describes a 90-day default window when no date range is set', () => {
+    expect(eftpTooltip(null, null)).toMatch(/from your most recent 90 days/);
+  });
+
+  it('describes a custom window when a date range is set', () => {
+    expect(eftpTooltip('2026-01-01', null)).toMatch(/within your selected date range/);
+    expect(eftpTooltip(null, '2026-01-01')).toMatch(/within your selected date range/);
+  });
+});
+
+describe('formQuality', () => {
+  it('bands TSB into fresh/stable/building/overloaded', () => {
+    expect(formQuality(10)).toEqual({ label: 'fresh', cls: 'is-good' });
+    expect(formQuality(5)).toEqual({ label: 'fresh', cls: 'is-good' });
+    expect(formQuality(4.9)).toEqual({ label: 'stable', cls: 'is-good' });
+    expect(formQuality(-5)).toEqual({ label: 'stable', cls: 'is-good' });
+    expect(formQuality(-5.1)).toEqual({ label: 'building', cls: 'is-mid' });
+    expect(formQuality(-20)).toEqual({ label: 'building', cls: 'is-mid' });
+    expect(formQuality(-20.1)).toEqual({ label: 'overloaded', cls: 'is-bad' });
+  });
+
+  it('treats a non-finite TSB as stable', () => {
+    expect(formQuality(NaN)).toEqual({ label: 'stable', cls: 'is-good' });
+  });
+});
+
+describe('formTooltip', () => {
+  it('reports rounded CTL/ATL and no adjustment at TSB 0', () => {
+    expect(formTooltip(50.4, 45.6, 0)).toBe('Form (TSB) = CTL 50 − ATL 46. Positive = fresh; negative = fatigued. no adjustment. Capped at ±5%.');
+  });
+
+  it('reports a positive capped adjustment for a strongly positive TSB', () => {
+    expect(formTooltip(50, 45, 25)).toMatch(/\+5% applied to predictions/);
+  });
+
+  it('reports a negative capped adjustment for a strongly negative TSB', () => {
+    expect(formTooltip(50, 45, -25)).toMatch(/-5% applied to predictions/);
   });
 });

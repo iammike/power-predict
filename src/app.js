@@ -995,8 +995,7 @@ export function allTimeLabel(activities) {
   return `Since ${d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`;
 }
 
-function eftpWindowLabel() {
-  const { dateFrom, dateTo } = currentSettings;
+export function eftpWindowLabel(dateFrom, dateTo) {
   if (!dateFrom && !dateTo) return 'last 90d';
   const todayIso = new Date().toISOString().slice(0, 10);
   const fmt = (iso) => {
@@ -1015,8 +1014,8 @@ function eftpWindowLabel() {
   if (dateFrom) return `since ${fmt(dateFrom)}`;
   return `through ${fmt(dateTo)}`;
 }
-function eftpTooltip() {
-  const range = currentSettings.dateFrom || currentSettings.dateTo
+export function eftpTooltip(dateFrom, dateTo) {
+  const range = dateFrom || dateTo
     ? 'within your selected date range'
     : 'from your most recent 90 days';
   return `Estimated FTP ${range}: 0.95 × best 20-min MMP. Used to drift-normalize older efforts when the fit falls back to all-time data.`;
@@ -1028,19 +1027,19 @@ export function formatTsb(tsb) {
   const v = Math.round(tsb);
   return v > 0 ? `+${v}` : String(v);
 }
-function formQuality() {
-  const band = tsbBand(currentLoad.tsb);
+export function formQuality(tsb) {
+  const band = tsbBand(tsb);
   if (band === 'fresh')      return { label: 'fresh', cls: 'is-good' };
   if (band === 'building')   return { label: 'building', cls: 'is-mid' };
   if (band === 'overloaded') return { label: 'overloaded', cls: 'is-bad' };
   return { label: 'stable', cls: 'is-good' };
 }
-function formTooltip() {
-  const ctl = Math.round(currentLoad.ctl);
-  const atl = Math.round(currentLoad.atl);
-  const adj = Math.round((formMultiplier(currentLoad.tsb) - 1) * 100);
+export function formTooltip(ctl, atl, tsb) {
+  const roundedCtl = Math.round(ctl);
+  const roundedAtl = Math.round(atl);
+  const adj = Math.round((formMultiplier(tsb) - 1) * 100);
   const adjStr = adj === 0 ? 'no adjustment' : `${adj > 0 ? '+' : ''}${adj}% applied to predictions`;
-  return `Form (TSB) = CTL ${ctl} − ATL ${atl}. Positive = fresh; negative = fatigued. ${adjStr}. Capped at ±5%.`;
+  return `Form (TSB) = CTL ${roundedCtl} − ATL ${roundedAtl}. Positive = fresh; negative = fatigued. ${adjStr}. Capped at ±5%.`;
 }
 
 // Fatigue k: personal Riegel exponent fitted from 20-min-to-4-hr MMP.
@@ -1474,14 +1473,14 @@ function renderPredictBlock() {
           <dd>${(currentFit.wPrimeJ / 1000).toFixed(1)} kJ<span class="fit-stats__quality ${wPrimeQuality(currentFit).cls}">${wPrimeQuality(currentFit).label}</span></dd>
         </div>
         ${currentEftpNow ? `
-        <div data-tooltip="${eftpTooltip()}">
+        <div data-tooltip="${eftpTooltip(currentSettings.dateFrom, currentSettings.dateTo)}">
           <dt>eFTP</dt>
-          <dd>${formatPower(currentEftpNow)}<span class="fit-stats__quality is-good">${eftpWindowLabel()}</span></dd>
+          <dd>${formatPower(currentEftpNow)}<span class="fit-stats__quality is-good">${eftpWindowLabel(currentSettings.dateFrom, currentSettings.dateTo)}</span></dd>
         </div>` : ''}
         ${currentLoad.hasFtp ? `
-        <div data-tooltip="${formTooltip()}">
+        <div data-tooltip="${formTooltip(currentLoad.ctl, currentLoad.atl, currentLoad.tsb)}">
           <dt>Form</dt>
-          <dd>${formatTsb(currentLoad.tsb)}<span class="fit-stats__quality ${formQuality().cls}">${formQuality().label}</span></dd>
+          <dd>${formatTsb(currentLoad.tsb)}<span class="fit-stats__quality ${formQuality(currentLoad.tsb).cls}">${formQuality(currentLoad.tsb).label}</span></dd>
         </div>` : ''}
         <div data-tooltip="${fatigueTooltip(currentFit)}">
           <dt>Fatigue k</dt>
@@ -1560,7 +1559,7 @@ function wirePredictForm() {
       : '';
     const formLine = adjPct === 0
       ? ''
-      : `<p class="predict-output__band" title="${formTooltip()}">At today's form (${adjPct > 0 ? '+' : ''}${adjPct}%): ${Math.round(raw.powerW * mult)} W</p>`;
+      : `<p class="predict-output__band" title="${formTooltip(currentLoad.ctl, currentLoad.atl, currentLoad.tsb)}">At today's form (${adjPct > 0 ? '+' : ''}${adjPct}%): ${Math.round(raw.powerW * mult)} W</p>`;
     out.hidden = false;
     out.innerHTML = `
       <p class="predict-output__label">Predicted for ${formatDuration(seconds)}</p>

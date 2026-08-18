@@ -5,7 +5,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import {
   formatBytes, renderMmpCell, latestActivityLabel, allTimeLabel,
-  rmseQuality, rmseTooltip, pointsQuality, pointsTooltip,
+  rmseQuality, pointsQuality,
   cpQuality, cpTooltip, wPrimeQuality, wPrimeTooltip,
   formatTsb, usesDefaultK, fatigueValue, fatigueQuality, fatigueTooltip,
   combinedFitQuality, combinedFitTooltip,
@@ -231,13 +231,6 @@ describe('rmseQuality', () => {
   });
 });
 
-describe('rmseTooltip', () => {
-  it('describes the RMSE bands regardless of input', () => {
-    expect(rmseTooltip(10)).toMatch(/excellent/);
-    expect(rmseTooltip(10)).toMatch(/Root-mean-squared error/);
-  });
-});
-
 describe('pointsQuality', () => {
   it('bands point counts into full/ok/minimal/too few', () => {
     expect(pointsQuality(9)).toEqual({ label: 'full', cls: 'is-good' });
@@ -248,12 +241,6 @@ describe('pointsQuality', () => {
     expect(pointsQuality(2)).toEqual({ label: 'minimal', cls: 'is-bad' });
     expect(pointsQuality(1)).toEqual({ label: 'too few', cls: 'is-bad' });
     expect(pointsQuality(0)).toEqual({ label: 'too few', cls: 'is-bad' });
-  });
-});
-
-describe('pointsTooltip', () => {
-  it('explains the point-count scale', () => {
-    expect(pointsTooltip(5)).toMatch(/Up to 9 possible/);
   });
 });
 
@@ -280,6 +267,10 @@ describe('cpTooltip', () => {
 
   it('falls back to a generic explanation for a plain regression', () => {
     expect(cpTooltip({ model: '2p' })).toBe('CP came from a normal regression on the active window (last 90 days or your custom range).');
+  });
+
+  it('falls back to the generic explanation for a 3p model missing pMaxW', () => {
+    expect(cpTooltip({ model: '3p' })).toBe('CP came from a normal regression on the active window (last 90 days or your custom range).');
   });
 });
 
@@ -386,7 +377,8 @@ describe('combinedFitQuality', () => {
   });
 
   it('picks points as the tiebreaker label when both axes tie in rank', () => {
-    expect(combinedFitQuality({ rmse: 10, nPoints: 5 })).toEqual({ label: 'ok', cls: 'is-mid' });
+    expect(combinedFitQuality({ rmse: 20, nPoints: 5 })).toEqual({ label: 'ok', cls: 'is-mid' });
+    expect(combinedFitQuality({ rmse: 40, nPoints: 1 })).toEqual({ label: 'too few', cls: 'is-bad' });
   });
 });
 

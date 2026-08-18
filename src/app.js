@@ -880,13 +880,6 @@ export function rmseQuality(rmse) {
   if (rmse < 30) return { label: 'noisy',     cls: 'is-mid'  };
   return                 { label: 'poor fit', cls: 'is-bad'  };
 }
-export function rmseTooltip(rmse) {
-  return 'Root-mean-squared error of the regression. Lower = tighter fit. '
-       + 'Typical bands: <5W excellent (clean test data), 5-15W good (real-world riding), '
-       + '15-30W noisy, >30W means the model isn\'t fitting your data well. '
-       + 'Note: the fit line is a least-squares smoother, so individual MMP dots can sit '
-       + 'slightly above or below it — RMSE is the size of that gap.';
-}
 export function pointsQuality(n) {
   // 9 durations available in our DURATIONS_S between 3 and 20 min.
   if (n >= 7) return { label: 'full',     cls: 'is-good' };
@@ -1095,12 +1088,6 @@ export function combinedFitQuality(fit) {
 export function combinedFitTooltip(fit) {
   return `Fit quality summary. RMSE ${fit.rmse.toFixed(1)} W (${rmseQuality(fit.rmse).label}) · ${fit.nPoints} points (${pointsQuality(fit.nPoints).label}). `
        + 'RMSE is regression error in watts; points is how many MMP durations between 3 and 20 min the fit had to work with.';
-}
-
-export function pointsTooltip(n) {
-  return 'Number of MMP points (durations between 3 and 20 minutes) the regression fitted on. '
-       + 'Up to 9 possible. 7+ is a full picture, 4-6 is workable, 2-3 is minimal — '
-       + 'a fit through only 2 points has no error to speak of but very little to corroborate it.';
 }
 
 function renderOverrideForm() {

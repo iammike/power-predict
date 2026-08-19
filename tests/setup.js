@@ -13,3 +13,9 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     dispatchEvent() { return false; },
   });
 }
+
+// jsdom 28 doesn't implement scrollIntoView. src/app.js's renderManualMode
+// calls it unconditionally after every manual-mode render (#239).
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}

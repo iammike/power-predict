@@ -38,14 +38,20 @@ function submit(form) {
   form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 }
 
-// The Last-90d column -- the one both rollingBest's table and the CP fit
-// itself read (src/app.js's `featured` cell / `last90`) -- for whichever
-// table row's Duration cell matches the given formatDuration() label.
-function featuredCellFor(durationLabel) {
+// A specific column (0=Duration, 1=Last30d, 2=Last90d/featured,
+// 3=All-time) of whichever table row's Duration cell matches the given
+// formatDuration() label.
+function cellFor(durationLabel, columnIndex) {
   for (const row of document.querySelectorAll('.mmp-table tbody tr')) {
-    if (row.children[0]?.textContent === durationLabel) return row.querySelector('td.featured');
+    if (row.children[0]?.textContent === durationLabel) return row.children[columnIndex];
   }
   return null;
+}
+
+// The Last-90d column -- the one both the table's featured display and
+// the CP fit itself read (src/app.js's `last90`).
+function featuredCellFor(durationLabel) {
+  return cellFor(durationLabel, 2);
 }
 
 beforeEach(() => {
@@ -92,7 +98,7 @@ describe('predict form (wirePredictForm/renderPredictBlock)', () => {
     // the 2-param fit's window, so the regression is an exact fit through
     // both -- the prediction at 1200s (a fit point, not extrapolated)
     // should reproduce its 290W input exactly, not just "some number."
-    expect(out.textContent).toContain('290');
+    expect(out.textContent).toMatch(/\b290W\b/);
   });
 
   it('shows a parse error for an unparseable duration instead of throwing', () => {
@@ -203,24 +209,27 @@ describe('excluding a ride (wireMmpTable)', () => {
   // Two rides where the second strictly out-powers the first at every
   // duration, so it wins every table cell by construction -- excluding
   // it has an observable, exact-value effect instead of a same-looking
-  // table with one fewer cached ride behind it.
+  // table with one fewer cached ride behind it. avgPower is left at
+  // fixtures.js's default (mmp[durationS], i.e. 250W/290W here) rather
+  // than overridden -- comfortably clear of the effort-quality gate
+  // either way (IF 0.80-0.93 against either ride's own ~276-314W
+  // estimated FTP), so no override is needed to keep this test's
+  // result away from that gate's boundary.
   const LOWER_MMP = { 60: 420, 300: 340, 1200: 290, 3600: 250 };
   const HIGHER_MMP = { 60: 460, 300: 380, 1200: 330, 3600: 290 };
 
   it('drops the displayed value and destroys exactly the outgoing chart; Restore brings both back', async () => {
     await resetIndexedDb();
-    // avgPower well clear of the effort-quality gate's 0.70 IF floor
-    // against either ride's own estimated FTP (~0.95 * mmp[1200]) --
-    // fixtures.js's 220W default sits close enough to that boundary
-    // against a 330W mmp[1200] winner (IF ~0.70) that this test
-    // shouldn't depend on it.
     await saveActivities([
-      makeRide({ mmp: LOWER_MMP, avgPower: 300 }),
-      makeRide({ mmp: HIGHER_MMP, avgPower: 300 }),
+      makeRide({ mmp: LOWER_MMP }),
+      makeRide({ mmp: HIGHER_MMP }),
     ]);
     await mountApp({ resetDb: false });
 
-    expect(featuredCellFor('20m').textContent).toContain('330');
+    expect(featuredCellFor('20m').textContent).toMatch(/\b330 W\b/);
+    // Not just the featured (Last-90d) column -- a regression confined
+    // to the all-time rollingBest* call sites should fail here too.
+    expect(cellFor('20m', 3).textContent).toMatch(/\b330 W\b/);
     await vi.waitFor(() => {
       if (!document.getElementById('curve-chart')?._chart) throw new Error('not charted yet');
     });
@@ -234,9 +243,9 @@ describe('excluding a ride (wireMmpTable)', () => {
     excludeBtn.click();
 
     await vi.waitFor(() => {
-      if (featuredCellFor('20m')?.textContent.includes('330')) throw new Error('not excluded yet');
+      if (!/\b290 W\b/.test(featuredCellFor('20m')?.textContent ?? '')) throw new Error('not excluded yet');
     });
-    expect(featuredCellFor('20m').textContent).toContain('290');
+    expect(cellFor('20m', 3).textContent).toMatch(/\b290 W\b/);
     const secondChart = document.getElementById('curve-chart')._chart;
     expect(firstChart.destroyed).toBe(true);
     expect(secondChart).not.toBe(firstChart);
@@ -244,7 +253,12 @@ describe('excluding a ride (wireMmpTable)', () => {
 
     document.querySelector('.exclusions-panel [data-restore-start]').click();
     await vi.waitFor(() => {
-      if (!featuredCellFor('20m')?.textContent.includes('330')) throw new Error('not restored yet');
+      if (!/\b330 W\b/.test(featuredCellFor('20m')?.textContent ?? '')) throw new Error('not restored yet');
     });
+    const thirdChart = document.getElementById('curve-chart')._chart;
+    expect(secondChart.destroyed).toBe(true);
+    expect(thirdChart).not.toBe(secondChart);
+    expect(thirdChart.destroyed).toBe(false);
+    expect(document.querySelectorAll('.exclusions-panel [data-restore-start]')).toHaveLength(0);
   });
 });

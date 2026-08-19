@@ -6,12 +6,21 @@
 import { MMP_VERSION } from '../../src/mmp.js';
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 // Anchored relative to Date.now(), not a hardcoded calendar date --
 // rollingBest/rollingBestWithOwners/computeLoadSeries all window off
 // Date.now() (src/aggregate.js), so a fixed past date drifts out of the
 // Last-30d/90d windows (and eventually the CP fit's 90-day window) as
-// real time passes, silently flipping which fit branch a test exercises.
-// 10 days back keeps every ride inside all of those windows indefinitely.
+// real time passes, silently flipping which fit branch a test exercises
+// with no assertion failing to signal it.
+//
+// The per-ride spacing is hourly, not daily: rideIndex is module-scoped
+// and accumulates across every test in a file (vi.resetModules() inside
+// mountApp() doesn't reset it -- this file's own static import binding
+// survives), so a whole test file's fixture rides share one counter. At
+// an hourly spacing, the Last-30d boundary (aggregate.js's earliest,
+// most conservative window) isn't reached until ride #720 in a single
+// file -- comfortably beyond what any realistic test file creates.
 let rideIndex = 0;
 
 // Durations span the 3-20 min CP fit window (300s, 1200s) plus a short
@@ -24,24 +33,24 @@ let rideIndex = 0;
 // mmp rather than rely on this default reaching it.
 const DEFAULT_MMP = { 60: 420, 300: 340, 1200: 290, 3600: 250 };
 
-// Real records (src/archive-worker.js) always carry a finite avgPower.
-// Defaulting it here (rather than undefined) keeps the effort-quality
-// gate (passesEffortGate) and the training-load pipeline (computeTss)
-// exercised the way they are in production, instead of both silently
-// no-op'ing. 220W clears the default 0.70 IF gate against this fixture's
-// ~276W estimated FTP (0.95 * mmp[1200]) with room to spare.
-const DEFAULT_AVG_POWER = 220;
-
 export function makeRide({
   startTime,
   durationS = 3600,
   mmp = DEFAULT_MMP,
-  avgPower = DEFAULT_AVG_POWER,
+  // Real records (src/archive-worker.js) always carry a finite avgPower,
+  // and since durationS's own window IS the whole ride, avgPower must
+  // equal mmp[durationS] -- no other value is reachable from a real
+  // parse. Defaulting to that (rather than undefined, or an unrelated
+  // constant) keeps the effort-quality gate (passesEffortGate) and the
+  // training-load pipeline (computeTss) exercised the way they are in
+  // production, instead of either silently no-op'ing or exercising an
+  // IF ratio a real archive could never produce.
+  avgPower = mmp?.[durationS] ?? 220,
   npW,
   stravaId = null,
   mmpVersion = MMP_VERSION,
 } = {}) {
-  const resolvedStartTime = startTime ?? (Date.now() - (10 + rideIndex) * DAY_MS);
+  const resolvedStartTime = startTime ?? (Date.now() - 10 * DAY_MS - rideIndex * HOUR_MS);
   rideIndex += 1;
   return {
     startTime: resolvedStartTime,

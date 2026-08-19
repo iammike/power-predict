@@ -11,6 +11,7 @@ import {
   combinedFitQuality, combinedFitTooltip,
   eftpWindowLabel, eftpTooltip, formQuality, formTooltip,
   filterExcludedActivities, renderExcludedRow,
+  withExclusion, withoutExclusion, clearOverrideSettings,
 } from '../src/app.js';
 
 describe('formatBytes', () => {
@@ -113,6 +114,13 @@ describe('renderMmpCell', () => {
   it('omits the exclude button when startTime is not known', () => {
     const el = parse(renderMmpCell({ value: 300, stravaId: '123456' }, null));
     expect(el.querySelector('.mmp-cell__exclude')).toBeNull();
+  });
+
+  it('falls back to plain text when stravaId is not purely numeric', () => {
+    const el = parse(renderMmpCell({ value: 300, stravaId: '123"><script>alert(1)</script>' }, null));
+    expect(el.querySelector('a')).toBeNull();
+    expect(el.querySelector('script')).toBeNull();
+    expect(el.textContent).toContain('300 W');
   });
 });
 
@@ -562,5 +570,82 @@ describe('renderExcludedRow', () => {
   it('falls back to "unknown date" when startTime is not finite', () => {
     const el = parse(renderExcludedRow({}));
     expect(el.textContent).toContain('unknown date');
+  });
+});
+
+describe('withExclusion', () => {
+  it('adds a startTime to an empty/missing exclusion list', () => {
+    expect(withExclusion({}, 5)).toEqual({ excludedStartTimes: [5] });
+  });
+
+  it('appends to an existing exclusion list without mutating it', () => {
+    const existing = [1, 2];
+    const settings = { excludedStartTimes: existing };
+    const next = withExclusion(settings, 3);
+    expect(next.excludedStartTimes).toEqual([1, 2, 3]);
+    expect(existing).toEqual([1, 2]);
+  });
+
+  it('is idempotent: excluding an already-excluded startTime returns the same settings reference', () => {
+    const settings = { excludedStartTimes: [1, 2] };
+    expect(withExclusion(settings, 2)).toBe(settings);
+  });
+
+  it('preserves unrelated settings fields', () => {
+    const settings = { cpOverrideW: 250, stravaSession: { token: 'x' } };
+    const next = withExclusion(settings, 5);
+    expect(next.cpOverrideW).toBe(250);
+    expect(next.stravaSession).toEqual({ token: 'x' });
+  });
+});
+
+describe('withoutExclusion', () => {
+  it('removes a matching startTime', () => {
+    const settings = { excludedStartTimes: [1, 2, 3] };
+    expect(withoutExclusion(settings, 2).excludedStartTimes).toEqual([1, 3]);
+  });
+
+  it('is a no-op when the startTime is not in the list', () => {
+    const settings = { excludedStartTimes: [1, 3] };
+    expect(withoutExclusion(settings, 999).excludedStartTimes).toEqual([1, 3]);
+  });
+
+  it('handles a missing exclusion list', () => {
+    expect(withoutExclusion({}, 5).excludedStartTimes).toEqual([]);
+  });
+
+  it('preserves unrelated settings fields', () => {
+    const settings = { excludedStartTimes: [1], cpOverrideW: 250 };
+    expect(withoutExclusion(settings, 1).cpOverrideW).toBe(250);
+  });
+});
+
+describe('clearOverrideSettings', () => {
+  it('deletes only the override-form fields', () => {
+    const settings = {
+      cpOverrideW: 250, overrideUnit: 'ftp', dateFrom: '2026-01-01', dateTo: '2026-02-01',
+    };
+    expect(clearOverrideSettings(settings)).toEqual({});
+  });
+
+  it('preserves excludedStartTimes — the #132 regression this locks in', () => {
+    const settings = { cpOverrideW: 250, excludedStartTimes: [1, 2] };
+    expect(clearOverrideSettings(settings).excludedStartTimes).toEqual([1, 2]);
+  });
+
+  it('preserves the Strava session and other unrelated fields', () => {
+    const settings = {
+      cpOverrideW: 250, stravaSession: { token: 'x' }, lastSyncNewIds: ['1'], minIF: 0.7,
+    };
+    const next = clearOverrideSettings(settings);
+    expect(next.stravaSession).toEqual({ token: 'x' });
+    expect(next.lastSyncNewIds).toEqual(['1']);
+    expect(next.minIF).toBe(0.7);
+  });
+
+  it('does not mutate the input settings object', () => {
+    const settings = { cpOverrideW: 250 };
+    clearOverrideSettings(settings);
+    expect(settings).toEqual({ cpOverrideW: 250 });
   });
 });

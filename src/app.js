@@ -89,8 +89,6 @@ async function hydrateFromCache() {
   try {
     const [cached, settings] = await Promise.all([loadActivities(), loadSettings()]);
     currentSettings = settings || {};
-    currentActivitiesRaw = cached;
-    currentActivities = filterExcludedActivities(cached, currentSettings.excludedStartTimes);
     if (cached.length > 0) {
       renderCurves(cached, { fromCache: true });
     }
@@ -632,6 +630,37 @@ export function filterExcludedActivities(activityMmps, excludedStartTimes) {
   return activityMmps.filter((a) => !excluded.has(a.startTime));
 }
 
+// Settings transforms for the exclude/restore/reset flows (#132). Pure and
+// exported so the state transitions that have twice broken during review
+// (dropped keys, wrong array reference) are covered by a regression test
+// rather than only by re-reading the call site.
+export function withExclusion(settings, startTime) {
+  const existing = settings.excludedStartTimes || [];
+  if (existing.includes(startTime)) return settings;
+  return { ...settings, excludedStartTimes: [...existing, startTime] };
+}
+
+export function withoutExclusion(settings, startTime) {
+  return {
+    ...settings,
+    excludedStartTimes: (settings.excludedStartTimes || []).filter((t) => t !== startTime),
+  };
+}
+
+// Reset clears only the override-form's own fields. Deleting by name
+// (rather than rebuilding from an allowlist of keys to keep) means every
+// other settings field — Strava session, excluded rides (#132),
+// lastSyncNewIds, minIF, whatever's added next — survives automatically
+// instead of needing to be remembered here.
+export function clearOverrideSettings(settings) {
+  const next = { ...settings };
+  delete next.cpOverrideW;
+  delete next.overrideUnit;
+  delete next.dateFrom;
+  delete next.dateTo;
+  return next;
+}
+
 function renderCurves(activityMmps, { fromCache = false } = {}) {
   currentActivitiesRaw = activityMmps;
   const excludedStartTimes = currentSettings.excludedStartTimes || [];
@@ -822,6 +851,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // exclusions panel would close on every single toggle.
   const wasLongExpanded = document.getElementById('mmp-long')?.hidden === false;
   const wasExclusionsOpen = document.querySelector('.exclusions-panel')?.open ?? false;
+  const priorWindow = document.querySelector('[data-window].is-active')?.dataset.window;
 
   destroyCurveChart();
   resultsEl.innerHTML = `
@@ -900,7 +930,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     renderCurves(currentActivitiesRaw, { fromCache: true });
   });
   wirePredictForm();
-  wireCurveChart();
+  wireCurveChart(priorWindow);
   wireOverrideForm();
   wireMmpTable();
 
@@ -980,12 +1010,15 @@ export function renderMmpCell(owner, newSyncIds) {
     : '';
   // startTime is the exclusion key (#132) — always present on a real
   // owner in practice, but guarded since a synthetic/legacy owner
-  // without one can't be excluded.
-  const excludeLabel = date ? `Exclude ride from ${date}` : 'Exclude this ride';
+  // without one can't be excluded. date is set under the same guard,
+  // so it's always available here when exclude is rendered.
   const exclude = Number.isFinite(owner.startTime)
-    ? ` <button type="button" class="mmp-cell__exclude" data-exclude-start="${owner.startTime}" data-tooltip="Exclude this ride from all stats" aria-label="${excludeLabel}">×</button>`
+    ? ` <button type="button" class="mmp-cell__exclude" data-exclude-start="${owner.startTime}" data-tooltip="Exclude this ride from all stats" aria-label="Exclude ride from ${date}">×</button>`
     : '';
-  if (!owner.stravaId) {
+  // stravaId is resolved from the user's uploaded activities.csv
+  // (archive-worker.js) — validate it's actually numeric before it
+  // goes into an href, rather than trusting archive-derived text.
+  if (!owner.stravaId || !/^\d+$/.test(String(owner.stravaId))) {
     return date ? `<span data-tooltip="${date}">${watts}</span>${badge}${exclude}` : `${watts}${badge}${exclude}`;
   }
   const tip = date ? `${date} · open on Strava` : 'Open this activity on Strava';
@@ -1237,9 +1270,9 @@ function wireMmpTable() {
     const btn = e.target.closest('[data-exclude-start]');
     if (!btn) return;
     const startTime = Number(btn.dataset.excludeStart);
-    const existing = currentSettings.excludedStartTimes || [];
-    if (existing.includes(startTime)) return;
-    currentSettings = { ...currentSettings, excludedStartTimes: [...existing, startTime] };
+    const next = withExclusion(currentSettings, startTime);
+    if (next === currentSettings) return;
+    currentSettings = next;
     await saveSettings(currentSettings);
     showStatus('Ride excluded from all stats.', { kind: 'success', dwellMs: 2200 });
     renderCurves(currentActivitiesRaw, { fromCache: true });
@@ -1248,10 +1281,7 @@ function wireMmpTable() {
     const btn = e.target.closest('[data-restore-start]');
     if (!btn) return;
     const startTime = Number(btn.dataset.restoreStart);
-    currentSettings = {
-      ...currentSettings,
-      excludedStartTimes: (currentSettings.excludedStartTimes || []).filter((t) => t !== startTime),
-    };
+    currentSettings = withoutExclusion(currentSettings, startTime);
     await saveSettings(currentSettings);
     showStatus('Ride restored to all stats.', { kind: 'success', dwellMs: 2200 });
     renderCurves(currentActivitiesRaw, { fromCache: true });
@@ -1314,17 +1344,7 @@ function wireOverrideForm() {
     renderCurves(currentActivitiesRaw, { fromCache: true });
   });
   document.getElementById('reset-override').addEventListener('click', async () => {
-    // Reset clears only the override-form's own fields. Deleting by
-    // name (rather than rebuilding from an allowlist of keys to keep)
-    // means every other settings field — Strava session, excluded
-    // rides (#132), lastSyncNewIds, minIF, whatever's added next —
-    // survives automatically instead of needing to be remembered here.
-    const next = { ...currentSettings };
-    delete next.cpOverrideW;
-    delete next.overrideUnit;
-    delete next.dateFrom;
-    delete next.dateTo;
-    currentSettings = next;
+    currentSettings = clearOverrideSettings(currentSettings);
     await saveSettings(currentSettings);
     renderCurves(currentActivitiesRaw, { fromCache: true });
   });
@@ -1364,7 +1384,7 @@ function destroyCurveChart() {
   el._chart = null;
 }
 
-function wireCurveChart() {
+function wireCurveChart(priorWindow) {
   const container = document.getElementById('curve-chart');
   if (!container || !currentFit) return;
   const tabs = document.querySelectorAll('[data-window]');
@@ -1388,7 +1408,11 @@ function wireCurveChart() {
   tabs.forEach((t) => {
     t.addEventListener('click', () => draw(t.dataset.window));
   });
-  draw('last90');
+  // Restore whichever window tab was active before this re-render (#132
+  // exclude/restore triggers a full re-render on every click) rather than
+  // always snapping back to last90.
+  const hasPriorWindow = priorWindow && Array.from(tabs).some((t) => t.dataset.window === priorWindow);
+  draw(hasPriorWindow ? priorWindow : 'last90');
 }
 
 // Manual mode: synthesize a CP/W' from the rider's FTP and render

@@ -1,9 +1,11 @@
 // DOM-wiring integration tests for renderCurves / the override form /
-// manual mode / the predict form (#239, part 1 of 3 — see #225 and the
-// per-activity-exclude-132 branch for the pure-helper coverage this
-// builds on). Mounts real index.html into jsdom and imports a fresh
-// src/app.js instance per test via tests/helpers/mountApp.js, then
-// drives the same DOM events a real user would.
+// manual mode / the predict form (#239, part 1 of 3 — see #225 for the
+// pure-helper coverage this builds on, and #132 for the exclude/restore
+// feature and the currentActivities/currentActivitiesRaw split a couple
+// of these tests specifically guard). Mounts real index.html into jsdom
+// and imports a fresh src/app.js instance per test via
+// tests/helpers/mountApp.js, then drives the same DOM events a real
+// user would.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mountApp, resetIndexedDb } from './helpers/mountApp.js';
 import { makeRide, makeRides } from './helpers/fixtures.js';
@@ -17,32 +19,37 @@ vi.mock('uplot', () => {
     constructor(opts) {
       this.opts = opts;
       this.destroyed = false;
-      this.setSizeCalls = [];
     }
-    setSize(size) { this.setSizeCalls.push(size); }
+    setSize() {}
     destroy() { this.destroyed = true; }
   }
   return { default: FakeUPlot };
 });
 
+// jsdom doesn't implement ResizeObserver; renderCurveChart's dependency
+// chain constructs one unconditionally. Nothing here drives a resize, so
+// the fake only needs to exist, not do anything.
 class FakeResizeObserver {
-  constructor(cb) {
-    this.cb = cb;
-    this.observedTargets = [];
-    FakeResizeObserver.instances.push(this);
-  }
-  observe(target) { this.observedTargets.push(target); }
+  observe() {}
   disconnect() {}
 }
-FakeResizeObserver.instances = [];
 
 function submit(form) {
   form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 }
 
+// The Last-90d column -- the one both rollingBest's table and the CP fit
+// itself read (src/app.js's `featured` cell / `last90`) -- for whichever
+// table row's Duration cell matches the given formatDuration() label.
+function featuredCellFor(durationLabel) {
+  for (const row of document.querySelectorAll('.mmp-table tbody tr')) {
+    if (row.children[0]?.textContent === durationLabel) return row.querySelector('td.featured');
+  }
+  return null;
+}
+
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
-  FakeResizeObserver.instances = [];
 });
 
 afterEach(() => {
@@ -80,8 +87,12 @@ describe('predict form (wirePredictForm/renderPredictBlock)', () => {
 
     const out = document.getElementById('predict-output');
     expect(out.hidden).toBe(false);
-    expect(out.textContent).toMatch(/\d+\s*W/);
     expect(out.textContent).toContain('20m');
+    // The default fixture's mmp has exactly two points (300s, 1200s) in
+    // the 2-param fit's window, so the regression is an exact fit through
+    // both -- the prediction at 1200s (a fit point, not extrapolated)
+    // should reproduce its 290W input exactly, not just "some number."
+    expect(out.textContent).toContain('290');
   });
 
   it('shows a parse error for an unparseable duration instead of throwing', () => {
@@ -155,35 +166,85 @@ describe('manual mode (renderManualMode)', () => {
     expect(document.body.dataset.appState).toBe('manual');
     expect(document.getElementById('manual-back')).toBeNull();
   });
-});
 
-describe('curve chart lifecycle across a wireMmpTable-triggered re-render', () => {
-  it('destroys exactly the outgoing chart when excluding a ride re-renders the page', async () => {
+  // renderManualMode snapshots currentActivitiesRaw (the complete set),
+  // not currentActivities (the exclusion-filtered view) -- src/app.js's
+  // own comment on that line says a previously-excluded ride would have
+  // nothing to restore from after a manual-mode round trip otherwise.
+  // Excluding a ride before entering manual mode, then coming back, is
+  // the one scenario where snapshotting the wrong array is observable.
+  it('preserves an exclusion made before entering manual mode, across the round trip', async () => {
     await resetIndexedDb();
     await saveActivities(makeRides(3));
     await mountApp({ resetDb: false });
 
+    document.querySelector('[data-exclude-start]').click();
+    await vi.waitFor(() => {
+      if (!document.querySelector('.exclusions-panel [data-restore-start]')) {
+        throw new Error('exclusion not applied yet');
+      }
+    });
+
+    document.getElementById('manual-unit').value = 'ftp';
+    document.getElementById('manual-threshold').value = '280';
+    submit(document.getElementById('manual-form'));
+    expect(document.body.dataset.appState).toBe('manual');
+
+    document.getElementById('manual-back').click();
+    expect(document.body.dataset.appState).toBe('data');
+    // Snapshotting the filtered view instead of the raw one would bring
+    // back a 2-ride set with nothing to restore from -- the panel would
+    // render empty or disappear entirely.
+    expect(document.querySelectorAll('.exclusions-panel [data-restore-start]')).toHaveLength(1);
+  });
+});
+
+describe('excluding a ride (wireMmpTable)', () => {
+  // Two rides where the second strictly out-powers the first at every
+  // duration, so it wins every table cell by construction -- excluding
+  // it has an observable, exact-value effect instead of a same-looking
+  // table with one fewer cached ride behind it.
+  const LOWER_MMP = { 60: 420, 300: 340, 1200: 290, 3600: 250 };
+  const HIGHER_MMP = { 60: 460, 300: 380, 1200: 330, 3600: 290 };
+
+  it('drops the displayed value and destroys exactly the outgoing chart; Restore brings both back', async () => {
+    await resetIndexedDb();
+    // avgPower well clear of the effort-quality gate's 0.70 IF floor
+    // against either ride's own estimated FTP (~0.95 * mmp[1200]) --
+    // fixtures.js's 220W default sits close enough to that boundary
+    // against a 330W mmp[1200] winner (IF ~0.70) that this test
+    // shouldn't depend on it.
+    await saveActivities([
+      makeRide({ mmp: LOWER_MMP, avgPower: 300 }),
+      makeRide({ mmp: HIGHER_MMP, avgPower: 300 }),
+    ]);
+    await mountApp({ resetDb: false });
+
+    expect(featuredCellFor('20m').textContent).toContain('330');
     await vi.waitFor(() => {
       if (!document.getElementById('curve-chart')?._chart) throw new Error('not charted yet');
     });
     const firstChart = document.getElementById('curve-chart')._chart;
     expect(firstChart.destroyed).toBe(false);
 
-    const excludeBtn = document.querySelector('[data-exclude-start]');
+    // The 20m/Last-90d cell's exclude button belongs to whichever ride
+    // owns that cell -- the higher-power ride, by construction above.
+    const excludeBtn = featuredCellFor('20m').querySelector('[data-exclude-start]');
     expect(excludeBtn).toBeTruthy();
     excludeBtn.click();
 
     await vi.waitFor(() => {
-      const chart = document.getElementById('curve-chart')?._chart;
-      if (!chart || chart === firstChart) throw new Error('not re-rendered yet');
+      if (featuredCellFor('20m')?.textContent.includes('330')) throw new Error('not excluded yet');
     });
+    expect(featuredCellFor('20m').textContent).toContain('290');
     const secondChart = document.getElementById('curve-chart')._chart;
-
     expect(firstChart.destroyed).toBe(true);
     expect(secondChart).not.toBe(firstChart);
     expect(secondChart.destroyed).toBe(false);
-    // The excluded ride moved into the managed-exclusions panel rather
-    // than just vanishing.
-    expect(document.querySelector('.exclusions-panel')).toBeTruthy();
+
+    document.querySelector('.exclusions-panel [data-restore-start]').click();
+    await vi.waitFor(() => {
+      if (!featuredCellFor('20m')?.textContent.includes('330')) throw new Error('not restored yet');
+    });
   });
 });

@@ -5,27 +5,46 @@
 // ratios (src/mmp.js) so fixtures aren't silently stripped.
 import { MMP_VERSION } from '../../src/mmp.js';
 
-let nextStartTime = new Date('2026-06-01T12:00:00Z').getTime();
+const DAY_MS = 86_400_000;
+// Anchored relative to Date.now(), not a hardcoded calendar date --
+// rollingBest/rollingBestWithOwners/computeLoadSeries all window off
+// Date.now() (src/aggregate.js), so a fixed past date drifts out of the
+// Last-30d/90d windows (and eventually the CP fit's 90-day window) as
+// real time passes, silently flipping which fit branch a test exercises.
+// 10 days back keeps every ride inside all of those windows indefinitely.
+let rideIndex = 0;
 
 // Durations span the 3-20 min CP fit window (300s, 1200s) plus a short
-// and a long point so the table renders more than one row and the fit
-// has enough points for both the 2-param and 3-param regressions.
+// and a long point so the table renders more than one row. This shape
+// fits cleanly via the 2-param regression -- the 3-param (Morton) fit's
+// tau grid search rejects it (the 3-point exact solution here lands
+// tau ~168s, outside the model's [1,90] trained-cyclist grid), so
+// currentFit.model stays 2-param for every test built on this default.
+// Tests that specifically need the 3-param branch should shape their own
+// mmp rather than rely on this default reaching it.
 const DEFAULT_MMP = { 60: 420, 300: 340, 1200: 290, 3600: 250 };
 
+// Real records (src/archive-worker.js) always carry a finite avgPower.
+// Defaulting it here (rather than undefined) keeps the effort-quality
+// gate (passesEffortGate) and the training-load pipeline (computeTss)
+// exercised the way they are in production, instead of both silently
+// no-op'ing. 220W clears the default 0.70 IF gate against this fixture's
+// ~276W estimated FTP (0.95 * mmp[1200]) with room to spare.
+const DEFAULT_AVG_POWER = 220;
+
 export function makeRide({
-  startTime = nextStartTime,
+  startTime,
   durationS = 3600,
   mmp = DEFAULT_MMP,
-  avgPower,
+  avgPower = DEFAULT_AVG_POWER,
   npW,
   stravaId = null,
   mmpVersion = MMP_VERSION,
 } = {}) {
-  // Auto-advance so successive makeRide() calls without an explicit
-  // startTime don't collide on IDB's startTime primary key.
-  nextStartTime += 86_400_000;
+  const resolvedStartTime = startTime ?? (Date.now() - (10 + rideIndex) * DAY_MS);
+  rideIndex += 1;
   return {
-    startTime,
+    startTime: resolvedStartTime,
     durationS,
     distanceM: durationS * 8, // ~28.8 km/h, not load-bearing for any assertion
     avgPower,
@@ -36,6 +55,11 @@ export function makeRide({
   };
 }
 
+// `overrides` may be a plain object (applied identically to every ride --
+// fine as long as it doesn't pin an explicit startTime, since activities
+// are keyed by startTime in IDB and identical values collapse to one row)
+// or a function `(index) => overrides` for rides that need to differ.
 export function makeRides(count, overrides = {}) {
-  return Array.from({ length: count }, () => makeRide(overrides));
+  const overridesFor = typeof overrides === 'function' ? overrides : () => overrides;
+  return Array.from({ length: count }, (_, i) => makeRide(overridesFor(i)));
 }

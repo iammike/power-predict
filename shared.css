@@ -802,6 +802,44 @@ body[data-app-state="manual"] #manual-mode {
   vertical-align: 0.1em;
 }
 
+/* Exclude control (#132). On hover-capable devices it's quiet until
+   the row is hovered/focused, so the table doesn't read as
+   button-heavy at rest. On touch, there's no hover to reveal it, and
+   opacity:0 doesn't stop it from being tappable — so it stays visible
+   and skips the reveal transition entirely rather than being an
+   invisible-but-active tap target. */
+.mmp-cell__exclude {
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .mmp-cell__exclude {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease, color 120ms ease;
+  }
+  .mmp-table tr:hover .mmp-cell__exclude,
+  .mmp-cell__exclude:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.mmp-cell__exclude:hover {
+  color: var(--oxblood);
+}
+.mmp-cell__exclude:focus-visible {
+  color: var(--oxblood);
+  outline: 2px solid var(--oxblood);
+  outline-offset: 1px;
+}
+
 
 .results-foot {
   display: flex;
@@ -1035,13 +1073,15 @@ body[data-app-state="manual"] #manual-mode {
 
 /* OVERRIDE PANEL */
 
-.override-panel {
+.override-panel,
+.exclusions-panel {
   margin: 1.25rem 0 0;
   border: 1px solid var(--hair);
   background: var(--paper-soft);
   padding: 0;
 }
-.override-panel > summary {
+.override-panel > summary,
+.exclusions-panel > summary {
   cursor: pointer;
   list-style: none;
   padding: 0.6rem 0.9rem;
@@ -1054,8 +1094,10 @@ body[data-app-state="manual"] #manual-mode {
   border-bottom: 1px solid transparent;
   transition: border-color 160ms ease, background 160ms ease;
 }
-.override-panel > summary::-webkit-details-marker { display: none; }
-.override-panel > summary::before {
+.override-panel > summary::-webkit-details-marker,
+.exclusions-panel > summary::-webkit-details-marker { display: none; }
+.override-panel > summary::before,
+.exclusions-panel > summary::before {
   content: '+';
   display: inline-block;
   width: 1em;
@@ -1063,10 +1105,27 @@ body[data-app-state="manual"] #manual-mode {
   color: var(--oxblood);
   margin-right: 0.4rem;
 }
-.override-panel[open] > summary::before { content: '−'; }
-.override-panel[open] > summary {
+.override-panel[open] > summary::before,
+.exclusions-panel[open] > summary::before { content: '−'; }
+.override-panel[open] > summary,
+.exclusions-panel[open] > summary {
   border-bottom-color: var(--hair);
   background: var(--paper);
+}
+
+.exclusions-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  display: grid;
+  gap: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+.exclusions-panel li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 /* Override form — refined editorial layout. Two columns

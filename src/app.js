@@ -68,7 +68,12 @@ if (manualForm) {
 
 // User-settable fit overrides, persisted to IDB.
 let currentSettings = {};
+// currentActivities is the exclusion-filtered view everything downstream
+// reads (table/chart/fit/predict). currentActivitiesRaw is the complete
+// set — re-renders after a settings change must start from the raw set
+// so restoring an excluded ride has something to restore from.
 let currentActivities = [];
+let currentActivitiesRaw = [];
 
 // Hydrate from IndexedDB on page load — returning visitors see their
 // curve instantly without re-uploading.
@@ -84,7 +89,6 @@ async function hydrateFromCache() {
   try {
     const [cached, settings] = await Promise.all([loadActivities(), loadSettings()]);
     currentSettings = settings || {};
-    currentActivities = cached;
     if (cached.length > 0) {
       renderCurves(cached, { fromCache: true });
     }
@@ -248,7 +252,7 @@ async function triggerStravaSync() {
     // Only rides already extracted at the current version are safe to
     // declare "known" — a stale-version ride must NOT be suppressed, or
     // the server would skip re-extracting it with the new bucket set.
-    const knownIds = currentActivities
+    const knownIds = currentActivitiesRaw
       .filter((a) => a.mmpVersion === MMP_VERSION)
       .map((a) => a.stravaId)
       .filter((id) => id != null && id !== '');
@@ -267,7 +271,7 @@ async function triggerStravaSync() {
     if (removedIds?.length) {
       await removeActivitiesByStravaId(removedIds);
       const removedSet = new Set(removedIds.map(String));
-      currentActivities = currentActivities.filter((a) => !removedSet.has(String(a.stravaId)));
+      currentActivitiesRaw = currentActivitiesRaw.filter((a) => !removedSet.has(String(a.stravaId)));
     }
     setSync('Loading synced data');
     const remoteActivities = await fetchSyncedActivities(session.session);
@@ -276,19 +280,21 @@ async function triggerStravaSync() {
       return;
     }
     // Write rides that are new OR whose server-side mmpVersion changed
-    // (a re-extraction). hasActivity alone would miss the latter.
-    const fresh = activitiesToRefresh(remoteActivities, currentActivities);
+    // (a re-extraction). hasActivity alone would miss the latter. Uses
+    // the raw (unfiltered) set — an excluded ride is still genuinely
+    // cached and must not be re-classified as "fresh" on every sync.
+    const fresh = activitiesToRefresh(remoteActivities, currentActivitiesRaw);
     // Snapshot per-(duration, window) owners BEFORE saving the sync
     // results so we can diff afterwards. The diff catches any cell
     // whose owner activity changed — that's the right signal for
     // "new this sync," more robust than "activity not in IDB by
     // startTime," which misses rides that arrived via webhook between
     // page loads or that share a startTime with an existing record.
-    const hadPriorActivities = currentActivities.length > 0;
+    const hadPriorActivities = currentActivitiesRaw.length > 0;
     const ownersBefore = {
-      allTime: rollingBestWithOwners(currentActivities),
-      last90:  rollingBestWithOwners(currentActivities, { windowDays: 90 }),
-      last30:  rollingBestWithOwners(currentActivities, { windowDays: 30 }),
+      allTime: rollingBestWithOwners(currentActivitiesRaw),
+      last90:  rollingBestWithOwners(currentActivitiesRaw, { windowDays: 90 }),
+      last30:  rollingBestWithOwners(currentActivitiesRaw, { windowDays: 30 }),
     };
     if (fresh.length) await saveActivities(fresh);
     const all = await loadActivities();
@@ -358,7 +364,7 @@ async function handleExpiredSession() {
   // Connected/Connect toggle on the now-cleared session, same as the
   // Disconnect handler does.
   await refreshStravaUi();
-  renderCurves(currentActivities, { fromCache: true });
+  renderCurves(currentActivitiesRaw, { fromCache: true });
   showStatus(
     `Strava session expired — <button type="button" class="link-button" id="reconnect-strava-btn">reconnect</button> to sync.`,
     { kind: 'error', persistent: true },
@@ -614,31 +620,85 @@ let currentEftpNow = null;
 let currentLoad = { ctl: 0, atl: 0, tsb: 0, hasFtp: false };
 let currentMmpByWindow = { last30: {}, last90: {}, allTime: {}, range: {} };
 
+// Drops manually-excluded rides (#132) — a user override for a ride the
+// auto-anomaly filter missed. Filtered at read time, not at ingest, so
+// un-excluding needs no re-parse/re-sync: the row stays in IDB, only the
+// settings-held id list changes.
+export function filterExcludedActivities(activityMmps, excludedStartTimes) {
+  if (!excludedStartTimes || excludedStartTimes.length === 0) return activityMmps;
+  const excluded = new Set(excludedStartTimes);
+  return activityMmps.filter((a) => !excluded.has(a.startTime));
+}
+
+// Settings transforms for the exclude/restore/reset flows (#132). Pure and
+// exported so the state transitions that have twice broken during review
+// (dropped keys, wrong array reference) are covered by a regression test
+// rather than only by re-reading the call site.
+export function withExclusion(settings, startTime) {
+  const existing = settings.excludedStartTimes || [];
+  if (existing.includes(startTime)) return settings;
+  return { ...settings, excludedStartTimes: [...existing, startTime] };
+}
+
+export function withoutExclusion(settings, startTime) {
+  return {
+    ...settings,
+    excludedStartTimes: (settings.excludedStartTimes || []).filter((t) => t !== startTime),
+  };
+}
+
+// Reset clears only the override-form's own fields. Deleting by name
+// (rather than rebuilding from an allowlist of keys to keep) means every
+// other settings field — Strava session, excluded rides (#132),
+// lastSyncNewIds, minIF, whatever's added next — survives automatically
+// instead of needing to be remembered here.
+export function clearOverrideSettings(settings) {
+  const next = { ...settings };
+  delete next.cpOverrideW;
+  delete next.overrideUnit;
+  delete next.dateFrom;
+  delete next.dateTo;
+  return next;
+}
+
 function renderCurves(activityMmps, { fromCache = false } = {}) {
-  currentActivities = activityMmps;
+  currentActivitiesRaw = activityMmps;
+  const excludedStartTimes = currentSettings.excludedStartTimes || [];
+  const visibleActivityMmps = excludedStartTimes.length
+    ? filterExcludedActivities(activityMmps, excludedStartTimes)
+    : activityMmps;
+  currentActivities = visibleActivityMmps;
+  // Onboarding-vs-data keys on the raw cache, not the visible set — an
+  // all-excluded cache is still a populated cache, not an empty one.
   setAppState(activityMmps.length > 0 ? 'data' : 'onboarding');
+  const excludedSet = new Set(excludedStartTimes);
+  // Newest-excluded-first — a ride you just excluded should be at the
+  // top of the list, not wherever IDB's startTime-ascending order put it.
+  const excludedActivities = excludedSet.size
+    ? activityMmps.filter((a) => excludedSet.has(a.startTime)).sort((a, b) => b.startTime - a.startTime)
+    : [];
   // Filter activities by the user's date range, if set.
   const dateFromMs = currentSettings.dateFrom ? Date.parse(currentSettings.dateFrom) : null;
   const dateToMs = currentSettings.dateTo
     ? Date.parse(currentSettings.dateTo) + 86400_000 - 1
     : null;
   const filtered = (dateFromMs || dateToMs)
-    ? activityMmps.filter((a) =>
+    ? visibleActivityMmps.filter((a) =>
         (!dateFromMs || a.startTime >= dateFromMs) &&
         (!dateToMs   || a.startTime <= dateToMs))
-    : activityMmps;
+    : visibleActivityMmps;
 
   // The MMP table reports the rider's actual rolling-best across
   // their full archive — Last 30d, Last 90d, All-time are static
   // facts about their history. Date-range overrides only steer the
   // fit pipeline below; they don't recompute what the user has
   // demonstrably ridden.
-  const allTime = rollingBest(activityMmps);
-  const last90 = rollingBest(activityMmps, { windowDays: 90 });
-  const last30 = rollingBest(activityMmps, { windowDays: 30 });
-  const allTimeOwners = rollingBestWithOwners(activityMmps);
-  const last90Owners = rollingBestWithOwners(activityMmps, { windowDays: 90 });
-  const last30Owners = rollingBestWithOwners(activityMmps, { windowDays: 30 });
+  const allTime = rollingBest(visibleActivityMmps);
+  const last90 = rollingBest(visibleActivityMmps, { windowDays: 90 });
+  const last30 = rollingBest(visibleActivityMmps, { windowDays: 30 });
+  const allTimeOwners = rollingBestWithOwners(visibleActivityMmps);
+  const last90Owners = rollingBestWithOwners(visibleActivityMmps, { windowDays: 90 });
+  const last30Owners = rollingBestWithOwners(visibleActivityMmps, { windowDays: 30 });
   // The chart shows the active date-range slice when an override
   // is set; otherwise it switches between the last30/last90/all-time
   // tabs. Filled in below once we know the fit's input set.
@@ -761,7 +821,7 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
   // fatigue, anchored at "now," regardless of any fit override.
   // FTP for the IF calculation: 0.95 × CP from the fit (or null).
   const ftpForLoad = currentFit?.cpW ? currentFit.cpW / 0.95 : null;
-  currentLoad = computeLoadSeries(activityMmps, ftpForLoad);
+  currentLoad = computeLoadSeries(visibleActivityMmps, ftpForLoad);
 
   const newSyncIds = new Set(currentSettings.lastSyncNewIds || []);
   const shownDurations = DURATIONS_S.filter((d) => allTime[d] !== undefined);
@@ -785,6 +845,13 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     if (!input || !input.value) return null;
     return { value: input.value, hadOutput: out && !out.hidden };
   })();
+  // Also preserve open/collapsed UI state across a re-render — the
+  // exclude/restore controls (#132) trigger a full re-render on every
+  // click, and without this the table would collapse or the
+  // exclusions panel would close on every single toggle.
+  const wasLongExpanded = document.getElementById('mmp-long')?.hidden === false;
+  const wasExclusionsOpen = document.querySelector('.exclusions-panel')?.open ?? false;
+  const priorWindow = document.querySelector('[data-window].is-active')?.dataset.window;
 
   destroyCurveChart();
   resultsEl.innerHTML = `
@@ -798,13 +865,13 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
           <th>Duration</th>
           <th>Last 30d</th>
           <th class="featured">Last 90d</th>
-          <th data-tooltip="Best across the entire local cache. Earlier rides may not be present if you only synced a recent window.">${allTimeLabel(activityMmps)}</th>
+          <th data-tooltip="Best across the entire local cache. Earlier rides may not be present if you only synced a recent window.">${allTimeLabel(visibleActivityMmps)}</th>
         </tr>
       </thead>
       <tbody>${shortRows}</tbody>
-      ${longRows ? `<tbody id="mmp-long" hidden>${longRows}</tbody>` : ''}
+      ${longRows ? `<tbody id="mmp-long"${wasLongExpanded ? '' : ' hidden'}>${longRows}</tbody>` : ''}
     </table>
-    ${longRows ? `<button type="button" class="link-button mmp-expand" id="mmp-expand" aria-expanded="false" aria-controls="mmp-long">Show longer efforts ▾</button>` : ''}
+    ${longRows ? `<button type="button" class="link-button mmp-expand" id="mmp-expand" aria-expanded="${wasLongExpanded}" aria-controls="mmp-long">${wasLongExpanded ? 'Show fewer ▴' : 'Show longer efforts ▾'}</button>` : ''}
     <aside class="data-sources" aria-label="Data sources">
       <section class="data-sources__row">
         <p class="data-sources__line">${activityMmps.length.toLocaleString()} activities cached locally · ${latestActivityLabel(activityMmps)}</p>
@@ -813,6 +880,13 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
           <button type="button" class="link-button" id="clear-cache">Clear cache</button>
         </span>
       </section>
+      ${excludedActivities.length ? `
+      <section class="data-sources__row">
+        <details class="exclusions-panel"${wasExclusionsOpen ? ' open' : ''}>
+          <summary>${excludedActivities.length} ride${excludedActivities.length === 1 ? '' : 's'} excluded from stats</summary>
+          <ul>${excludedActivities.map(renderExcludedRow).join('')}</ul>
+        </details>
+      </section>` : ''}
       <section class="data-sources__row">
         ${currentSettings.stravaSession
           ? `<p class="data-sources__line">Connected to Strava.</p>
@@ -853,11 +927,12 @@ function renderCurves(activityMmps, { fromCache = false } = {}) {
     await clearSession();
     currentSettings = (await loadSettings()) || {};
     showAuthToast('Disconnected from Strava');
-    renderCurves(currentActivities, { fromCache: true });
+    renderCurves(currentActivitiesRaw, { fromCache: true });
   });
   wirePredictForm();
-  wireCurveChart();
+  wireCurveChart(priorWindow);
   wireOverrideForm();
+  wireMmpTable();
 
   if (priorPredict) {
     const input = document.getElementById('predict-input');
@@ -933,11 +1008,36 @@ export function renderMmpCell(owner, newSyncIds) {
   const badge = isNew
     ? ' <span class="mmp-cell__new" data-tooltip="Set by a ride added in the most recent sync">NEW</span>'
     : '';
-  if (!owner.stravaId) {
-    return date ? `<span data-tooltip="${date}">${watts}</span>${badge}` : `${watts}${badge}`;
+  // startTime is the exclusion key (#132) — always present on a real
+  // owner in practice, but guarded since a synthetic/legacy owner
+  // without one can't be excluded. date is set under the same guard,
+  // so it's always available here when exclude is rendered.
+  const exclude = Number.isFinite(owner.startTime)
+    ? ` <button type="button" class="mmp-cell__exclude" data-exclude-start="${owner.startTime}" data-tooltip="Exclude this ride from all stats" aria-label="Exclude ride from ${date}">×</button>`
+    : '';
+  // stravaId is resolved from the user's uploaded activities.csv
+  // (archive-worker.js) — validate it's actually numeric before it
+  // goes into an href, rather than trusting archive-derived text.
+  if (!owner.stravaId || !/^\d+$/.test(String(owner.stravaId))) {
+    return date ? `<span data-tooltip="${date}">${watts}</span>${badge}${exclude}` : `${watts}${badge}${exclude}`;
   }
   const tip = date ? `${date} · open on Strava` : 'Open this activity on Strava';
-  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" data-tooltip="${tip}">${watts}</a>${badge}`;
+  return `<a class="mmp-link" href="https://www.strava.com/activities/${owner.stravaId}" target="_blank" rel="noopener" data-tooltip="${tip}">${watts}</a>${badge}${exclude}`;
+}
+
+// One row in the "managed exclusions" list (#132) — lets the user see
+// and reverse an override without touching the raw IDB cache.
+export function renderExcludedRow(activity) {
+  const date = Number.isFinite(activity.startTime)
+    ? new Date(activity.startTime).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : 'unknown date';
+  // stravaId is resolved from the user's uploaded activities.csv
+  // (archive-worker.js) — validate it's actually numeric before it
+  // goes into an href, rather than trusting archive-derived text.
+  const link = /^\d+$/.test(String(activity.stravaId))
+    ? ` · <a href="https://www.strava.com/activities/${activity.stravaId}" target="_blank" rel="noopener">view</a>`
+    : '';
+  return `<li>${date}${link} <button type="button" class="link-button" data-restore-start="${activity.startTime}">Restore</button></li>`;
 }
 
 // eFTP is computed from a 90-day window ending at the most recent
@@ -1160,6 +1260,34 @@ function renderOverrideForm() {
   `;
 }
 
+// Delegated listeners for the exclude buttons in the MMP table and the
+// restore buttons in the "managed exclusions" panel (#132). Delegated
+// rather than per-cell because renderMmpCell/renderExcludedRow are pure
+// string builders with no hooks back into JS, and the table/panel are
+// both fully rebuilt on every renderCurves call anyway.
+function wireMmpTable() {
+  document.querySelector('.mmp-table')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-exclude-start]');
+    if (!btn) return;
+    const startTime = Number(btn.dataset.excludeStart);
+    const next = withExclusion(currentSettings, startTime);
+    if (next === currentSettings) return;
+    currentSettings = next;
+    await saveSettings(currentSettings);
+    showStatus('Ride excluded from all stats.', { kind: 'success', dwellMs: 2200 });
+    renderCurves(currentActivitiesRaw, { fromCache: true });
+  });
+  document.querySelector('.exclusions-panel')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-restore-start]');
+    if (!btn) return;
+    const startTime = Number(btn.dataset.restoreStart);
+    currentSettings = withoutExclusion(currentSettings, startTime);
+    await saveSettings(currentSettings);
+    showStatus('Ride restored to all stats.', { kind: 'success', dwellMs: 2200 });
+    renderCurves(currentActivitiesRaw, { fromCache: true });
+  });
+}
+
 function wireOverrideForm() {
   const form = document.getElementById('override-form');
   if (!form) return;
@@ -1213,21 +1341,12 @@ function wireOverrideForm() {
       dateTo: to || null,
     };
     await saveSettings(currentSettings);
-    renderCurves(currentActivities, { fromCache: true });
+    renderCurves(currentActivitiesRaw, { fromCache: true });
   });
   document.getElementById('reset-override').addEventListener('click', async () => {
-    // Reset clears the override-form fields (CP override + date range)
-    // but must preserve the Strava session — those keys belong to a
-    // different feature, not the user's fit overrides.
-    const preserved = {
-      stravaSession: currentSettings.stravaSession,
-      stravaAthleteId: currentSettings.stravaAthleteId,
-    };
-    currentSettings = Object.fromEntries(
-      Object.entries(preserved).filter(([, v]) => v != null)
-    );
+    currentSettings = clearOverrideSettings(currentSettings);
     await saveSettings(currentSettings);
-    renderCurves(currentActivities, { fromCache: true });
+    renderCurves(currentActivitiesRaw, { fromCache: true });
   });
   document.querySelectorAll('.override-form__presets [data-preset-days]').forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -1242,7 +1361,7 @@ function wireOverrideForm() {
         dateTo: fmt(today),
       };
       await saveSettings(currentSettings);
-      renderCurves(currentActivities, { fromCache: true });
+      renderCurves(currentActivitiesRaw, { fromCache: true });
     });
   });
 }
@@ -1265,7 +1384,7 @@ function destroyCurveChart() {
   el._chart = null;
 }
 
-function wireCurveChart() {
+function wireCurveChart(priorWindow) {
   const container = document.getElementById('curve-chart');
   if (!container || !currentFit) return;
   const tabs = document.querySelectorAll('[data-window]');
@@ -1289,7 +1408,11 @@ function wireCurveChart() {
   tabs.forEach((t) => {
     t.addEventListener('click', () => draw(t.dataset.window));
   });
-  draw('last90');
+  // Restore whichever window tab was active before this re-render (#132
+  // exclude/restore triggers a full re-render on every click) rather than
+  // always snapping back to last90.
+  const hasPriorWindow = priorWindow && Array.from(tabs).some((t) => t.dataset.window === priorWindow);
+  draw(hasPriorWindow ? priorWindow : 'last90');
 }
 
 // Manual mode: synthesize a CP/W' from the rider's FTP and render
@@ -1299,8 +1422,12 @@ function renderManualMode(fit, inputs = {}) {
   // Snapshot the existing data-driven state so the user can swap
   // back without reloading. Manual mode replaces the rendered view
   // but does not clear IDB or the in-memory activity list — we just
-  // hold onto it for the "Back to my data" link below.
-  const priorActivities = currentActivities;
+  // hold onto it for the "Back to my data" link below. Snapshot the
+  // raw (unfiltered) set, not currentActivities — renderCurves needs
+  // the complete set to re-derive the exclusion filter from, or a
+  // previously-excluded ride would have nothing to restore from after
+  // a manual-mode round trip.
+  const priorActivities = currentActivitiesRaw;
   const priorSettings = currentSettings;
   currentFit = fit;
   currentEftpNow = null;
@@ -1576,6 +1703,7 @@ async function handleClearCache() {
   destroyCurveChart();
   resultsEl.innerHTML = '';
   currentActivities = [];
+  currentActivitiesRaw = [];
   setAppState('onboarding');
   showStatus('Cache cleared', { kind: 'success', dwellMs: 2200 });
 }

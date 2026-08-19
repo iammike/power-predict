@@ -25,6 +25,7 @@ No archive yet? The landing page also has a **manual mode** that synthesizes a c
 - **Fitness-drift normalization** — when the 90-day window is sparse and the fit falls back to all-time, each activity's MMP is rescaled by `eFTP_now / eFTP_then` (clamped to [0.7, 1.3]) so a years-old peak doesn't anchor today's prediction.
 - **Riegel-style fatigue decay** beyond the fit window with k = 0.10. Anchored on whichever observed effort closest to the target exceeds the model — predictions are grounded in real data, not just the regression's asymptote.
 - **Manual fit override** — pin CP to a value you trust, or restrict the fit to a date range. Persists in IndexedDB.
+- **Per-activity exclusion** — drop a single anomalous ride (a power-meter glitch the auto-anomaly filter missed) from the table/chart/fit/predict pipeline without clearing the whole cache. Reversible, persists in IndexedDB.
 
 Full methodology + references at `docs/methodology.html` (Skiba, Allen & Coggan, Riegel 1981, Monod & Scherrer 1965, Hill 1925).
 

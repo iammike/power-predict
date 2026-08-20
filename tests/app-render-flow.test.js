@@ -103,7 +103,16 @@ describe('predict form (wirePredictForm/renderPredictBlock)', () => {
 
   it('shows a parse error for an unparseable duration instead of throwing', () => {
     document.getElementById('predict-input').value = 'nonsense';
-    expect(() => submit(document.getElementById('predict-form'))).not.toThrow();
+    // Not just "doesn't throw" -- jsdom swallows a listener's thrown
+    // exception and reports it separately rather than propagating it
+    // through dispatchEvent, so that alone wouldn't catch a submit
+    // handler that throws instead of rendering an error. Assert no
+    // window-level error surfaced either.
+    const onError = vi.fn();
+    window.addEventListener('error', onError);
+    submit(document.getElementById('predict-form'));
+    window.removeEventListener('error', onError);
+    expect(onError).not.toHaveBeenCalled();
 
     const out = document.getElementById('predict-output');
     expect(out.hidden).toBe(false);

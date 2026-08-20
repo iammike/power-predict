@@ -18,9 +18,10 @@ const HOUR_MS = 3_600_000;
 // and accumulates across every test in a file (vi.resetModules() inside
 // mountApp() doesn't reset it -- this file's own static import binding
 // survives), so a whole test file's fixture rides share one counter. At
-// an hourly spacing, the Last-30d boundary (aggregate.js's earliest,
-// most conservative window) isn't reached until ride #720 in a single
-// file -- comfortably beyond what any realistic test file creates.
+// an hourly spacing from a 10-day-back base, the Last-30d boundary
+// (aggregate.js's earliest, most conservative window) isn't reached
+// until ride #480 in a single file -- comfortably beyond what any
+// realistic test file creates.
 let rideIndex = 0;
 
 // Durations span the 3-20 min CP fit window (300s, 1200s) plus a short

@@ -249,12 +249,34 @@ describe('handleArchive with unparseable files', () => {
   });
 });
 
+// worker.onmessage is intentionally synchronous now (the fix in this
+// PR moved its async work into an unawaited per-message IIFE -- see
+// deliver()'s comment) -- so `await worker.onmessage(...)` does NOT wait
+// for that IIFE to finish; it resolves immediately since onmessage
+// itself returns undefined. Giving the IIFE's own hasActivity() IDB
+// lookup a real macrotask to resolve is the only way, from a black-box
+// test, to know an 'activity' message has actually landed in
+// newActivities before triggering whatever comes next.
+async function flushPendingActivity() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe('handleArchive worker failure', () => {
-  it('shows a failure banner, terminates the worker, and never renders results', async () => {
+  // Both tests deliver and flush a real 'activity' message before
+  // failing the worker, so the results-hidden/empty-IDB assertions below
+  // prove the error path actually discards in-flight work rather than
+  // just observing there was nothing to discard in the first place.
+  // Verified: without flushPendingActivity() here, a mutation that saves
+  // whatever's in newActivities from inside the catch block survived
+  // every test in this describe block, because the error could win the
+  // race before the activity handler ever got there.
+  it('shows a failure banner, terminates the worker, discards any in-flight activity, and never renders results', async () => {
     await mountApp();
     dropFile();
     const worker = await currentWorker();
 
+    deliver(worker, activityMsg());
+    await flushPendingActivity();
     worker.onerror({ message: 'boom' });
 
     await vi.waitFor(() => {
@@ -271,6 +293,8 @@ describe('handleArchive worker failure', () => {
     dropFile();
     const worker = await currentWorker();
 
+    deliver(worker, activityMsg());
+    await flushPendingActivity();
     worker.onmessage({ data: { type: 'error', message: 'parse exploded' } });
 
     await vi.waitFor(() => {
@@ -305,6 +329,7 @@ describe('handleArchive screen wake lock', () => {
     await vi.waitFor(() => expect(request).toHaveBeenCalledWith('screen'));
 
     deliver(worker, activityMsg());
+    await flushPendingActivity();
     // Not released while still mid-parse -- pins the ordering, not just
     // that release() was called at some point (a request-then-immediately
     // -release implementation that defeats the feature would otherwise

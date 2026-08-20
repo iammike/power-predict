@@ -420,10 +420,20 @@ async function handleArchive(file) {
 
   const worker = new Worker('dist/archive-worker.js');
 
+  // Each 'activity' message's hasActivity() IDB lookup is async, and a
+  // real Worker delivers postMessage calls as separate queued tasks --
+  // the worker can (and for a large archive, does) post 'done' while the
+  // handler for the last few 'activity' messages is still awaiting that
+  // lookup. Tracking the in-flight handler promises and awaiting them
+  // all before resolving on 'done' keeps this correct regardless of that
+  // interleaving; resolving on 'done' alone silently drops whichever
+  // activities hadn't finished their lookup yet.
+  const pendingActivities = [];
+
   try {
     await new Promise((resolve, reject) => {
       worker.onerror = (e) => reject(new Error(e.message || 'worker error'));
-      worker.onmessage = async (e) => {
+      worker.onmessage = (e) => {
         const msg = e.data;
         if (msg.type === 'progress') {
           lastActivitiesSeen = msg.activitiesSeen;
@@ -439,30 +449,32 @@ async function handleArchive(file) {
         } else if (msg.type === 'activity') {
           if (seenStartTimes.has(msg.startTime)) return;
           seenStartTimes.add(msg.startTime);
-          try {
-            if (await hasActivity(msg.startTime)) {
-              skipped++;
-            } else {
-              newActivities.set(msg.startTime, {
-                startTime: msg.startTime,
-                durationS: msg.durationS,
-                distanceM: msg.distanceM,
-                avgPower: msg.avgPower,
-                npW: msg.npW ?? msg.avgPower,
-                mmp: msg.mmp,
-                mmpVersion: msg.mmpVersion ?? MMP_VERSION,
-                stravaId: msg.stravaId ?? null,
-              });
+          pendingActivities.push((async () => {
+            try {
+              if (await hasActivity(msg.startTime)) {
+                skipped++;
+              } else {
+                newActivities.set(msg.startTime, {
+                  startTime: msg.startTime,
+                  durationS: msg.durationS,
+                  distanceM: msg.distanceM,
+                  avgPower: msg.avgPower,
+                  npW: msg.npW ?? msg.avgPower,
+                  mmp: msg.mmp,
+                  mmpVersion: msg.mmpVersion ?? MMP_VERSION,
+                  stravaId: msg.stravaId ?? null,
+                });
+              }
+              withPower++;
+            } catch (err) {
+              console.warn('cache check failed', err);
             }
-            withPower++;
-          } catch (err) {
-            console.warn('cache check failed', err);
-          }
+          })());
         } else if (msg.type === 'done') {
           parseFailed = msg.failed || 0;
           parseFailedSamples = msg.failedSamples || [];
           parseSkippedNonRide = msg.skippedNonRide || 0;
-          resolve();
+          Promise.all(pendingActivities).then(resolve, reject);
         } else if (msg.type === 'error') {
           reject(new Error(msg.message));
         }

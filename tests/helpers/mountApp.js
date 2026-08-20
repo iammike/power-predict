@@ -63,9 +63,19 @@ export async function mountApp({ resetDb = true } = {}) {
   const staticConnectBtn = document.getElementById('strava-connect-btn');
   vi.resetModules();
   await import('../../src/app.js');
+  // 8000ms, not vi.waitFor's 1000ms default: hydration is a handful of
+  // real IndexedDB round trips, and running the full suite in parallel
+  // (many spec files each opening/hydrating their own app.js instance
+  // concurrently) has been observed to occasionally push a single mount
+  // past 2000ms under CI-like load even though it settles in well under
+  // 100ms in isolation. Deliberately kept below vitest.config.js's
+  // 15000ms testTimeout, with headroom for whatever a test does after
+  // mountApp() resolves -- if hydration is ever actually stuck (not just
+  // slow), this should still surface the "app not hydrated yet" message
+  // instead of a bare "Test timed out" with no indication of where.
   await vi.waitFor(() => {
     const btn = document.getElementById('strava-connect-btn')
       || document.getElementById('strava-sync-btn');
     if (!btn || btn === staticConnectBtn) throw new Error('app not hydrated yet');
-  }, { timeout: 2000 });
+  }, { timeout: 8000 });
 }

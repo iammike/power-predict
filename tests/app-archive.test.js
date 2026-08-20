@@ -253,12 +253,26 @@ describe('handleArchive with unparseable files', () => {
 // PR moved its async work into an unawaited per-message IIFE -- see
 // deliver()'s comment) -- so `await worker.onmessage(...)` does NOT wait
 // for that IIFE to finish; it resolves immediately since onmessage
-// itself returns undefined. Giving the IIFE's own hasActivity() IDB
-// lookup a real macrotask to resolve is the only way, from a black-box
-// test, to know an 'activity' message has actually landed in
-// newActivities before triggering whatever comes next.
+// itself returns undefined. From a black-box test there's no direct
+// handle on that IIFE's promise, so this waits it out with real
+// macrotasks instead.
+//
+// A single `setTimeout(resolve, 0)` is NOT enough and was verified
+// flaky: fake-indexeddb's hasActivity() resolves through several of its
+// own internal setImmediate-scheduled steps (factory queueTask, the
+// transaction's _start, the request's re-entrant queueTask, then the
+// completion dispatch), and a clamped ~1ms setTimeout(0) doesn't
+// reliably drain all of them -- measured the lookup still pending after
+// a single flush in roughly 1 run in 4, which silently made the tests
+// that depend on this vacuous that fraction of the time. Looping the
+// flush gives every one of those internal steps its own macrotask to
+// run in; confirmed zero survivals across 25-run mutation-survival
+// loops at 10 iterations (see this file's git history for the mutations
+// used), versus roughly 25% survival at one iteration.
 async function flushPendingActivity() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  for (let i = 0; i < 10; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 }
 
 describe('handleArchive worker failure', () => {

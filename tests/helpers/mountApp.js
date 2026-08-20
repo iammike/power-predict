@@ -63,9 +63,15 @@ export async function mountApp({ resetDb = true } = {}) {
   const staticConnectBtn = document.getElementById('strava-connect-btn');
   vi.resetModules();
   await import('../../src/app.js');
+  // 5000ms, not vi.waitFor's 1000ms default: hydration is a handful of
+  // real IndexedDB round trips, and running the full suite in parallel
+  // (many spec files each opening/hydrating their own app.js instance
+  // concurrently) has been observed to occasionally push a single mount
+  // past 2000ms under CI-like load even though it settles in well under
+  // 100ms in isolation.
   await vi.waitFor(() => {
     const btn = document.getElementById('strava-connect-btn')
       || document.getElementById('strava-sync-btn');
     if (!btn || btn === staticConnectBtn) throw new Error('app not hydrated yet');
-  }, { timeout: 2000 });
+  }, { timeout: 5000 });
 }

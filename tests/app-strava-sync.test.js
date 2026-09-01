@@ -10,7 +10,6 @@ import { mountApp, resetIndexedDb } from './helpers/mountApp.js';
 import { makeRide, makeRides } from './helpers/fixtures.js';
 import { saveActivities, loadActivities, loadSettings } from '../src/storage.js';
 import { saveSession, loadSession, API_BASE } from '../src/strava-session.js';
-import { MMP_VERSION } from '../src/mmp.js';
 
 vi.mock('uplot', () => {
   class FakeUPlot {
@@ -87,7 +86,13 @@ function stubLocationAssign() {
   const assign = vi.fn();
   Object.defineProperty(window, 'location', {
     configurable: true,
-    value: { href: original.href, pathname: original.pathname, search: original.search, assign },
+    value: {
+      href: original.href,
+      pathname: original.pathname,
+      search: original.search,
+      hash: original.hash,
+      assign,
+    },
   });
   restoreLocation = () => {
     Object.defineProperty(window, 'location', { configurable: true, value: original });
@@ -136,7 +141,7 @@ describe('triggerStravaSync happy path', () => {
     document.getElementById('strava-sync-btn').click();
 
     await vi.waitFor(() => {
-      if (!bannerText().includes('Sync complete')) throw new Error('not settled yet');
+      if (!bannerText().includes('already had everything')) throw new Error('not settled yet');
     });
     const bodies = syncPostBodies(fetchMock);
     expect(bodies[0].knownIds).toEqual(['current-1']);
@@ -159,22 +164,40 @@ describe('triggerStravaSync happy path', () => {
     expect(saved.map((a) => a.stravaId)).toEqual(['keep-1']);
   });
 
-  it('flags cells whose owner changed this sync in settings.lastSyncNewIds', async () => {
-    const scale = (mmp, f) => Object.fromEntries(Object.entries(mmp).map(([d, p]) => [d, Math.round(p * f)]));
-    const base = { 60: 420, 300: 340, 1200: 290, 3600: 250 };
-    const weak = makeRide({ stravaId: 'weak-old', mmp: scale(base, 0.7) });
+  // lastSyncNewIds is an owner *diff*, not "which rides are fresh": a
+  // synced ride only lands in it if it takes over a per-duration best
+  // from whatever held it before. These two cases pin that distinction —
+  // a naive `fresh.map(stravaId)` would pass the first and fail the
+  // second.
+  const SCALE_BASE = { 60: 420, 300: 340, 1200: 290, 3600: 250 };
+  const scaledMmp = (f) => Object.fromEntries(
+    Object.entries(SCALE_BASE).map(([d, p]) => [d, Math.round(p * f)]),
+  );
+
+  it('adds a synced ride to settings.lastSyncNewIds when it takes over a cell', async () => {
+    const weak = makeRide({ stravaId: 'weak-old', mmp: scaledMmp(0.7) });
     await mountConnected({ cachedRides: [weak] });
-    const strong = makeRide({ stravaId: 'strong-new', mmp: scale(base, 1.3) });
-    stubFetch({ activities: [strong] });
+    stubFetch({ activities: [makeRide({ stravaId: 'strong-new', mmp: scaledMmp(1.3) })] });
 
     document.getElementById('strava-sync-btn').click();
 
     await vi.waitFor(() => {
       if (!bannerText().includes('Sync complete')) throw new Error('not settled yet');
     });
-    const settings = await loadSettings();
-    expect(settings.lastSyncNewIds).toContain('strong-new');
-    expect(settings.lastSyncNewIds).not.toContain('weak-old');
+    expect((await loadSettings()).lastSyncNewIds).toEqual(['strong-new']);
+  });
+
+  it('leaves settings.lastSyncNewIds empty for a fresh synced ride that owns no cell', async () => {
+    const strong = makeRide({ stravaId: 'strong-old', mmp: scaledMmp(1.3) });
+    await mountConnected({ cachedRides: [strong] });
+    stubFetch({ activities: [makeRide({ stravaId: 'weak-new', mmp: scaledMmp(0.7) })] });
+
+    document.getElementById('strava-sync-btn').click();
+
+    await vi.waitFor(() => {
+      if (!bannerText().includes('Sync complete')) throw new Error('not settled yet');
+    });
+    expect((await loadSettings()).lastSyncNewIds).toEqual([]);
   });
 
   it('shows a no-rides-in-window message without touching an existing cache', async () => {
@@ -211,20 +234,29 @@ describe('triggerStravaSync happy path', () => {
 });
 
 describe('triggerStravaSync multi-slice sync loop', () => {
-  it('threads the cursor across slices and shows per-slice progress in the banner', async () => {
-    await mountConnected();
+  it('threads cursor + knownIds across slices and shows cumulative per-slice progress', async () => {
+    await mountConnected({ cachedRides: [makeRide({ stravaId: 'cached-1' })] });
 
-    let releaseSecondSlice;
-    const secondSliceGate = new Promise((resolve) => { releaseSecondSlice = resolve; });
+    // Three slices, the last two gated, so the test can read the banner
+    // while the loop is parked mid-flight. The banner's "processed" count
+    // is cumulative across slices; slice 2 landing on 4 / 6 (not its
+    // slice-local 2) is what pins that.
+    const gate = () => { let release; const p = new Promise((r) => { release = r; }); return { p, release }; };
+    const slice2 = gate();
+    const slice3 = gate();
     const fetchMock = vi.fn(async (url, init) => {
       const urlStr = String(url);
       if (urlStr.includes('/sync/recent')) {
-        const body = JSON.parse(init.body);
-        if (!body.cursor) {
-          return jsonResponse(200, { processed: 2, totalWithPower: 5, remaining: 3, done: false, cursor: { tag: 'c1' } });
+        const tag = JSON.parse(init.body).cursor?.tag ?? null;
+        if (tag === null) {
+          return jsonResponse(200, { processed: 2, totalWithPower: 6, remaining: 4, done: false, cursor: { tag: 'c1' } });
         }
-        await secondSliceGate;
-        return jsonResponse(200, { processed: 3, totalWithPower: 5, remaining: 0, done: true });
+        if (tag === 'c1') {
+          await slice2.p;
+          return jsonResponse(200, { processed: 2, totalWithPower: 6, remaining: 2, done: false, cursor: { tag: 'c2' } });
+        }
+        await slice3.p;
+        return jsonResponse(200, { processed: 2, totalWithPower: 6, remaining: 0, done: true });
       }
       if (urlStr.includes('/activities/recent')) return jsonResponse(200, { activities: [] });
       throw new Error(`unexpected URL ${urlStr}`);
@@ -233,14 +265,24 @@ describe('triggerStravaSync multi-slice sync loop', () => {
 
     document.getElementById('strava-sync-btn').click();
 
-    // Paused at the second slice's gate: the first slice's onProgress
-    // has run, so the banner shows cumulative 2 / 5 with 3 remaining.
-    await vi.waitFor(() => {
-      if (!bannerText().includes('2 / 5')) throw new Error('first slice progress not shown yet');
-    });
-    expect(bannerText()).toContain('3 remaining');
+    try {
+      await vi.waitFor(() => {
+        if (!bannerText().includes('2 / 6')) throw new Error('slice 1 progress not shown yet');
+      });
+      expect(bannerText()).toContain('4 remaining');
+    } finally {
+      slice2.release();
+    }
 
-    releaseSecondSlice();
+    try {
+      // Cumulative: 2 (slice 1) + 2 (slice 2), not slice 2's local 2.
+      await vi.waitFor(() => {
+        if (!bannerText().includes('4 / 6')) throw new Error('cumulative slice 2 progress not shown yet');
+      });
+      expect(bannerText()).toContain('2 remaining');
+    } finally {
+      slice3.release();
+    }
 
     await vi.waitFor(() => {
       if (!bannerText().includes('No power-equipped rides in the synced window')) {
@@ -248,9 +290,10 @@ describe('triggerStravaSync multi-slice sync loop', () => {
       }
     });
     const bodies = syncPostBodies(fetchMock);
-    expect(bodies).toHaveLength(2);
-    expect(bodies[0].cursor).toBeNull();
-    expect(bodies[1].cursor).toEqual({ tag: 'c1' });
+    expect(bodies.map((b) => b.cursor)).toEqual([null, { tag: 'c1' }, { tag: 'c2' }]);
+    // knownIds only travels on the first call — the worker has the
+    // dedup'd worklist on the cursor after that.
+    expect(bodies.map((b) => b.knownIds)).toEqual([['cached-1'], [], []]);
   });
 });
 

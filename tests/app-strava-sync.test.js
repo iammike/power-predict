@@ -8,8 +8,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mountApp, resetIndexedDb } from './helpers/mountApp.js';
 import { makeRide, makeRides } from './helpers/fixtures.js';
-import { saveActivities, loadActivities } from '../src/storage.js';
+import { saveActivities, loadActivities, loadSettings } from '../src/storage.js';
 import { saveSession, loadSession, API_BASE } from '../src/strava-session.js';
+import { MMP_VERSION } from '../src/mmp.js';
 
 vi.mock('uplot', () => {
   class FakeUPlot {
@@ -25,12 +26,15 @@ class FakeResizeObserver {
   disconnect() {}
 }
 
+let restoreLocation = null;
+
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', FakeResizeObserver);
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  if (restoreLocation) restoreLocation();
 });
 
 function jsonResponse(status, body) {
@@ -42,20 +46,18 @@ function jsonResponse(status, body) {
   };
 }
 
-// Routes by URL substring so a single stub can answer both endpoints
-// triggerStravaSync drives in sequence: syncRecent()'s POST /sync/recent
-// loop (one entry per call; the last entry repeats for any call past the
-// end, so a single-slice `{done: true}` array of length 1 is enough for
-// every happy-path test) and fetchSyncedActivities()'s GET /activities/recent.
-function stubFetch({ syncSlices = [{ processed: 0, remaining: 0, done: true }], activities = [], activitiesStatus = 200 }) {
-  let callIndex = 0;
+// Routes by URL substring so a single stub answers both endpoints
+// triggerStravaSync drives: syncRecent()'s POST /sync/recent and
+// fetchSyncedActivities()'s GET /activities/recent. The happy-path
+// sync loop is single-slice here (one POST, `done: true`); the
+// multi-slice loop + progress banner get their own gated mock in the
+// 'multi-slice sync loop' block below.
+function stubFetch({ sync = { processed: 0, remaining: 0, done: true }, syncStatus, activities = [], activitiesStatus = 200 } = {}) {
   const fetchMock = vi.fn(async (url) => {
     const urlStr = String(url);
     if (urlStr.includes('/sync/recent')) {
-      const slice = syncSlices[Math.min(callIndex, syncSlices.length - 1)];
-      callIndex += 1;
-      if (slice.status) return jsonResponse(slice.status, slice.body ?? {});
-      return jsonResponse(200, slice);
+      if (syncStatus) return jsonResponse(syncStatus, { error: 'boom' });
+      return jsonResponse(200, sync);
     }
     if (urlStr.includes('/activities/recent')) {
       if (activitiesStatus !== 200) return jsonResponse(activitiesStatus, { error: 'boom' });
@@ -67,13 +69,40 @@ function stubFetch({ syncSlices = [{ processed: 0, remaining: 0, done: true }], 
   return fetchMock;
 }
 
+// Parsed request bodies of every POST /sync/recent the run made, in
+// order — lets a test assert what the client sent (knownIds, cursor).
+function syncPostBodies(fetchMock) {
+  return fetchMock.mock.calls
+    .filter(([url]) => String(url).includes('/sync/recent'))
+    .map(([, init]) => JSON.parse(init.body));
+}
+
+// jsdom's Location.assign has a non-configurable/non-writable own
+// descriptor, so vi.spyOn(window.location, 'assign') throws — but the
+// `location` property on `window` is itself configurable, so
+// defineProperty swaps the whole object for one whose assign is a spy.
+// Restored in afterEach so a later test gets the real Location back.
+function stubLocationAssign() {
+  const original = window.location;
+  const assign = vi.fn();
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { href: original.href, pathname: original.pathname, search: original.search, assign },
+  });
+  restoreLocation = () => {
+    Object.defineProperty(window, 'location', { configurable: true, value: original });
+    restoreLocation = null;
+  };
+  return assign;
+}
+
 function bannerText() {
   return document.querySelector('.status-banner')?.textContent ?? '';
 }
 
-async function mountConnected({ withCachedRide = false } = {}) {
+async function mountConnected({ cachedRides = [] } = {}) {
   await resetIndexedDb();
-  if (withCachedRide) await saveActivities(makeRides(1));
+  if (cachedRides.length) await saveActivities(cachedRides);
   await saveSession({ session: 'tok-123', athleteId: '999' });
   await mountApp({ resetDb: false });
 }
@@ -89,8 +118,7 @@ describe('triggerStravaSync happy path', () => {
     await vi.waitFor(() => {
       if (!bannerText().includes('Sync complete')) throw new Error('not settled yet');
     });
-    expect(bannerText()).toContain('1');
-    expect(bannerText()).toContain('new ride added');
+    expect(bannerText()).toContain('1 new ride added');
     expect(document.querySelector('.mmp-table')).toBeTruthy();
 
     const saved = await loadActivities();
@@ -99,8 +127,58 @@ describe('triggerStravaSync happy path', () => {
     expect(saved[0].stravaId).toBe('555');
   });
 
+  it('sends only current-mmpVersion Strava ids as knownIds', async () => {
+    const current = makeRide({ stravaId: 'current-1' });
+    const stale = makeRide({ stravaId: 'stale-1', mmpVersion: 'v0-old' });
+    await mountConnected({ cachedRides: [current, stale] });
+    const fetchMock = stubFetch({ activities: [current] });
+
+    document.getElementById('strava-sync-btn').click();
+
+    await vi.waitFor(() => {
+      if (!bannerText().includes('Sync complete')) throw new Error('not settled yet');
+    });
+    const bodies = syncPostBodies(fetchMock);
+    expect(bodies[0].knownIds).toEqual(['current-1']);
+  });
+
+  it('prunes rides the worker reconciled out of D1 from the local cache', async () => {
+    const keep = makeRide({ stravaId: 'keep-1' });
+    const drop = makeRide({ stravaId: 'drop-1' });
+    await mountConnected({ cachedRides: [keep, drop] });
+    stubFetch({ sync: { processed: 0, remaining: 0, done: true, removedIds: ['drop-1'] }, activities: [] });
+
+    document.getElementById('strava-sync-btn').click();
+
+    await vi.waitFor(() => {
+      if (!bannerText().includes('No power-equipped rides in the synced window')) {
+        throw new Error('not settled yet');
+      }
+    });
+    const saved = await loadActivities();
+    expect(saved.map((a) => a.stravaId)).toEqual(['keep-1']);
+  });
+
+  it('flags cells whose owner changed this sync in settings.lastSyncNewIds', async () => {
+    const scale = (mmp, f) => Object.fromEntries(Object.entries(mmp).map(([d, p]) => [d, Math.round(p * f)]));
+    const base = { 60: 420, 300: 340, 1200: 290, 3600: 250 };
+    const weak = makeRide({ stravaId: 'weak-old', mmp: scale(base, 0.7) });
+    await mountConnected({ cachedRides: [weak] });
+    const strong = makeRide({ stravaId: 'strong-new', mmp: scale(base, 1.3) });
+    stubFetch({ activities: [strong] });
+
+    document.getElementById('strava-sync-btn').click();
+
+    await vi.waitFor(() => {
+      if (!bannerText().includes('Sync complete')) throw new Error('not settled yet');
+    });
+    const settings = await loadSettings();
+    expect(settings.lastSyncNewIds).toContain('strong-new');
+    expect(settings.lastSyncNewIds).not.toContain('weak-old');
+  });
+
   it('shows a no-rides-in-window message without touching an existing cache', async () => {
-    await mountConnected({ withCachedRide: true });
+    await mountConnected({ cachedRides: makeRides(1) });
     stubFetch({ activities: [] });
 
     document.getElementById('strava-sync-btn').click();
@@ -113,14 +191,14 @@ describe('triggerStravaSync happy path', () => {
     expect(await loadActivities()).toHaveLength(1);
   });
 
-  it('merges into an existing cache and reports "already had everything" when nothing is new', async () => {
+  it('reports "already had everything" when the remote set matches the cache', async () => {
     await resetIndexedDb();
     const existing = makeRide({ stravaId: '555' });
     await saveActivities([existing]);
     await saveSession({ session: 'tok-123', athleteId: '999' });
     await mountApp({ resetDb: false });
     // Same startTime + same mmpVersion as the cached row -- activitiesToRefresh
-    // should treat this as nothing new to write.
+    // treats this as nothing new to write.
     stubFetch({ activities: [existing] });
 
     document.getElementById('strava-sync-btn').click();
@@ -132,10 +210,54 @@ describe('triggerStravaSync happy path', () => {
   });
 });
 
+describe('triggerStravaSync multi-slice sync loop', () => {
+  it('threads the cursor across slices and shows per-slice progress in the banner', async () => {
+    await mountConnected();
+
+    let releaseSecondSlice;
+    const secondSliceGate = new Promise((resolve) => { releaseSecondSlice = resolve; });
+    const fetchMock = vi.fn(async (url, init) => {
+      const urlStr = String(url);
+      if (urlStr.includes('/sync/recent')) {
+        const body = JSON.parse(init.body);
+        if (!body.cursor) {
+          return jsonResponse(200, { processed: 2, totalWithPower: 5, remaining: 3, done: false, cursor: { tag: 'c1' } });
+        }
+        await secondSliceGate;
+        return jsonResponse(200, { processed: 3, totalWithPower: 5, remaining: 0, done: true });
+      }
+      if (urlStr.includes('/activities/recent')) return jsonResponse(200, { activities: [] });
+      throw new Error(`unexpected URL ${urlStr}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    document.getElementById('strava-sync-btn').click();
+
+    // Paused at the second slice's gate: the first slice's onProgress
+    // has run, so the banner shows cumulative 2 / 5 with 3 remaining.
+    await vi.waitFor(() => {
+      if (!bannerText().includes('2 / 5')) throw new Error('first slice progress not shown yet');
+    });
+    expect(bannerText()).toContain('3 remaining');
+
+    releaseSecondSlice();
+
+    await vi.waitFor(() => {
+      if (!bannerText().includes('No power-equipped rides in the synced window')) {
+        throw new Error('not settled yet');
+      }
+    });
+    const bodies = syncPostBodies(fetchMock);
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].cursor).toBeNull();
+    expect(bodies[1].cursor).toEqual({ tag: 'c1' });
+  });
+});
+
 describe('triggerStravaSync error handling', () => {
   it('on a 401, clears the session, shows a reconnect prompt, and flips the UI back to Connect', async () => {
     await mountConnected();
-    stubFetch({ syncSlices: [{ status: 401, body: { error: 'unauthenticated' } }] });
+    stubFetch({ syncStatus: 401 });
 
     document.getElementById('strava-sync-btn').click();
 
@@ -150,7 +272,7 @@ describe('triggerStravaSync error handling', () => {
 
   it('on a 5xx, shows a calm unavailable message and leaves the session untouched', async () => {
     await mountConnected();
-    stubFetch({ syncSlices: [{ status: 503, body: { error: 'strava down' } }] });
+    stubFetch({ syncStatus: 503 });
 
     document.getElementById('strava-sync-btn').click();
 
@@ -163,7 +285,7 @@ describe('triggerStravaSync error handling', () => {
 
   it('surfaces a generic transport error for anything else, and leaves the session untouched', async () => {
     await mountConnected();
-    stubFetch({ syncSlices: [{ status: 418, body: { error: 'teapot' } }] });
+    stubFetch({ syncStatus: 418 });
 
     document.getElementById('strava-sync-btn').click();
 
@@ -175,21 +297,8 @@ describe('triggerStravaSync error handling', () => {
 });
 
 describe('Strava connect/disconnect', () => {
-  it('Connect shows immediate loading feedback without navigating', async () => {
-    // beginStravaConnect defers window.location.assign behind a real
-    // setTimeout(60ms). This test only asserts the synchronous click
-    // feedback and deliberately doesn't wait for or assert on that
-    // deferred call. It's harmless but not preventable: jsdom's
-    // Location.assign is non-configurable/non-writable (verified
-    // directly -- neither vi.stubGlobal('location', ...) nor a plain
-    // property overwrite can intercept it), and fake timers aren't a fix
-    // either, since they hang mountApp()'s own IDB-backed vi.waitFor. So
-    // the timer fires for real ~60ms later, sometimes mid-way through a
-    // *later* test in this file (jsdom's window/location persist across
-    // tests within one spec file), producing a benign "Not implemented:
-    // navigation to another Document" console warning. It doesn't affect
-    // any assertion or leak state -- confirmed by running this file
-    // repeatedly -- so it's left as expected noise rather than suppressed.
+  it('Connect shows loading feedback and navigates to the authorize URL', async () => {
+    const assign = stubLocationAssign();
     await mountApp();
     expect(document.body.dataset.appState).toBe('onboarding');
 
@@ -200,6 +309,14 @@ describe('Strava connect/disconnect', () => {
     expect(btn.disabled).toBe(true);
     expect(btn.classList.contains('is-loading')).toBe(true);
     expect(bannerText()).toContain('Connecting to Strava');
+
+    // beginStravaConnect defers the redirect behind a 60ms setTimeout.
+    await vi.waitFor(() => {
+      if (!assign.mock.calls.length) throw new Error('redirect not fired yet');
+    });
+    const target = assign.mock.calls[0][0];
+    expect(target).toContain(`${API_BASE}/auth/strava/authorize`);
+    expect(target).toContain('return_to=%2F');
   });
 
   it('Disconnect clears the session and flips the UI back to Connect', async () => {
@@ -219,12 +336,10 @@ describe('Strava connect/disconnect', () => {
     await mountConnected();
     vi.stubGlobal('confirm', () => false);
 
+    // handleDisconnect returns synchronously at the declined confirm(),
+    // before any await, so there is no async settling to wait for.
     document.getElementById('strava-disconnect').click();
 
-    // No async settling to wait for -- handleDisconnect returns
-    // synchronously right after the declined confirm(), before any
-    // await. A brief real delay confirms nothing changes after the fact.
-    await new Promise((resolve) => setTimeout(resolve, 10));
     expect(await loadSession()).toEqual({ session: 'tok-123', athleteId: '999' });
     expect(document.getElementById('strava-sync-btn')).toBeTruthy();
   });

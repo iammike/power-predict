@@ -358,8 +358,7 @@ describe('Strava connect/disconnect', () => {
       if (!assign.mock.calls.length) throw new Error('redirect not fired yet');
     });
     const target = assign.mock.calls[0][0];
-    expect(target).toContain(`${API_BASE}/auth/strava/authorize`);
-    expect(target).toContain('return_to=%2F');
+    expect(target).toBe(`${API_BASE}/auth/strava/authorize?return_to=%2F`);
   });
 
   it('Disconnect clears the session and flips the UI back to Connect', async () => {

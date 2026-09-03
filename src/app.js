@@ -1694,13 +1694,18 @@ function wirePredictForm() {
   feelingSelect?.addEventListener('change', () => {
     currentSettings = { ...currentSettings, feelingPreset: feelingSelect.value };
     // Refresh an already-shown prediction first — the visible update
-    // shouldn't wait on (or be skipped by) the IDB write. Skip it when
-    // the duration field has since been cleared, or the synthetic
-    // submit would replace a good result with a parse error.
+    // shouldn't wait on (or be skipped by) the IDB write.
     const out = document.getElementById('predict-output');
     const input = document.getElementById('predict-input');
-    if (out && !out.hidden && input?.value.trim()) {
-      form.dispatchEvent(new Event('submit', { cancelable: true }));
+    if (out && !out.hidden) {
+      if (input?.value.trim()) {
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      } else {
+        // Duration field was cleared since the last prediction — drop the
+        // now-stale output rather than leave it showing the old preset.
+        out.hidden = true;
+        out.innerHTML = '';
+      }
     }
     saveSettings(currentSettings).catch((err) => console.error('feeling save failed', err));
   });

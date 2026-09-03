@@ -280,6 +280,12 @@ describe('manual mode (renderManualMode)', () => {
     // Headline is untouched; the -10% adjustment is the secondary line.
     expect(out.querySelector('.predict-output__value').textContent).toBe(headline);
     expect(out.textContent).toContain('Properly detrained · -10% →');
+
+    // The re-predict runs ahead of the fire-and-forget IDB write; wait it
+    // out so it can't land during the next test's resetIndexedDb().
+    await vi.waitFor(async () => {
+      if ((await loadSettings()).feelingPreset !== 'detrained') throw new Error('not persisted yet');
+    });
   });
 
   it('keeps a feeling picked in manual mode after "Back to my data", and a later settings write does not clobber it', async () => {

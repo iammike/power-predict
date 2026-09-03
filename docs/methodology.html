@@ -159,9 +159,9 @@
 
     <p>Manual mode is intentionally coarse. It can't anchor the long-duration end of the curve to real data, so 4-hour and 12-hour predictions fall back to the model's pure decay rather than observed history. Upload an archive when possible &mdash; the prediction quality improves materially.</p>
 
-    <h2>Form-based prediction nudge (CTL / ATL / TSB)</h2>
+    <h2>Form (CTL / ATL / TSB) and the Feeling selector</h2>
 
-    <p>Power Predict computes the standard cycling training-load triumvirate from your activity history and uses it to nudge predictions toward your current state of rest or fatigue:</p>
+    <p>Power Predict computes the standard cycling training-load triumvirate from your activity history and surfaces it in the predict block as a <strong>Form</strong> stat:</p>
 
     <ul>
       <li><strong>TSS</strong> per activity = (IF² × duration<sub>h</sub> × 100), where IF = NP / FTP. NP is Coggan's normalized-power form (4th-root-of-mean-of-30s-rolling-avg<sup>4</sup>); FTP is taken as 0.95 × CP from the active fit. Capped at 600 to swallow data noise.</li>
@@ -170,16 +170,24 @@
       <li><strong>TSB</strong> (Training Stress Balance) = CTL − ATL. Positive values mean you're rested; negative means you're carrying fatigue.</li>
     </ul>
 
-    <p>The predict block surfaces TSB as a <strong>Form</strong> stat. A small multiplier flows from TSB back into the prediction: peaking riders get a few percent up, deeply fatigued riders get a few percent down, capped at &plusmn;5 % so this is a nudge, not a rewrite. The output's confidence band carries the same multiplier.</p>
+    <p>TSB is shown for context only &mdash; it does not move the prediction. Adjusting for how you feel is instead a manual call: the predict form has a <strong>Feeling</strong> selector where you rate today's form against your last-90-day bests, and a small multiplier is applied to the estimate. The headline stays the form-free &ldquo;fresh&rdquo; number (the one that matches the curve and matters for a tapered race day); the adjusted figure shows as a secondary line.</p>
 
-    <p>The motivating case: a rider with a high CP who's spent 30 days on zone-2 base reads low on the rolling-90-day MMP because the recent rides aren't peak efforts. CTL stays high, ATL drops, TSB swings positive — the form adjustment recognizes they're rested and lifts the prediction by a couple of percent. Conversely, after a hard block: TSB negative, prediction trims a couple of percent, the model is honest about fatigue.</p>
+    <ul>
+      <li><strong>Sharp</strong> &mdash; +3 %</li>
+      <li><strong>Normal</strong> &mdash; 0 % (default)</li>
+      <li><strong>Just cruising</strong> &mdash; &minus;3 %</li>
+      <li><strong>A touch out of shape</strong> &mdash; &minus;6 %</li>
+      <li><strong>Properly detrained</strong> &mdash; &minus;10 %</li>
+    </ul>
+
+    <p>Why hand this to the rider rather than infer it from TSB: training-load balance is a blunt proxy. It can't tell a genuine taper from a data gap, and it knows nothing about sleep, illness, or life stress. A rider usually knows whether they're a touch off or flying, and the envelope here is wider (&minus;10 %) than a TSB-derived one would justify.</p>
 
     <h2>Limitations and planned improvements</h2>
 
     <p>Today's predictions assume your last 90 days of data accurately reflect your current fitness. Issues planned for upcoming releases:</p>
 
     <ul>
-      <li><strong>Training-load adjustment</strong> &mdash; modulate predictions by recent CTL/ATL/TSB so a rider mid-taper doesn't get the same forecast as a rider mid-build.</li>
+      <li><strong>Automatic form adjustment</strong> &mdash; the Feeling selector is rider-driven; deriving a starting suggestion from CTL/ATL/TSB (still rider-overridable) is a possible later step.</li>
     </ul>
 
     <p>Track these on the <a href="https://github.com/iammike/power-predict/milestones" target="_blank" rel="noopener">project milestones</a>.</p>

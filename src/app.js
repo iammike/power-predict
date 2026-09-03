@@ -17,7 +17,8 @@ import {
 import { fitCp2, fitCp3, fitFatigueK, predictPower, mmpToPoints, DEFAULT_DECAY } from './cpfit.js';
 import { parseDuration } from './duration.js';
 import { synthesizeFit } from './manual.js';
-import { computeLoadSeries, formMultiplier, tsbBand } from './load.js';
+import { computeLoadSeries, tsbBand } from './load.js';
+import { FEELING_PRESETS, DEFAULT_FEELING, feelingPreset, feelingMultiplier } from './feeling.js';
 import { partitionDurations } from './table.js';
 import {
   parseAuthHash, clearAuthHash, loadSession, saveSession, clearSession, authorizeUrl,
@@ -1146,12 +1147,12 @@ export function formQuality(tsb) {
   if (band === 'overloaded') return { label: 'overloaded', cls: 'is-bad' };
   return { label: 'stable', cls: 'is-good' };
 }
-export function formTooltip(ctl, atl, tsb) {
+export function formTooltip(ctl, atl) {
   const roundedCtl = Math.round(ctl);
   const roundedAtl = Math.round(atl);
-  const adj = Math.round((formMultiplier(tsb) - 1) * 100);
-  const adjStr = adj === 0 ? 'no adjustment' : `${adj > 0 ? '+' : ''}${adj}% applied to predictions`;
-  return `Form (TSB) = CTL ${roundedCtl} − ATL ${roundedAtl}. Positive = fresh; negative = fatigued. ${adjStr}. Capped at ±5%.`;
+  // TSB is context only now — predictions are adjusted by the Feeling
+  // selector (#248), not automatically from training load.
+  return `Form (TSB) = CTL ${roundedCtl} − ATL ${roundedAtl}. Positive = fresh; negative = fatigued. Shown for context; use the Feeling selector to adjust a prediction.`;
 }
 
 // Fatigue k: personal Riegel exponent fitted from 20-min-to-4-hr MMP.
@@ -1440,7 +1441,6 @@ function renderManualMode(fit, inputs = {}) {
   // previously-excluded ride would have nothing to restore from after
   // a manual-mode round trip.
   const priorActivities = currentActivitiesRaw;
-  const priorSettings = currentSettings;
   currentFit = fit;
   currentEftpNow = null;
   currentLoad = { ctl: 0, atl: 0, tsb: 0, hasFtp: false };
@@ -1502,6 +1502,10 @@ function renderManualMode(fit, inputs = {}) {
           <span>Target duration</span>
           <input type="text" id="predict-input" placeholder="45m or 2h30m" autocomplete="off" spellcheck="false" required>
         </label>
+        <label class="predict-form__field predict-form__field--feeling">
+          <span>Feeling</span>
+          ${renderFeelingSelect()}
+        </label>
         <button type="submit">Predict</button>
       </form>
       <output class="predict-output" id="predict-output" hidden></output>
@@ -1525,8 +1529,12 @@ function renderManualMode(fit, inputs = {}) {
   // visible across manual state, so users have natural access to drop
   // an archive or hit Connect / Sync without leaving the page.
   if (hasPriorData) {
-    document.getElementById('manual-back').addEventListener('click', () => {
-      currentSettings = priorSettings;
+    document.getElementById('manual-back').addEventListener('click', async () => {
+      // Re-read rather than restore a snapshot: the feeling selector
+      // (and a sync run from manual mode) can persist settings changes
+      // while manual mode is up, and a stale snapshot would revert them
+      // — then the next whole-object saveSettings would make it stick.
+      currentSettings = (await loadSettings()) || {};
       renderCurves(priorActivities, { fromCache: true });
     });
   }
@@ -1570,6 +1578,20 @@ function wireManualInline() {
   unitSelect.addEventListener('change', recompute);
   valueInput.addEventListener('input', recompute);
   sprintInput.addEventListener('input', recompute);
+}
+
+// The "how do I feel vs my 90-day bests" selector (#248). Shared by
+// the data-mode and manual-mode predict forms. Reflects the persisted
+// currentSettings.feelingPreset; feelingPreset() coerces an unknown
+// stored id back to Normal.
+function renderFeelingSelect() {
+  const active = feelingPreset(currentSettings.feelingPreset || DEFAULT_FEELING).id;
+  const options = FEELING_PRESETS.map((p) => {
+    const sign = p.adjPct > 0 ? '+' : '';
+    const suffix = p.adjPct === 0 ? '' : ` (${sign}${p.adjPct}%)`;
+    return `<option value="${p.id}"${p.id === active ? ' selected' : ''}>${p.label}${suffix}</option>`;
+  }).join('');
+  return `<select id="predict-feeling">${options}</select>`;
 }
 
 function renderPredictBlock() {
@@ -1617,7 +1639,7 @@ function renderPredictBlock() {
           <dd>${formatPower(currentEftpNow)}<span class="fit-stats__quality is-good">${eftpWindowLabel(currentSettings.dateFrom, currentSettings.dateTo)}</span></dd>
         </div>` : ''}
         ${currentLoad.hasFtp ? `
-        <div data-tooltip="${formTooltip(currentLoad.ctl, currentLoad.atl, currentLoad.tsb)}">
+        <div data-tooltip="${formTooltip(currentLoad.ctl, currentLoad.atl)}">
           <dt>Form</dt>
           <dd>${formatTsb(currentLoad.tsb)}<span class="fit-stats__quality ${formQuality(currentLoad.tsb).cls}">${formQuality(currentLoad.tsb).label}</span></dd>
         </div>` : ''}
@@ -1653,6 +1675,10 @@ function renderPredictBlock() {
           <span>Target duration</span>
           <input type="text" id="predict-input" placeholder="45m or 2h30m" autocomplete="off" spellcheck="false" required>
         </label>
+        <label class="predict-form__field predict-form__field--feeling">
+          <span>Feeling</span>
+          ${renderFeelingSelect()}
+        </label>
         <button type="submit">Predict</button>
       </form>
       <output class="predict-output" id="predict-output" hidden></output>
@@ -1663,6 +1689,27 @@ function renderPredictBlock() {
 function wirePredictForm() {
   const form = document.getElementById('predict-form');
   if (!form) return;
+
+  const feelingSelect = document.getElementById('predict-feeling');
+  feelingSelect?.addEventListener('change', () => {
+    currentSettings = { ...currentSettings, feelingPreset: feelingSelect.value };
+    // Refresh an already-shown prediction first — the visible update
+    // shouldn't wait on (or be skipped by) the IDB write.
+    const out = document.getElementById('predict-output');
+    const input = document.getElementById('predict-input');
+    if (out && !out.hidden) {
+      if (input?.value.trim()) {
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      } else {
+        // Duration field was cleared since the last prediction — drop the
+        // now-stale output rather than leave it showing the old preset.
+        out.hidden = true;
+        out.innerHTML = '';
+      }
+    }
+    saveSettings(currentSettings).catch((err) => console.error('feeling save failed', err));
+  });
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const input = document.getElementById('predict-input');
@@ -1685,25 +1732,25 @@ function wirePredictForm() {
       out.innerHTML = `<p class="predict-output__error">Prediction failed.</p>`;
       return;
     }
-    // The headline is the form-free "fresh" estimate. That's the number
-    // that matters for race planning — you'll be tapered and rested on
-    // the day — and it matches the chart, which also bakes no form in.
-    // Today's form adjustment (capped at ±5% inside formMultiplier) is
-    // demoted to a subtext line: informative, but it no longer drags the
-    // headline below what you'd actually hit fresh.
-    const mult = currentLoad.hasFtp ? formMultiplier(currentLoad.tsb) : 1;
-    const adjPct = Math.round((mult - 1) * 100);
+    // The headline is the form-free "fresh" estimate — the number that
+    // matters for race planning (you'll be tapered and rested on the
+    // day) and the one that matches the chart, which bakes in no form.
+    // The rider's self-assessed feeling vs their 90-day bests (#248) is
+    // a subtext line: informative, but it doesn't drag the headline
+    // below what they'd hit fresh.
+    const preset = feelingPreset(currentSettings.feelingPreset || DEFAULT_FEELING);
+    const mult = feelingMultiplier(preset.id);
     const extrapChip = raw.extrapolated
       ? '<span class="predict-output__flag">extrapolated</span>'
       : '';
-    const formLine = adjPct === 0
+    const feelingLine = preset.adjPct === 0
       ? ''
-      : `<p class="predict-output__band" title="${formTooltip(currentLoad.ctl, currentLoad.atl, currentLoad.tsb)}">At today's form (${adjPct > 0 ? '+' : ''}${adjPct}%): ${Math.round(raw.powerW * mult)} W</p>`;
+      : `<p class="predict-output__band" title="Your read on today's form versus your last-90-day bests, applied to the fresh estimate.">${preset.label} · ${preset.adjPct > 0 ? '+' : ''}${preset.adjPct}% → ${Math.round(raw.powerW * mult)} W</p>`;
     out.hidden = false;
     out.innerHTML = `
       <p class="predict-output__label">Predicted for ${formatDuration(seconds)}</p>
       <p class="predict-output__value">${Math.round(raw.powerW)}<span class="predict-output__unit">W</span>${extrapChip}</p>
-      ${formLine}
+      ${feelingLine}
     `;
   });
 }

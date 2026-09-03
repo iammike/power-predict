@@ -486,20 +486,12 @@ describe('formQuality', () => {
 });
 
 describe('formTooltip', () => {
-  it('reports rounded CTL/ATL and no adjustment at TSB 0', () => {
-    expect(formTooltip(50.4, 45.6, 0)).toBe('Form (TSB) = CTL 50 − ATL 46. Positive = fresh; negative = fatigued. no adjustment. Capped at ±5%.');
+  it('reports rounded CTL/ATL', () => {
+    expect(formTooltip(50.4, 45.6)).toBe('Form (TSB) = CTL 50 − ATL 46. Positive = fresh; negative = fatigued. Shown for context; use the Feeling selector to adjust a prediction.');
   });
 
-  it('reports the uncapped linear adjustment partway to the cap', () => {
-    expect(formTooltip(50, 45, 10)).toMatch(/\+2% applied to predictions/);
-  });
-
-  it('reports a positive capped adjustment for a TSB past the cap threshold', () => {
-    expect(formTooltip(50, 45, 40)).toMatch(/\+5% applied to predictions/);
-  });
-
-  it('reports a negative capped adjustment for a TSB past the cap threshold', () => {
-    expect(formTooltip(50, 45, -40)).toMatch(/-5% applied to predictions/);
+  it('no longer claims any automatic prediction adjustment', () => {
+    expect(formTooltip(50, 45)).not.toMatch(/applied to predictions/);
   });
 });
 
@@ -636,11 +628,13 @@ describe('clearOverrideSettings', () => {
   it('preserves the Strava session and other unrelated fields', () => {
     const settings = {
       cpOverrideW: 250, stravaSession: { token: 'x' }, lastSyncNewIds: ['1'], minIF: 0.7,
+      feelingPreset: 'detrained',
     };
     const next = clearOverrideSettings(settings);
     expect(next.stravaSession).toEqual({ token: 'x' });
     expect(next.lastSyncNewIds).toEqual(['1']);
     expect(next.minIF).toBe(0.7);
+    expect(next.feelingPreset).toBe('detrained');
   });
 
   it('does not mutate the input settings object', () => {

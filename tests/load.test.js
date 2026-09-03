@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTss, computeLoadSeries, formMultiplier, tsbBand } from '../src/load.js';
+import { computeTss, computeLoadSeries, tsbBand } from '../src/load.js';
 
 const day = 86_400_000;
 
@@ -77,27 +77,6 @@ describe('computeLoadSeries', () => {
     }
     const out = computeLoadSeries(acts, ftp, { now });
     expect(out.tsb).toBeGreaterThan(0);
-  });
-});
-
-describe('formMultiplier', () => {
-  it('returns 1 when TSB is unknown', () => {
-    expect(formMultiplier(NaN)).toBe(1);
-    expect(formMultiplier(null)).toBe(1);
-  });
-  it('returns 1 at TSB = 0', () => {
-    expect(formMultiplier(0)).toBeCloseTo(1, 6);
-  });
-  it('caps at +5% above TSB +25', () => {
-    expect(formMultiplier(40)).toBeCloseTo(1.05, 4);
-    expect(formMultiplier(25)).toBeCloseTo(1.05, 4);
-  });
-  it('caps at -5% below TSB -25', () => {
-    expect(formMultiplier(-40)).toBeCloseTo(0.95, 4);
-    expect(formMultiplier(-25)).toBeCloseTo(0.95, 4);
-  });
-  it('scales linearly between caps', () => {
-    expect(formMultiplier(10)).toBeCloseTo(1.02, 4);
   });
 });
 

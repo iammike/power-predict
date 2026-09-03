@@ -83,21 +83,6 @@ export function computeLoadSeries(activities, ftpW, opts = {}) {
   };
 }
 
-// Map TSB to a tiny multiplier on the prediction. Conservative
-// envelope so this is a nudge, not a rewrite of the model:
-//   TSB ≥ +25  →  +5%   (peaking, capped)
-//   TSB ≈ 0    →   0%
-//   TSB ≤ -25  →  -5%   (deeply fatigued, capped)
-// Linear in between. Returns 1 (no adjustment) when TSB isn't
-// computable.
-export function formMultiplier(tsb, opts = {}) {
-  if (!Number.isFinite(tsb)) return 1;
-  const cap = opts.capPct ?? 0.05;
-  const tsbAtCap = opts.tsbAtCap ?? 25;
-  const adj = Math.max(-cap, Math.min(cap, (tsb / tsbAtCap) * cap));
-  return 1 + adj;
-}
-
 // Categorize the TSB value for UI labelling. Returns one of
 // 'fresh' | 'stable' | 'building' | 'overloaded'.
 export function tsbBand(tsb) {

@@ -1441,7 +1441,6 @@ function renderManualMode(fit, inputs = {}) {
   // previously-excluded ride would have nothing to restore from after
   // a manual-mode round trip.
   const priorActivities = currentActivitiesRaw;
-  const priorSettings = currentSettings;
   currentFit = fit;
   currentEftpNow = null;
   currentLoad = { ctl: 0, atl: 0, tsb: 0, hasFtp: false };
@@ -1530,8 +1529,12 @@ function renderManualMode(fit, inputs = {}) {
   // visible across manual state, so users have natural access to drop
   // an archive or hit Connect / Sync without leaving the page.
   if (hasPriorData) {
-    document.getElementById('manual-back').addEventListener('click', () => {
-      currentSettings = priorSettings;
+    document.getElementById('manual-back').addEventListener('click', async () => {
+      // Re-read rather than restore a snapshot: the feeling selector
+      // (and a sync run from manual mode) can persist settings changes
+      // while manual mode is up, and a stale snapshot would revert them
+      // — then the next whole-object saveSettings would make it stick.
+      currentSettings = (await loadSettings()) || {};
       renderCurves(priorActivities, { fromCache: true });
     });
   }
@@ -1688,14 +1691,18 @@ function wirePredictForm() {
   if (!form) return;
 
   const feelingSelect = document.getElementById('predict-feeling');
-  feelingSelect?.addEventListener('change', async () => {
+  feelingSelect?.addEventListener('change', () => {
     currentSettings = { ...currentSettings, feelingPreset: feelingSelect.value };
-    await saveSettings(currentSettings);
-    // Refresh an already-shown prediction against the new feeling.
+    // Refresh an already-shown prediction first — the visible update
+    // shouldn't wait on (or be skipped by) the IDB write. Skip it when
+    // the duration field has since been cleared, or the synthetic
+    // submit would replace a good result with a parse error.
     const out = document.getElementById('predict-output');
-    if (out && !out.hidden) {
+    const input = document.getElementById('predict-input');
+    if (out && !out.hidden && input?.value.trim()) {
       form.dispatchEvent(new Event('submit', { cancelable: true }));
     }
+    saveSettings(currentSettings).catch((err) => console.error('feeling save failed', err));
   });
 
   form.addEventListener('submit', (e) => {
@@ -1733,7 +1740,7 @@ function wirePredictForm() {
       : '';
     const feelingLine = preset.adjPct === 0
       ? ''
-      : `<p class="predict-output__band">${preset.label} · ${preset.adjPct > 0 ? '+' : ''}${preset.adjPct}% → ${Math.round(raw.powerW * mult)} W</p>`;
+      : `<p class="predict-output__band" title="Your read on today's form versus your last-90-day bests, applied to the fresh estimate.">${preset.label} · ${preset.adjPct > 0 ? '+' : ''}${preset.adjPct}% → ${Math.round(raw.powerW * mult)} W</p>`;
     out.hidden = false;
     out.innerHTML = `
       <p class="predict-output__label">Predicted for ${formatDuration(seconds)}</p>

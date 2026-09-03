@@ -1527,13 +1527,18 @@ body[data-app-state="manual"] #manual-mode {
 .predict-form select {
   font-family: var(--mono);
   font-size: 1rem;
-  background: transparent;
+  background: transparent
+    /* caret in --muted (#6b6052) — keeps the look consistent across
+       Chrome/Safari/Firefox instead of each browser's native widget */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%236b6052' stroke-width='1.5' d='M1 1l4 4 4-4'/%3E%3C/svg%3E")
+    no-repeat right 0.1rem center;
   color: var(--ink);
   border: none;
   border-bottom: 1px solid var(--ink);
-  padding: 0.5rem 0;
+  padding: 0.5rem 1.1rem 0.5rem 0;
   outline: none;
   cursor: pointer;
+  appearance: none;
   transition: border-color 160ms ease;
 }
 .predict-form select:focus { border-bottom-color: var(--oxblood); }

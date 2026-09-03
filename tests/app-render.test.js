@@ -628,11 +628,13 @@ describe('clearOverrideSettings', () => {
   it('preserves the Strava session and other unrelated fields', () => {
     const settings = {
       cpOverrideW: 250, stravaSession: { token: 'x' }, lastSyncNewIds: ['1'], minIF: 0.7,
+      feelingPreset: 'detrained',
     };
     const next = clearOverrideSettings(settings);
     expect(next.stravaSession).toEqual({ token: 'x' });
     expect(next.lastSyncNewIds).toEqual(['1']);
     expect(next.minIF).toBe(0.7);
+    expect(next.feelingPreset).toBe('detrained');
   });
 
   it('does not mutate the input settings object', () => {

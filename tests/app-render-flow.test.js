@@ -205,7 +205,10 @@ describe('manual mode (renderManualMode)', () => {
     expect(backBtn).toBeTruthy();
 
     backBtn.click();
-    expect(document.body.dataset.appState).toBe('data');
+    // The back handler re-reads settings from storage before re-rendering.
+    await vi.waitFor(() => {
+      if (document.body.dataset.appState !== 'data') throw new Error('not back yet');
+    });
     expect(document.querySelector('.mmp-table')).toBeTruthy();
   });
 
@@ -245,11 +248,73 @@ describe('manual mode (renderManualMode)', () => {
     expect(document.body.dataset.appState).toBe('manual');
 
     document.getElementById('manual-back').click();
-    expect(document.body.dataset.appState).toBe('data');
+    await vi.waitFor(() => {
+      if (document.body.dataset.appState !== 'data') throw new Error('not back yet');
+    });
     // Snapshotting the filtered view instead of the raw one would bring
     // back a 2-ride set with nothing to restore from -- the panel would
     // render empty or disappear entirely.
     expect(document.querySelectorAll('.exclusions-panel [data-restore-start]')).toHaveLength(1);
+  });
+
+  it('exposes a working Feeling selector in manual mode (no adjustment lever existed there before)', async () => {
+    await mountApp();
+    document.getElementById('manual-unit').value = 'ftp';
+    document.getElementById('manual-threshold').value = '280';
+    submit(document.getElementById('manual-form'));
+
+    const select = document.getElementById('predict-feeling');
+    expect(select).toBeTruthy();
+    expect(select.value).toBe('normal');
+
+    document.getElementById('predict-input').value = '40m';
+    submit(document.getElementById('predict-form'));
+    const out = document.getElementById('predict-output');
+    const headline = out.querySelector('.predict-output__value').textContent;
+
+    select.value = 'detrained';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => {
+      if (!out.textContent.includes('→')) throw new Error('adjusted line not shown yet');
+    });
+    // Headline is untouched; the -10% adjustment is the secondary line.
+    expect(out.querySelector('.predict-output__value').textContent).toBe(headline);
+    expect(out.textContent).toContain('Properly detrained · -10% →');
+  });
+
+  it('keeps a feeling picked in manual mode after "Back to my data", and a later settings write does not clobber it', async () => {
+    await resetIndexedDb();
+    await saveActivities(makeRides(3));
+    await mountApp({ resetDb: false });
+
+    document.getElementById('manual-unit').value = 'ftp';
+    document.getElementById('manual-threshold').value = '280';
+    submit(document.getElementById('manual-form'));
+
+    const select = document.getElementById('predict-feeling');
+    select.value = 'detrained';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(async () => {
+      if ((await loadSettings()).feelingPreset !== 'detrained') throw new Error('not persisted yet');
+    });
+
+    document.getElementById('manual-back').click();
+    await vi.waitFor(() => {
+      if (!document.querySelector('.mmp-table')) throw new Error('not back to data yet');
+    });
+    // The restored data-mode form reflects the choice made in manual mode
+    // -- not a stale pre-manual snapshot.
+    expect(document.getElementById('predict-feeling').value).toBe('detrained');
+
+    // A later whole-object saveSettings (here via an exclusion) must not
+    // drop the feeling the snapshot-restore path used to strand.
+    document.querySelector('[data-exclude-start]').click();
+    await vi.waitFor(() => {
+      if (!document.querySelector('.exclusions-panel [data-restore-start]')) {
+        throw new Error('exclusion not applied yet');
+      }
+    });
+    expect((await loadSettings()).feelingPreset).toBe('detrained');
   });
 });
 

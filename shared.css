@@ -1521,6 +1521,23 @@ body[data-app-state="manual"] #manual-mode {
 .predict-form input::placeholder { color: var(--muted); opacity: 0.7; }
 .predict-form input:focus { border-bottom-color: var(--oxblood); }
 
+/* The feeling selector (#248) — a self-assessed adjustment vs 90-day
+   bests. Narrower than the duration field; matches the bottom-rule look. */
+.predict-form__field--feeling { flex: 0 1 14rem; }
+.predict-form select {
+  font-family: var(--mono);
+  font-size: 1rem;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.5rem 0;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+.predict-form select:focus { border-bottom-color: var(--oxblood); }
+
 .predict-form button {
   font-family: var(--sans);
   font-size: 0.78rem;

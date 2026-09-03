@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mountApp, resetIndexedDb } from './helpers/mountApp.js';
 import { makeRide, makeRides } from './helpers/fixtures.js';
-import { saveActivities } from '../src/storage.js';
+import { saveActivities, saveSettings, loadSettings } from '../src/storage.js';
 
 // Real uPlot needs a canvas rendering context jsdom doesn't provide.
 // These tests are about DOM wiring, not the chart's visual output, so
@@ -117,6 +117,45 @@ describe('predict form (wirePredictForm/renderPredictBlock)', () => {
     const out = document.getElementById('predict-output');
     expect(out.hidden).toBe(false);
     expect(out.textContent).toContain("Couldn't parse that");
+  });
+
+  it('defaults the feeling selector to Normal and shows no adjustment line', () => {
+    expect(document.getElementById('predict-feeling').value).toBe('normal');
+
+    document.getElementById('predict-input').value = '20m';
+    submit(document.getElementById('predict-form'));
+
+    const out = document.getElementById('predict-output');
+    expect(out.textContent).toMatch(/\b290W\b/);
+    expect(out.textContent).not.toMatch(/→/); // no "label · -x% → y W" line
+  });
+
+  it('re-predicts with a secondary adjusted line when the feeling changes, and persists it', async () => {
+    document.getElementById('predict-input').value = '20m';
+    submit(document.getElementById('predict-form'));
+
+    const select = document.getElementById('predict-feeling');
+    select.value = 'off'; // "A touch out of shape", -6%
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const out = document.getElementById('predict-output');
+    await vi.waitFor(() => {
+      if (!out.textContent.includes('→')) throw new Error('adjusted line not shown yet');
+    });
+    // Headline stays the form-free number; the adjustment is a subtext line.
+    expect(out.textContent).toMatch(/\b290W\b/);
+    expect(out.textContent).toContain('A touch out of shape · -6% → 273 W');
+
+    await vi.waitFor(async () => {
+      if ((await loadSettings()).feelingPreset !== 'off') throw new Error('not persisted yet');
+    });
+  });
+
+  it('reflects a persisted feeling on the next mount', async () => {
+    await saveSettings({ ...(await loadSettings()), feelingPreset: 'detrained' });
+    await mountApp({ resetDb: false });
+
+    expect(document.getElementById('predict-feeling').value).toBe('detrained');
   });
 });
 

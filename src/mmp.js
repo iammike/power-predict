@@ -32,15 +32,18 @@ export const MMP_VERSION = 2;
 // goal is to catch glitches, not to clip real efforts. Each pair is
 // checked independently — fixing one row can leave another flagged,
 // so we iterate until no further changes (in practice 1-2 passes).
+//
+// Only 1-3s are checked, against 5s. The ratios are applied per ride,
+// and a ride's best longer-duration value often isn't a maximal effort:
+// an isolated sprint or one hard minute in a steady ride (586W 1m vs
+// 305W 5m, or 12s at 1000W vs a 520W 30s) is real, not a glitch. A 5s
+// window sits inside a short spike or flatline, so the 1-3s/5s checks
+// still catch those; a glitch sustained long enough to inflate 5s+ is
+// rare enough to leave to manual exclusion (#132).
 const ANOMALY_CHECKS = [
   [1, 5, 1.6],
   [2, 5, 1.5],
   [3, 5, 1.4],
-  [5, 30, 1.8],
-  [10, 30, 1.6],
-  [15, 60, 1.7],
-  [30, 300, 2.0],
-  [60, 300, 1.7],
 ];
 
 export function dropAnomalies(mmp) {

@@ -77,6 +77,33 @@ describe('dropAnomalies', () => {
     expect(out[1200]).toBe(220);
   });
 
+  it('keeps a real 1-min effort when the ride had no hard 5 min', () => {
+    // One hard minute in an otherwise steady ride: 586W 1m vs 305W 5m
+    // (ratio 1.92) is a genuine effort, not a power-meter glitch.
+    const mmp = { 1: 700, 5: 660, 30: 610, 60: 586, 300: 305 };
+    expect(dropAnomalies(mmp)).toEqual(mmp);
+  });
+
+  it('keeps a 1-min effort extracted from a steady ride stream', () => {
+    const stream = Array(3600).fill(200);
+    for (let i = 1800; i < 1860; i++) stream[i] = 586;
+    const out = dropAnomalies(extractMmp(stream));
+    expect(out[60]).toBeCloseTo(586, 5);
+    expect(out[30]).toBeCloseTo(586, 5);
+    expect(out[15]).toBeCloseTo(586, 5);
+  });
+
+  it('keeps 5-15s values from an isolated sprint in a steady ride', () => {
+    // 12s at 1000W in a 200W ride: 30s is only 520W (10s/30s = 1.92),
+    // but every short value is a genuine effort.
+    const stream = Array(3600).fill(200);
+    for (let i = 1800; i < 1812; i++) stream[i] = 1000;
+    const out = dropAnomalies(extractMmp(stream));
+    expect(out[5]).toBeCloseTo(1000, 5);
+    expect(out[10]).toBeCloseTo(1000, 5);
+    expect(out[15]).toBeCloseTo(840, 5);
+  });
+
   it('handles missing pairs gracefully', () => {
     expect(dropAnomalies({})).toEqual({});
     expect(dropAnomalies({ 60: 250 })).toEqual({ 60: 250 });

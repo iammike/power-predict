@@ -58,6 +58,8 @@
 
     <p>Before merging each activity's MMP into the rolling-best, Power Predict checks adjacent-duration ratios against caps tuned to the upper edge of trained-cyclist data. Any short-duration value that breaches its cap relative to a longer reference is dropped from <em>that activity only</em> &mdash; the rest of the activity (longer durations, average power, etc.) still feeds the curve. Other rides' best efforts at the dropped duration carry the table.</p>
 
+    <p>Only the 1&ndash;3 second values are checked, each against the same ride's 5-second value: a short spike or flatline sits inside that 5-second window, so the ratio gives it away. Longer durations aren't checked, because a single ride's best 30 seconds or 5 minutes often isn't a maximal effort &mdash; an isolated sprint or one hard minute in a steady ride is real, not a glitch. If a longer glitch does slip through, exclude that ride from the table.</p>
+
     <h3>Effort-quality filter</h3>
 
     <p>Recency weighting on its own can underread your fitness when recent rides have been low intensity &mdash; a 30-day base block of zone-2 spinning gets weighted heavily even though those rides don't reflect what you can do at threshold.</p>
